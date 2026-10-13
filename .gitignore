@@ -1,1 +1,6 @@
 opencode.json
+
+# Skills instaladas (npx skills add)
+.agents/skills/
+skills-lock.json
+
