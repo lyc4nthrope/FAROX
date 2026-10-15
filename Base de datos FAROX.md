@@ -149,7 +149,7 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `phone` | text | FAROX — requisito p.7 |
 | `location` | **geography(Point,4326) NOT NULL** | NØSEE — PostGIS (decidido); único punto de verdad geográfico (D12) |
 | `website_url` | text | NØSEE |
-| `created_by` | uuid FK → `users` RESTRICT | NØSEE (patrón de actor) |
+| `created_by` | uuid FK → `users` RESTRICT DEFAULT auth.uid() | mod — NØSEE (patrón de actor); el DEFAULT evita suplantación de actor al crear tienda vía PostgREST |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
 | `created_at` / `updated_at` | timestamptz | mod — `updated_at` añadido |
 
@@ -166,7 +166,7 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `id` | bigint identity PK | NØSEE |
 | `product_id` | bigint NOT NULL FK RESTRICT | NØSEE |
 | `store_id` | bigint NOT NULL FK RESTRICT | mod — era `uuid`; tipo sigue a `stores.id` (D1). RESTRICT en vez del `CASCADE` de NØSEE: con soft-delete no debe perderse historial de precios (D14) |
-| `user_id` | uuid NOT NULL FK → `users` RESTRICT | NØSEE — quién publicó |
+| `created_by` | uuid NOT NULL FK → `users` RESTRICT | **mod** — era `user_id`; D4: actor = `created_by`. Escrito solo por `set_price()` |
 | `price` | numeric(12,2) NOT NULL **CHECK (> 0)** | mod — precisión fija; **0 prohibido** (¿gratis o error de captura?) (D27) |
 | `currency` | char(3) NOT NULL DEFAULT `'COP'` | FAROX — divisa explícita (D26) |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
@@ -192,7 +192,7 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `email` | text **UNIQUE** | FAROX — copia de `auth.users.email` sincronizada por trigger (PostgREST no puede leer `auth.users` con el JWT del cliente); UNIQUE por si se redacta a mano |
 | `phone_number` | text | NØSEE |
 | `contact_preference` | contact_preference NOT NULL DEFAULT `whatsapp` | FAROX — requisito .md |
-| `distributor_id` | bigint NULL FK → `distributors` ON DELETE SET NULL | FAROX — **sin esto el rol distribuidor no existe**: RLS "solo los suyos" necesita `mi_id`. **1 usuario ↔ 1 distribuidor** (D29); un trigger **limpia esta columna** al cambiar `role_id` a un rol que no sea `distribuidor` (evita scope RLS huérfano) |
+| `distributor_id` | bigint NULL FK → `distributors` ON DELETE SET NULL | FAROX — **sin esto el rol distribuidor no existe**: RLS "solo los suyos" necesita `mi_id`. **1 usuario ↔ 1 distribuidor** (D29); el trigger `sanitize_distributor_scope()` exige el par (rol `distribuidor` ⇒ `distributor_id NOT NULL`; otro rol ⇒ `NULL`) — evita scope RLS huérfano o incompleto (M11) |
 | `premium` | boolean NOT NULL DEFAULT false | FAROX — fuente única de verdad en tabla (D7); `is_premium()` la lee. "Admin siempre premium" se resuelve en `is_premium()` (`premium OR rol = admin`), no con constraint |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
 | `created_at` / `updated_at` | timestamptz | NØSEE |
@@ -218,9 +218,11 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 | `expected_at` | timestamptz NULL | FAROX — **fecha prometida/SLA**: sin ella la alerta `order_late` es inexpressible (crítica B1) |
 | `delivered_at` | timestamptz NULL | FAROX — momento de entrega (reportes y créditos) |
 | `notes` | text | FAROX (opcional) |
+| `cancelled_at` | timestamptz NULL | FAROX — instante de cancelación (A7) |
+| `cancelled_reason` | text NULL | FAROX — motivo obligatorio al cancelar (lo exige `update_order_status`) |
 | `created_at` / `updated_at` | timestamptz | NØSEE |
 
-**CHECKs de consistencia**: `CHECK (status <> 'delivered' OR delivered_at IS NOT NULL)` y `CHECK (delivered_at IS NULL OR status = 'delivered')` — un pedido no puede estar "entregado sin fecha" ni "con fecha sin entregarse".
+**CHECKs de consistencia**: `CHECK (status <> 'delivered' OR delivered_at IS NOT NULL)` y `CHECK (delivered_at IS NULL OR status = 'delivered')` — un pedido no puede estar "entregado sin fecha" ni "con fecha sin entregarse". `CHECK (status <> 'cancelled' OR cancelled_at IS NOT NULL)` — cancelado implica fecha de cancelación.
 
 **Elimina de NØSEE**: `delivery_address`, `delivery_location`, `total_*` (4), `savings_percentage`, `stores`/`items`/`checked_items` jsonb, `delivery_fee`, `service_fee`, `strategy`, `payment_*`, `abandoned_*`, `delivery_pin`+`pin_verified_at`, `compromiso_*`, `llegando_at`, `local_id`, `dealer_*`, `is_priority`, `dealer_cancel_*`, `delivery_mode`, `delivery_coords`, `delivery_name/phone/apartment/instructions` — ~35 columnas de flujo de delivery que no aplican.
 
@@ -244,7 +246,7 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 **Índices**: PK · `UNIQUE (order_id, product_id)` — una línea por producto por pedido (evita duplicados por doble submit) · el índice del unique **cubre** la FK `order_id`; `btree (product_id)` para joins inversos.
 **Nota**: NØSEE deja `order_items` **sin índices FK** — no copiar ese descuido.
 
-**Consulta DIST-02** ("asignado a distribuidor, no movilizado") — sin tabla extra: `order_items JOIN orders WHERE distributor_id = X AND status IN ('pending') AND NOT EXISTS (movements WHERE order_id = orders.id)`. Una sola fuente de verdad del "recibido": `order_items.status/received_quantity` (escritura); `movements` con `order_id` es el **efecto en stock** de esa misma operación atómica (§4 `confirm_delivery`), no una segunda opinión divergente.
+**Consulta DIST-02** ("asignado a distribuidor, no movilizado") — sin tabla extra: `order_items JOIN orders WHERE orders.distributor_id = X AND orders.status = 'pending' AND order_items.status IN ('pending') AND NOT EXISTS (movements WHERE order_id = orders.id)` (calificado: hay `status` en ambas tablas — NIT corregido). Una sola fuente de verdad del "recibido": `order_items.status/received_quantity` (escritura); `movements` con `order_id` es el **efecto en stock** de esa misma operación atómica (§4 `confirm_delivery` — que **suma** entrada a la tienda destino), no una segunda opinión divergente.
 
 ---
 
@@ -315,7 +317,7 @@ ALTER TABLE stock SET (fillfactor = 85, autovacuum_vacuum_scale_factor = 0.02, a
 | `created_at` | timestamptz NOT NULL DEFAULT now() | |
 
 - **Append-only**: ni `updated_at` ni UPDATEs (REVOKE completo).
-- **Índices (reducidos de 7 a 5)**:
+- **Índices (reducidos de 7 a 6, de los cuales 3 parciales + 1 BRIN)**:
   - PK
   - `btree (store_id, created_at DESC)` — historial por tienda
   - `btree (product_id, created_at DESC)` — historial por producto
@@ -372,7 +374,9 @@ ALTER TABLE stock SET (fillfactor = 85, autovacuum_vacuum_scale_factor = 0.02, a
 | `created_at` / `updated_at` | timestamptz | |
 
 - "Deudores con saldo > por mis distribuidores": `credits JOIN orders USING (order_id)` — join directo por el unique, **sin columna duplicada**.
-- Índices: PK · UNIQUE parcial del pedido · `btree (store_id)` · `btree (status) WHERE status <> 'paid'` (cartera abierta).
+- Índices: PK · UNIQUE parcial del pedido · `btree (store_id)` · `btree (status) WHERE status IN ('pending')` (cartera abierta real; `WHERE status <> 'paid'` incluía `cancelled` — A/M5).
+- **Cancelación (regla fija)**: `cancel_credit()` solo admin; exige `cancelled_at`/`cancelled_reason`; si `balance < total_amount` (ya hay cobros) **primero** exige revertir los pagos (`register_payment_reverse`) — un crédito con pagos no se anula con saldo.
+- `CHECK (status <> 'paid' OR settled_at IS NOT NULL)` — `paid` exige fecha de saldado.
 - `ALTER TABLE credits SET (fillfactor = 90, autovacuum_vacuum_scale_factor = 0.05);`
 
 ### 3.8 `credit_payments`
@@ -398,7 +402,7 @@ Append-only · **Índices**: PK · `btree (credit_id)`.
 | `store_id` | bigint NULL FK RESTRICT | |
 | `product_id` | bigint NULL FK RESTRICT | |
 | `order_id` | bigint NULL FK RESTRICT | |
-| `distributor_id` | bigint NULL FK RESTRICT | **Añadido** — el distribuidor solo ve "sus" alertas sin join (crítica B7) |
+| `distributor_id` | bigint NULL FK RESTRICT | Dueño para RLS: **solo `order_late` y `credit_overdue`** lo derivan del pedido/crédito. `stock_low`/`expiry_soon` son **de tienda** y lo dejan NULL (no existe relación tienda↔distribuidor en el esquema) — política explícita en §8: el distribuidor **no** esas alertas; las ven admin y el operador de la tienda (A4) |
 | `message` | text NOT NULL | **Añadido** — texto listo para UI ("Coca-Cola en Tienda Norte: 3 < umbral 10"); la UI no debe reconstruir datos que ya cambiaron |
 | `context` | jsonb | **Añadido** — snapshot al disparar: `{quantity, threshold, dias_restantes, monto}` |
 | `read_at` | timestamptz NULL | Reemplaza a `is_read` (un solo campo, se consulta `read_at IS NULL`) |
@@ -407,10 +411,11 @@ Append-only · **Índices**: PK · `btree (credit_id)`.
 
 - **Regla de cálculo explícita** (antes era vaga):
   - `stock_low`: en `assign_product_to_store`/`register_*` si `quantity = 0 OR (threshold IS NOT NULL AND quantity <= threshold)`; se **resuelve** (`resolved_at = now()`) cuando `quantity > threshold` (o `> 0` si no hay umbral).
-  - `expiry_soon`: job diario (§7) sobre `stock.expiry_date <= CURRENT_DATE + 15` (horizonte = constante del job) AND `quantity > 0`.
-  - `order_late`: job diario sobre `orders.expected_at < now() AND delivered_at IS NULL AND status NOT IN ('delivered','cancelled')`.
-  - `credit_overdue`: job diario sobre `credits.due_date < CURRENT_DATE AND balance > 0`.
-- **Anti-duplicados por episodio** (corregido): `UNIQUE (type, coalesce(store_id,0), coalesce(product_id,0), coalesce(order_id,0)) WHERE resolved_at IS NULL` — con el dedup viejo (`WHERE NOT is_read`), marcar como leída y seguir por debajo del umbral re-alertaba **en cada movimiento** (spam + realtime + egress). Ahora: 1 alerta abierta por episodio; se re-abre solo cuando la condición se normaliza y vuelve a cruzarse.
+  - `expiry_soon`: job diario (§7) sobre `stock.expiry_date <= CURRENT_DATE + 15` (horizonte = constante del job) AND `quantity > 0`; se **resuelve** cuando la fila sale del horizonte (`expiry_date > CURRENT_DATE + 15` o `quantity = 0`) — el job también **cierra** episodios caducos, no solo los abre (A6).
+  - `order_late`: job diario sobre `orders.expected_at < now() AND delivered_at IS NULL AND status NOT IN ('delivered','cancelled')`; se **resuelve** en `confirm_delivery` (al poner `delivered_at`) y en la cancelación (A6).
+  - `credit_overdue`: job diario sobre `credits.due_date < CURRENT_DATE AND balance > 0`; se **resuelve** en `register_payment`/`register_payment_reverse` cuando `balance = 0`, y al cancelar el crédito (A6).
+  - Sin este cierre, el dedup `WHERE resolved_at IS NULL` impediría re-alertar **para siempre** tras la primera vez (A6).
+- **Anti-duplicados por episodio** (corregido): índice **nombrado** `uq_alert_open` = `UNIQUE (type, coalesce(store_id,0), coalesce(product_id,0), coalesce(order_id,0)) WHERE resolved_at IS NULL` — con el dedup viejo (`WHERE NOT is_read`), marcar como leída y seguir por debajo del umbral re-alertaba **en cada movimiento** (spam + realtime + egress). Ahora: 1 alerta abierta por episodio; se re-abre solo cuando la condición se normaliza y vuelve a cruzarse. **El `ON CONFLICT` debe referenciar `ON CONFLICT (type, coalesce(...), ...) WHERE resolved_at IS NULL` carácter a carácter igual que la definición del índice** (si no, Postgres no matchea el índice y lanza error en caliente) (nit).
 - Todo INSERT de alertas usa **`ON CONFLICT ... DO NOTHING` con el target completo** (expresiones COALESCE incluidas) — nunca `EXCEPTION` (subtransacción en el camino caliente) ni SELECT previo (carrera).
 - **Índices**: PK · el único parcial cubre "alertas sin resolver" (el listado principal) · `btree (distributor_id)`.
 
@@ -459,6 +464,7 @@ Sin esto, "Dashboard: operador ✔ su alcance" y el RLS por tienda no tienen sob
 | `updated_at` | timestamptz | |
 
 - `UNIQUE (day, distributor_id)`.
+- **Alcance por rol (A3 — decisión MVP)**: el grano es por **distribuidor** y no existe relación tienda↔distribuidor, por lo que "su alcance" del operador (tiendas) **no es servible** sin re-agregar `movements`. Decisión MVP: **el operador ve el agregado global** (desviación consciente de la matriz SEC-01, anotada en §8 y en la matriz); el distribuidor solo su `distributor_id`. Si el alcance por tienda se vuelve requisito, se añade columna `store_id` al agregado y upsert por tienda (migración aditiva).
 - **`INSERT … ON CONFLICT DO UPDATE`** dentro de `register_entry/register_exit` — 1 upsert barato por movimiento en vez de **re-agregar todo el historial en cada poll** (crítica A2: la vista original leía ~150 MB lógicos por refresco a 1M movements y crecía sin límite de filas).
 - Lectura vía **`get_dashboard(p_from, p_to)`** (§4): RPC `SECURITY DEFINER` con rango por defecto **30 días** y filtro por rol — además resolvía que la vista **evadía RLS** (ejecutaba como owner y el distribuidor veía el agregado de todos).
 - Realtime: la tabla se publica (§5) — el front recibe la fila `(day, distributor_id)` actualizada, payload minúsculo.
@@ -475,12 +481,12 @@ Sin esto, "Dashboard: operador ✔ su alcance" y el RLS por tienda no tienen sob
 | `diff` | jsonb NOT NULL DEFAULT `{}` | **Solo columnas cambiadas**, no snapshots completos (D10) |
 | `created_at` | timestamptz | |
 
-**Alcance CORREGIDO** (crítica A1 — el alcance original duplicaba el ledger): trigger `audit_diff()` **solo en** `users` (rol/premium/baja), `price_publications` (cambios de precio), `orders` (cambios de `status`), `credits`, `credit_payments`, `distributors`.
+**Alcance CORREGIDO** (crítica A1 — el alcance original duplicaba el ledger): trigger `audit_diff()` **solo en** `users` (rol/premium/baja), `price_publications` (cambios de precio), `orders` (cambios de `status`), `credits`, `credit_payments`, `distributors`, **+ `products` y `stores`** (CRUD y baja lógica — su mutación es tan sensible como la de usuarios; asimetría corregida, M8).
 **NO** en `movements` (el movimiento **ya es** el asiento forense — auditar su INSERT duplicaba la fuente de verdad) ni en `chat_*` (1 fila por mensaje = el volumen más alto de la BD).
-Estimado corregido: ~50 MB en vez de ~500 MB a 1M movements.
+**Nota**: los **SELECT** (incluidos los tools del chatbot) **no** se auditan con triggers DML — si se requiere trazabilidad de lecturas del chatbot, es un mecanismo aparte (pendiente §9; el .md principal afirma "cada consulta queda en audit_log", M8).
+Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 
 **Índices**: PK · `btree (table_name, row_id)` · **`BRIN (created_at)`**. **Eliminado** `btree (created_by)` — 27 valores distintos, selectividad basura, ~50 MB perdidos; para "qué hizo el usuario X" existe el BRIN por fecha + `table_name` (crítica A1).
-
 ---
 
 ## 4. Funciones RPC (el conjunto completo que hace implementable la matriz SEC-01)
@@ -489,43 +495,69 @@ Estimado corregido: ~50 MB en vez de ~500 MB a 1M movements.
 
 | Función | Rol permitido | Qué hace |
 |---|---|---|
-| `my_role()` | auth | `SECURITY DEFINER STABLE` → nombre del rol del JWT (helper de todas las validaciones) |
-| `is_premium()` | auth | `SECURITY DEFINER STABLE` → **`premium OR my_role() = 'admin'`** (satisface "admin siempre premium" sin constraint) (D7) |
+| `my_role()` | auth | `SECURITY DEFINER STABLE SET search_path` → nombre del rol del JWT (helper de todas las validaciones) |
+| `is_premium()` | auth | `SECURITY DEFINER STABLE SET search_path` → **`premium OR my_role() = 'admin'`** leído de `users` (nunca del JWT) (D7) |
 | `my_store_ids()` | auth | ids de `user_stores` del usuario (RLS del operador evaluado 1 vez) |
 | `my_distributor_id()` | auth | `users.distributor_id` del usuario |
+| `handle_new_user()` | trigger (C2) | `AFTER INSERT ON auth.users` → inserta la fila `public.users`: `role_id` = **`operador`** por defecto (rol neutro de ejecución; admin luego reasigna con `update_user_role`), `full_name` desde metadata o email, `email` copiado. **Sin esto el primer login no tiene fila y todo el sistema de permisos cae** |
+| `update_user_role(p_user, p_role, p_distributor)` | **solo admin** (C2/M11) | Cambia rol: si el nuevo rol es `distribuidor` **exige** `p_distributor NOT NULL`; si no lo es, setea `distributor_id = NULL`. Única vía de asignar alcance de distribuidor |
+| `assign_user_stores(p_user, p_stores bigint[])` | **solo admin** (A1) | Reemplaza el alcance del operador (borra los ausentes, inserta los nuevos, 1 transacción). Única escritura de `user_stores` |
 | `assign_product_to_store(p_product, p_store, p_threshold)` | admin, operador | INV-03: crea/actualiza `stock`, evalúa `stock_low` |
 | `register_entry(...)` | admin, operador | Valida, **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
 | `register_exit(...)` | admin, operador | Igual, con validación de stock suficiente |
 | `register_reverse(p_movement_id, p_reason)` | **solo admin** | Inserta movimiento inverso con `reverso_of_id` (1 por original, tipo opuesto, mismo producto/tienda), reevalúa alertas y dashboard |
-| `set_price(p_product, p_store, p_price, p_currency)` | **solo admin** | Inserta fila nueva + desactiva la anterior (única mutación de precios permitida) |
+| `set_price(p_product, p_store, p_price, p_currency)` | **solo admin** | `SELECT ... FOR UPDATE` del activo previo (serializa concurrentes) + inserta fila nueva + desactiva la anterior — única mutación de precios permitida |
 | `create_order(...)` | admin | Crea `orders` + `order_items` (`unit_price` congelado) |
-| `update_order_status(p_order, p_status)` | admin, operador | Transiciones pendiente→en_ruta→…; cancelación con motivo |
-| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos) | `received_quantity`/`status` por línea + `delivered_at` + `register_exit` por línea + derivar `distributor_id` — todo atómico |
-| `save_route(...)` / `update_stop(...)` | admin (crear), distribuidor (paradas propias) | `mark_stop` valida que la ruta sea del distribuidor del JWT |
-| `create_credit(...)` / `cancel_credit(...)` | **solo admin** | Alta/baja con motivo (matriz) |
-| `register_payment(p_credit, p_amount, p_method)` | admin, operador | Valida `amount <= balance`, inserta pago, recalcula `balance`, pone `paid`+`settled_at` si llega a 0, audita |
-| `mark_alert_read(p_alert)` | auth + scope | Pone `read_at` (solo alertas visibles según RLS) |
-| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth | Lee `dashboard_daily` filtrando por rol (distribuidor: su id) — egress mínimo, RLS resuelta en servidor |
+| `update_order_status(p_order, p_status, p_reason)` | admin, operador (**`cancelled` solo admin**) (A7) | Transiciones `pending → in_route → …`; `delivered` solo la pone `confirm_delivery`; `cancelled` exige rol admin + `p_reason` y escribe `cancelled_at`/`cancelled_reason` (CHECK lo exige) |
+| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos), operador (tiendas de su alcance) (M6) | **`register_entry` por línea, no exit** (C3): la entrega **suma** stock a la tienda destino (`motive_id` = `reabastecimiento` por defecto); `received_quantity`/`status` por línea (`received` si = quantity, `partial` si 0 < recibido < quantity); `delivered_at` + `status = 'delivered'` en el pedido (lo exige el CHECK); deriva `distributor_id`; cierra alertas `order_late` del pedido — todo atómico |
+| `save_route(...)` / `mark_stop(...)` | admin (crear), distribuidor (paradas propias) | **Nombre único `mark_stop`** (nit: antes `update_stop`/`mark_stop`); valida en servidor que la ruta sea del distribuidor del JWT |
+| `update_route_status(p_route, p_status)` | admin; distribuidor solo `completed` de su ruta (A8) | Transiciones `planned → active → completed`/`cancelled` — `route_status` sin esto era decorativo |
+| `create_credit(...)` / `cancel_credit(...)` | **solo admin** | Alta/baja con motivo: `cancel_credit` exige `cancelled_at`/`cancelled_reason` y — si `balance < total_amount` — revertir primero los pagos (A5) |
+| `register_payment(p_credit, p_amount, p_method)` | admin, operador | Valida `amount <= balance`, inserta pago, recalcula `balance`, pone `paid`+`settled_at` si llega a 0, **cierra alertas `credit_overdue`**, audita |
+| `register_payment_reverse(p_payment, p_reason)` | **solo admin** (A5) | Inserta `credit_payments` reverso (`reverso_of_id`), recalcula `credits.balance` (suma el reverso), reabre `status` si estaba `paid` (limpia `settled_at`), cierra/reabre `credit_overdue`, audita — la única corrección de cobros (append-only intacto) |
+| `mark_alert_read(p_alert)` | auth | **`SECURITY DEFINER`** (el UPDATE directo está revocado): valida scope **dentro** de la función (admin · `store_id = ANY(my_store_ids())` · `distributor_id = my_distributor_id()`) y pone `read_at` — la RLS no aplica en DEFINER, el chequeo interno es obligatorio (A2) |
+| `get_stock(p_store bigint, p_limit int DEFAULT 50)` | auth + scope (M3) | Tool del chatbot: filtra `p_store` contra `my_store_ids()`/`my_distributor_id()` en servidor, `LIMIT` duro, columnas mínimas |
+| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth | Lee `dashboard_daily` filtrando por rol: distribuidor su id; **operador ve el agregado global en MVP** (decisión A3 en §3.13) — egress mínimo |
+| `create_chat(p_title)` / `send_message(p_conversation, p_content)` | auth, dueño (`user_id = auth.uid()`) (M3) | Chat solo por RPC: valida dueño en servidor, inserta, toca `updated_at` de la conversación |
 | `touch_updated_at()` | trigger | `BEFORE UPDATE` de todas las mutables |
-| `audit_diff()` | trigger | Solo en las tablas del alcance §3.14 |
-| `sync_email()` | trigger | `auth.users` → `users.email` (onboarding/edición) |
-| `sanitize_distributor_role()` | trigger | `BEFORE UPDATE OF role_id` en `users`: si el nuevo rol no es `distribuidor` → `distributor_id = NULL` |
+| `audit_diff()` | trigger | Solo en las tablas del alcance §3.14 (8 tablas) |
+| `prevent_price_update()` | trigger (M2) | `BEFORE UPDATE OF price` en `price_publications`: rechaza si la fila está activa — el mecanismo que §2.8 prometía pero no estaba listado |
+| `sync_email()` | trigger | `auth.users` → `users.email` (edición posterior) |
+| `sanitize_distributor_scope()` | trigger (M11) | `BEFORE INSERT OR UPDATE` en `users`: rol `distribuidor` ⇒ `distributor_id NOT NULL`; otro rol ⇒ `NULL` (red de seguridad además de `update_user_role`) |
 
 **Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función).
 
 **Atomicidad del stock (corregido — crítico)**: nunca leer-then-escribir. El UPDATE lleva el guard en el `WHERE` (lock implícito + validación en 1 sentencia):
 ```sql
+-- Salida (register_exit):
 UPDATE stock SET quantity = quantity - p_qty, updated_at = now()
 WHERE product_id = p_pid AND store_id = p_sid AND quantity >= p_qty
 RETURNING quantity;
 IF NOT FOUND THEN RAISE EXCEPTION 'stock insuficiente o fila inexistente'; END IF;
--- En batches (confirm_delivery): ordenar filas por (product_id, store_id) para adquirir locks en mismo orden (anti-deadlock).
+
+-- Entrada (register_entry / confirm_delivery): SIN guard de suficiencia — la entrega suma
+UPDATE stock SET quantity = quantity + p_qty, expiry_date = LEAST(...), updated_at = now()
+WHERE product_id = p_pid AND store_id = p_sid;
+-- confirm_delivery ordena las filas por (product_id, store_id) para adquirir locks en mismo orden (anti-deadlock).
 -- Prohibido EXCEPTION WHEN unique_violation como control de flujo → usar ON CONFLICT.
 ```
 
-**REVOKE/GRANT**: `REVOKE INSERT, UPDATE, DELETE ON stock, movements, order_items, orders, credits, credit_payments, price_publications, alerts FROM authenticated;` + `GRANT EXECUTE` solo a las funciones de esta tabla. Lecturas vía RLS normal. `REVOKE EXECUTE ... FROM anon` en helpers y RPC (el chatbot/n8n siempre viaja con JWT de usuario, nunca anon sin sesión).
+**REVOKE/GRANT (A1 — ampliado; antes faltaban 6 tablas)**:
+```sql
+-- Todas las tablas mutables por RPC/trigger (nunca directo desde el cliente):
+REVOKE INSERT, UPDATE, DELETE ON
+  stock, movements, order_items, orders, credits, credit_payments,
+  price_publications, alerts, routes, route_stops, user_stores,
+  dashboard_daily, audit_log, chat_conversations, chat_messages
+FROM authenticated;
+-- Lecturas selectivas por RLS: en user_stores/audit_log/dashboard_daily/chat_* también se revoca SELECT
+-- (solo RPC las leen: my_store_ids, get_dashboard, etc.) — el resto lee vía RLS.
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n siempre viaja con JWT de usuario
+```
+`user_stores` **solo** se escribe con `assign_user_stores(p_user, p_stores)` (solo admin) — sin esto un operador podría auto-insertarse filas y **escalar su propio alcance RLS** (A1). `dashboard_daily` solo se escribe en el upsert interno de `register_*` y se lee con `get_dashboard` — un cliente no puede falsificar cifras.
 
-**Search path (obligatorio)**: toda función `SECURITY DEFINER` se crea con `SET search_path = public` — sin esto un objeto temporal/`public` malicioso puede redirigir la ejecución (hijack clásico de PostgREST).
+**Search path (obligatorio)**: toda función `SECURITY DEFINER` se crea con `SET search_path = pg_catalog, public` — sin esto un objeto temporal/`public` malicioso puede redirigir la ejecución (hijack clásico de PostgREST).
 
 ---
 
@@ -534,7 +566,7 @@ IF NOT FOUND THEN RAISE EXCEPTION 'stock insuficiente o fila inexistente'; END I
 **Espacio (storage)**
 - `bigint` en IDs internos; enums de 4B; BRIN en append-only (KB vs MB de btree).
 - `audit_log` con alcance acotado + `diff` JSONB: ~50 MB a 1M movements en vez de ~500 MB.
-- `movements`: 5 índices (2 parciales) en vez de 7 → ~60 MB menos y ~7% menos CPU por INSERT.
+- `movements`: 6 índices secundarios (3 parciales + BRIN) en vez de 7 → ~55 MB menos y ~7% menos CPU por INSERT (recuento corregido: M4).
 - `updated_at` solo donde hay UPDATEs; nada de `hidden_*`/votos de NØSEE (~15 columnas muertas no viajan).
 - **Sin partición** (D23): 1M movements ≈ 180 MB no justifican la deuda; `audit_log`/`chat_messages` pueden `ATTACH` luego (sin FKs entrantes).
 - `fillfactor`/`autovacuum` en las tablas con UPDATEs frecuentes: `stock` (85 / 0.02 / 0.01), `credits` (90 / 0.05), `alerts` (90) — `stock` recibe 1 UPDATE por movimiento del sistema.
@@ -592,7 +624,7 @@ IF NOT FOUND THEN RAISE EXCEPTION 'stock insuficiente o fila inexistente'; END I
 | D18 | BRIN en append-only | Orden temporal intrínseco ⇒ compresión de rangos; btree ×1000 más grande |
 | D19 | Semilla **mínima + `motives`** + prerrequisito de admin | `motives` faltaba (rompía INV-04); ningún seed con `created_by` corre sin un admin signup previo |
 | D20 | **`dashboard_daily` como tabla con upsert**, no vista | La vista re-agregaba todo el historial en cada poll (~150 MB lógicos a 1M), crecía sin límite y **evadía RLS** (ejecuta como owner). El upsert es O(1) por movimiento y la RPC filtra por rol |
-| D21 | Alcance del audit acotado (6 tablas); **sin** audit de `movements` ni chat | `movements` ya es el asiento forense; auditar su INSERT = duplicar el ledger (~500 MB); 1 fila por mensaje de chat era el mayor volumen de la BD |
+| D21 | Alcance del audit acotado (8 tablas); **sin** audit de `movements` ni chat | `movements` ya es el asiento forense; auditar su INSERT = duplicar el ledger (~500 MB); 1 fila por mensaje de chat era el mayor volumen de la BD |
 | D22 | **Índices diferidos por umbral** (GIST, GIN, catálogos) | Con 25 tiendas/209 productos/27 usuarios el planner ignora esos índices pero **se paga su escritura** en cada INSERT; activar cuando `pg_stat_statements` lo justifique |
 | D23 | `movements` **no se particiona** | ~180 MB a 1M no es un problema de disco; particionar rompería la FK `reverso_of_id` (PK de partición no única global) — BRIN + retención por DELETE bastan |
 | D24 | Alertas por **episodio** (`resolved_at`), no por lectura (`is_read`) | El dedup por `is_read` re-alertaba en cada movimiento tras marcar leída (spam de UI+realtime+egress) |
@@ -620,34 +652,44 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;   -- jobs diarios de alertas (expiry_soo
 
 -- 4. Aplicar alteraciones de este documento (tips, FKs, columnas, drops, checks)
 
--- 5. Seeds en orden (D19):
+-- 5. Funciones + triggers (§4) — INCLUYE handle_new_user() y sanitize_distributor_scope()
+--    ANTES de cualquier signup (sin el trigger, el primer login no crea fila users y RLS/permisos caen)
+
+-- 6. Seeds en orden (D19):
 --    a) roles (admin, operador, distribuidor)
 --    b) unit_types, store_types
 --    c) product_categories (padres ANTES que hijos por parent_id)
 --    d) brands
 --    e) motives: venta(exit), reabastecimiento(entry), devolución(entry), merma(exit), ajuste(NULL)
 
--- 6. PRERREQUISITO: signup del primer usuario admin (users.created_by NOT NULL en stores etc.)
+-- 7. PRERREQUISITO: signup del primer usuario admin (handle_new_user lo crea como operador)
+--    → update_user_role(p_admin, 'admin', NULL) para promoverlo.
+--    (Seeds con created_by NOT NULL — tiendas, órdenes, precios — solo corren DESPUÉS de este paso)
 
--- 7. Funciones + triggers (§4) y RLS (§8)
+-- 8. RLS (§8): ENABLE ROW LEVEL SECURITY en todas las tablas + policies de la matriz
 
--- 8. Podar publicación realtime (§5):
+-- 9. Podar publicación realtime (§5):
 --    ALTER PUBLICATION supabase_realtime DROP TABLE audit_log, chat_messages,
 --      chat_conversations, credit_payments, movements;
 
--- 9. Jobs pg_cron (diario):
---    expiry_soon   → stock.expiry_date <= CURRENT_DATE + 15 AND quantity > 0
---    order_late    → orders.expected_at < now() AND delivered_at IS NULL AND status NOT IN ('delivered','cancelled')
---    credit_overdue→ credits.due_date < CURRENT_DATE AND balance > 0
---    (todas con INSERT ... ON CONFLICT DO NOTHING sobre uq_alert_open)
+-- 10. Jobs pg_cron (diario; hora fija p.ej. 06:00 America/Bogota):
+--    expiry_soon   → INSERT si stock.expiry_date <= CURRENT_DATE + 15 AND quantity > 0
+--                     + UPDATE resolved_at si ya NO se cumple (cierra episodios, A6)
+--    order_late    → INSERT si orders.expected_at < now() AND delivered_at IS NULL AND status NOT IN ('delivered','cancelled')
+--                     (también se cierra en confirm_delivery/update_order_status)
+--    credit_overdue→ INSERT si credits.due_date < CURRENT_DATE AND balance > 0
+--                     (también se cierra en register_payment/register_payment_reverse/cancel_credit)
+--    (INSERTs con ON CONFLICT sobre el target EXACTO de uq_alert_open; ver §3.9)
 
--- 10. Verificaciones
+-- 11. Verificaciones
 DO $$ DECLARE r record; BEGIN
   FOR r IN SELECT conname FROM pg_constraint WHERE NOT convalidated LOOP
     RAISE WARNING 'FK inválida: %', r.conname;
   END LOOP;
 END $$;
--- + probar: assign → entry → exit (concurrente) → reverse → set_price → payment
+-- + probar: signup (¿fila users creada con operador?) → update_user_role → assign_user_stores
+--   → assign → entry → exit (concurrente) → reverse → set_price → payment → payment_reverse
+--   → create_order → confirm_delivery (STOCK SUMA, no resta) → routes → mark_stop → alertas (alta y cierre)
 ```
 
 **Preparación de datos (cuando se carguen productos/tiendas/precios)**
@@ -659,9 +701,11 @@ END $$;
 
 ---
 
-## 8. RLS (referencia)
+## 8. RLS (referencia) — especificación completa de políticas
 
-Políticas completas en `idea basica proy admin de proys.md` → sección *Roles y Permisos (SEC-01)*. Resumen de dependencias del esquema:
+> **Corregido (C1)**: antes este apartado remitía al `.md` principal, donde solo existía la **matriz** y un ejemplo inválido. Las policies reales viven **aquí**; el SQL se escribe en el Sprint 1 (§7 paso 7). Con `ENABLE ROW LEVEL SECURITY` sin policies = deny-all ⇒ el demo del Sprint 1 quedaría bloqueado si no se copia este apartado.
+
+**Dependencias de scope**:
 
 | Rol | Se filtra por | Soporte en esquema |
 |---|---|---|
@@ -670,11 +714,35 @@ Políticas completas en `idea basica proy admin de proys.md` → sección *Roles
 | premium | `is_premium()` (incluye admin) | `users.premium` (§2.9) |
 | admin | sin filtro + `created_by` trazable | `created_by` en orders/movements/credits |
 
-**Matriz → funciones**: cada operación de la matriz SEC-01 se resuelve con la función de §4 que valida rol **y** scope (la RLS sola no expresa transiciones de estado ni "solo los suyos" al crear). Las políticas `SELECT` se abren a `authenticated` con filtros de scope; **INSERT/UPDATE/DELETE directos están revocados** en las tablas sensibles.
+**Matriz de policies por tabla × operación** (solo `TO authenticated`; `anon` no tiene ninguna). Donde dice **RPC**, la lectura/escritura directa está revocada (§4) y la policy no aplica:
 
-**Corrección documentada contra el `.md`**: el ejemplo `crud_products FOR ALL USING (is_premium())` del .md **está mal** — `FOR ALL` incluye DELETE y daría borrado a un operador premium, violando la matriz. Las policies deben ser **por operación** (`SELECT`/`INSERT`/`UPDATE` separados) y el "eliminar" de admin es **soft-delete** (`is_active = false`) porque las FK `RESTRICT` bloquean el hard delete con historial.
+| Tabla | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| `roles`, `unit_types`, `store_types`, `motives`, `brands`, `product_categories` | `true` | admin | admin | admin (soft-delete: solo `is_active`) |
+| `products` | `true` | admin, operador | admin, operador | admin (solo `is_active = false`) |
+| `stores` | `true` | admin, operador | admin, operador | admin (solo `is_active = false`) |
+| `distributors` | admin, operador | admin | admin | admin (solo `is_active = false`) |
+| `price_publications` | admin, operador | — RPC `set_price` | — RPC `set_price` | admin (soft) |
+| `users` | fila propia, o admin | — RPC `update_user_role` / trigger | admin (rol/premium/actividad) | — (baja = `is_active`) |
+| `orders` | admin · operador (`store_id ∈ my_store_ids()`) · distribuidor (`distributor_id = mine`) | — RPC `create_order` | — RPC `update_order_status`/`confirm_delivery` | — |
+| `order_items` | hereda del `orders` visible | — RPC | — RPC | — |
+| `stock` | admin · operador (`store_id ∈ mine`) · distribuidor (tiendas de sus pedidos/ruta) | — RPC | — RPC | — |
+| `movements` | admin · operador (`store_id ∈ mine`) · distribuidor (solo `distributor_id = mine`) | — RPC | — (append-only) | — |
+| `routes`/`route_stops` | admin · operador · distribuidor (`distributor_id = mine`) | — RPC | — RPC | — |
+| `credits`/`credit_payments` | admin, operador (cobros) | — RPC | — RPC | — |
+| `alerts` | admin (todas) · operador (`store_id ∈ mine`) · distribuidor (**solo `distributor_id = mine`** — nunca NULL, A4) | — jobs/trigger | — RPC `mark_alert_read` | — |
+| `user_stores` | fila propia, admin | — RPC admin | — | — RPC admin |
+| `chat_conversations`/`chat_messages` | `user_id = auth.uid()` / conversación propia | — RPC `create_chat`/`send_message` | — (trigger solo) | — |
+| `audit_log` | admin | — trigger | — (append-only) | — |
+| `dashboard_daily` | solo RPC `get_dashboard` (SELECT revocado) | — upsert interno RPC | — | — |
 
-Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1.
+**Reglas de composición**:
+- Policies **por operación** (`SELECT`/`INSERT`/`UPDATE`/`DELETE` separados). **Prohibido `FOR ALL`** en tablas sensibles: el ejemplo `crud_products FOR ALL USING (is_premium())` del `.md` principal incluiría DELETE y violaría la matriz.
+- "Eliminar" de la matriz = **soft-delete** (`is_active = false`) — las FK `RESTRICT` bloquean hard delete con historial.
+- `is_premium()` como gate **solo** donde la matriz lo diga explícitamente (QR masivo, features premium) — nunca como único filtro de una policy de escritura general.
+- Alcance del operador **solo** se modifica con `assign_user_stores()` (solo admin); nadie más escribe `user_stores`.
+- Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1 (default deny).
+- **Desviación MVP registrada (A3)**: `get_dashboard` da al operador el agregado **global** (no por tienda) mientras `dashboard_daily` sea por `(day, distributor_id)` — ver §3.13.
 
 ---
 
@@ -684,7 +752,32 @@ Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1.
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
 - [x] Premium alineado en el `.md` principal (tabla `users`, no `app_metadata`; `is_premium()` única y con `SET search_path`).
 - [ ] Alinear el `.md` principal (resto): `order` → `orders`, `price_publication` → `price_publications`, `umbral` → `threshold`, `user_id` de movimientos → `created_by`, `leída` → `read_at`, **eliminar el ejemplo `FOR ALL is_premium()`** (§8), `phone` → `phone_number`, DIST-04 en `motives`, `quantity` en kg (`numeric`), `expected_at`/`due_date`/`currency` como nuevos campos de requisito.
-- [ ] Corregir referencias cruzadas en este doc: §3.4→D18 (BRIN), §3.7→D15 (unique de créditos).
 - [ ] **Umbrales de índices diferidos (D22)**: crear `GIST(location)` al llegar a ~1.000 tiendas; `pg_trgm`+GIN al llegar a ~50.000 productos — revisar con `pg_stat_statements` en cada sprint.
 - [ ] Validar `unit_types.abbreviation` único en seed (§7).
 - [ ] Confirmar nombre de proyecto (checklist p.4) → afecta `project_ref` en el MCP.
+- [ ] Definir en la matriz SEC-01 del `.md` **qué es exactamente "CRUD avanzado" premium** (M7): hoy solo QR masivo está concreto y es UX-only (se genera en cliente, D6) — listar operaciones premium server-side o quitar el gate de la matriz.
+- [ ] Expectativa del `.md` "cada consulta del chatbot queda en audit_log" (M8): los triggers DML no auditan SELECT. Decidir: quitar la frase o añadir mecanismo de lecturas (pgAudit/future).
+- [ ] Decisión pendiente (A4/§3.9): si el distribuidor debe ver `stock_low`/`expiry_soon`, requerirá relación tienda↔distribuidor (hoy no existe); MVP: no las ve.
+- [ ] Decisión pendiente (A3/§3.13): si el operador requiere dashboard "por su alcance", añadir `store_id` a `dashboard_daily` (MVP: agregado global).
+
+### Inconsistencias detectadas entre este doc y `idea basica proy admin de proys.md`
+*(agente revisor; corregir al alinear el .md — son nombres/semántica, este doc manda)*
+
+1. `.md` tiene `products.sku` → aquí no existe `sku` (D6: se usa `barcode`).
+2. `.md` describe `unit_types` con `code` → aquí es `name`+`abbreviation`+`category`.
+3. `.md` dice `stores.lat, lng` → aquí `location geography(Point,4326)` + vista `stores_geo`.
+4. `.md` enum alertas en español y de 3 valores (`stock_bajo`, `caducidad_proxima`, `pedido_retrasado`) → aquí 4 en inglés, **+`credit_overdue`** (§1).
+5. `.md` contradice su modelo: dice "la alerta se calcula, no se almacena" y "se llena por trigger" → aquí están **materializadas** en `alerts` (D11).
+6. `.md` INV-06 usa `Stock < Umbral` → la regla de este doc es `<=` (§3.1). *(línea del .md corregida a ≤ en este pase)*
+7. `.md` `audit_log` con `antes`/`después` JSONB y `registro_id` → aquí `diff` (solo cambios), `row_id text`.
+8. `.md` afirma "cada consulta [del chatbot] queda en audit_log" → imposible con triggers DML (ver pendiente M8).
+9. `.md` `credits`: `monto_total`, `saldo_pendiente` → aquí `total_amount`, `balance`.
+10. `.md` `credit_payments`: `user_id`, `fecha`, `forma_pago` → aquí `created_by`, `paid_at`, `payment_method`.
+11. `.md` `order_items`: `cantidad_solicitada`, `cantidad_recibida` → aquí `quantity`, `received_quantity` (+`unit_price`, `status`).
+12. `.md` `price_publication`: `published_at`, `active` → aquí `created_at`, `is_active` (+`currency`).
+13. `.md` `users`: `nombre` → aquí `full_name`.
+14. `.md` ejemplo `registrar_entrada(...)` → nombre real `register_entry(...)` (§4).
+15. `.md` dice "audit_log activo desde Sprint 2" → este doc lo crea en Sprint 1 (§7 paso 5/8).
+16. `.md` llama "vista" al Dashboard (INT-01) → aquí es la **tabla** `dashboard_daily` (D20).
+17. `.md` cronograma: SEC-01 en Sprint 3 vs backlog que lo marca S2 (contradicción interna del .md).
+18. `.md` modelo: `price_publication.user_id` vs convención D4 (`created_by`) — ya corregido en §2.8 de este doc; falta renombrar en el .md.

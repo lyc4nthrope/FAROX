@@ -117,6 +117,7 @@ Resuelve los puntos 7-11 y 14. Se parte de una base de datos existente y se exti
 | Corregir/anular movimientos existentes | ✔ (reverso) | ✘ | ✘ |
 | Publicar/editar precios (`price_publication`) | ✔ | ✘ solo lectura | ✘ |
 | CRUD Distribuidores (DIST-01) | ✔ | ✘ solo lectura | ✘ |
+| Catálogos (roles, unit_types, store_types, motives, brands, categorías) | ✔ crear/editar | ✘ | ✘ |
 | Pedidos (DIST-02) | ✔ crear/cancelar | ✔ recepción/estados | ✔ **solo los suyos** + confirmar entrega |
 | Rutas (DIST-03) | ✔ crear/asignar | ✔ ver | ✔ **solo su ruta** + marcar paradas |
 | Credits: crear/anular | ✔ | ✘ | ✘ |
@@ -151,7 +152,7 @@ CREATE policy crud_products ON products FOR ALL
 
 ```sql
 CREATE FUNCTION public.is_premium() RETURNS boolean
-LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = pg_catalog, public AS $$
   SELECT COALESCE(u.premium, false) OR COALESCE(r.name = 'admin', false)
   FROM users u
   LEFT JOIN roles r ON r.id = u.role_id
@@ -193,7 +194,7 @@ Objetivo: Administrar el catálogo de bienes, su estado físico y su trazabilida
 4. Gestión de Inventario (Transacciones): Registro granular de Entradas y Salidas, obligando la asociación a una entidad tienda y un motivo/origen definido.  
    * Flag de Alerta de Stock: Mecanismo para señalar automáticamente cuando el inventario cae por debajo de un umbral predefinido (punto de pedido).  
 5. Trazabilidad y QR: Generación de Códigos de Respuesta Rápida (QR) vinculados a la relación Producto ↔ Tienda, facilitando su escaneo para identificación rápida en campo.  
-6. Identificación de Faltantes: Funcionalidad específica para identificar productos que requieren reabastecimiento (Stock \= 0 o Stock < Umbral).
+6. Identificación de Faltantes: Funcionalidad específica para identificar productos que requieren reabastecimiento (Stock \= 0 o Stock ≤ Umbral — alineado con la regla INV-06 del esquema).  
 
 ## **Módulo Operacional: Distribuidor y Logística**
 
