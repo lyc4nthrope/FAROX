@@ -511,6 +511,8 @@ Estimado corregido: ~50 MB en vez de ~500 MB a 1M movements.
 | `sync_email()` | trigger | `auth.users` → `users.email` (onboarding/edición) |
 | `sanitize_distributor_role()` | trigger | `BEFORE UPDATE OF role_id` en `users`: si el nuevo rol no es `distribuidor` → `distributor_id = NULL` |
 
+**Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función).
+
 **Atomicidad del stock (corregido — crítico)**: nunca leer-then-escribir. El UPDATE lleva el guard en el `WHERE` (lock implícito + validación en 1 sentencia):
 ```sql
 UPDATE stock SET quantity = quantity - p_qty, updated_at = now()
@@ -521,7 +523,9 @@ IF NOT FOUND THEN RAISE EXCEPTION 'stock insuficiente o fila inexistente'; END I
 -- Prohibido EXCEPTION WHEN unique_violation como control de flujo → usar ON CONFLICT.
 ```
 
-**REVOKE/GRANT**: `REVOKE INSERT, UPDATE, DELETE ON stock, movements, order_items, orders, credits, credit_payments, price_publications, alerts FROM authenticated;` + `GRANT EXECUTE` solo a las funciones de esta tabla. Lecturas vía RLS normal.
+**REVOKE/GRANT**: `REVOKE INSERT, UPDATE, DELETE ON stock, movements, order_items, orders, credits, credit_payments, price_publications, alerts FROM authenticated;` + `GRANT EXECUTE` solo a las funciones de esta tabla. Lecturas vía RLS normal. `REVOKE EXECUTE ... FROM anon` en helpers y RPC (el chatbot/n8n siempre viaja con JWT de usuario, nunca anon sin sesión).
+
+**Search path (obligatorio)**: toda función `SECURITY DEFINER` se crea con `SET search_path = public` — sin esto un objeto temporal/`public` malicioso puede redirigir la ejecución (hijack clásico de PostgREST).
 
 ---
 
@@ -678,7 +682,8 @@ Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1.
 
 - [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7.
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
-- [ ] Alinear el `.md` principal: `order` → `orders`, `price_publication` → `price_publications`, `umbral` → `threshold`, `user_id` de movimientos → `created_by`, `leída` → `read_at`, premium en tabla (no `app_metadata`), **eliminar el ejemplo `FOR ALL is_premium()`** (§8), `is_premium()` definido **una sola vez**, `phone` → `phone_number`, DIST-04 en `motives`, `quantity` en kg (`numeric`), `expected_at`/`due_date`/`currency` como nuevos campos de requisito.
+- [x] Premium alineado en el `.md` principal (tabla `users`, no `app_metadata`; `is_premium()` única y con `SET search_path`).
+- [ ] Alinear el `.md` principal (resto): `order` → `orders`, `price_publication` → `price_publications`, `umbral` → `threshold`, `user_id` de movimientos → `created_by`, `leída` → `read_at`, **eliminar el ejemplo `FOR ALL is_premium()`** (§8), `phone` → `phone_number`, DIST-04 en `motives`, `quantity` en kg (`numeric`), `expected_at`/`due_date`/`currency` como nuevos campos de requisito.
 - [ ] Corregir referencias cruzadas en este doc: §3.4→D18 (BRIN), §3.7→D15 (unique de créditos).
 - [ ] **Umbrales de índices diferidos (D22)**: crear `GIST(location)` al llegar a ~1.000 tiendas; `pg_trgm`+GIN al llegar a ~50.000 productos — revisar con `pg_stat_statements` en cada sprint.
 - [ ] Validar `unit_types.abbreviation` único en seed (§7).

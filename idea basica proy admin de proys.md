@@ -133,7 +133,7 @@ Resuelve los puntos 7-11 y 14. Se parte de una base de datos existente y se exti
 Regla de oro: **el front nunca da seguridad** — solo UX. El enforcement real vive en la BD. Cinco capas:
 
 ## **1. Autenticación — Supabase Auth**
-JWT corto + refresh token. Rol y premium en **`app_metadata`** (firmado por Supabase), jamás en `user_metadata` (el cliente puede escribirlo con su propio token y elevarse a premium).
+JWT corto + refresh token. Rol y premium viven en la tabla **`users`** (`role_id`, `premium`) y se leen con `my_role()`/`is_premium()` (SECURITY DEFINER) — nunca en claims del JWT ni en `user_metadata` (el cliente puede escribir `user_metadata` con su propio token y elevarse a premium; los claims quedan stale hasta refrescar el token). Fuente única de verdad: decisión D7 del esquema de BD.
 
 ## **2. Autorización — RLS en todas las tablas (desde Sprint 1)**
 
@@ -147,12 +147,15 @@ CREATE policy crud_products ON products FOR ALL
   TO authenticated USING (public.is_premium());
 ```
 
-`is_premium()` es `SECURITY DEFINER` y lee el JWT:
+`is_premium()` es `SECURITY DEFINER` y lee la tabla `users` (no el JWT). "Admin siempre premium" se resuelve en la fórmula, no con constraint:
 
 ```sql
 CREATE FUNCTION public.is_premium() RETURNS boolean
-LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT COALESCE((auth.jwt()->'app_metadata'->>'premium')::boolean, false)
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT COALESCE(u.premium, false) OR COALESCE(r.name = 'admin', false)
+  FROM users u
+  LEFT JOIN roles r ON r.id = u.role_id
+  WHERE u.id = auth.uid()
 $$;
 ```
 
@@ -171,7 +174,7 @@ La función valida (cantidad > 0, stock suficiente, tienda existe), actualiza st
 - Google Maps key restringida por HTTP referrer; QR codifica solo IDs, el servidor revalida al escanear.
 
 ## **5. Chatbot (CHAT-01/02) — n8n + OpenRouter**
-- El webhook de n8n **verifica la firma del JWT** con el JWT secret de Supabase (decodificar sin verificar = no cuenta) y extrae `user_id`/`premium` de `app_metadata` — **nunca del texto del usuario** (anti prompt-injection).
+- El webhook de n8n **verifica la firma del JWT** con el JWT secret de Supabase (decodificar sin verificar = no cuenta) y extrae solo `user_id` del claim verificado — **nunca del texto del usuario** (anti prompt-injection). Premium y rol se consultan con el JWT del usuario vía `is_premium()`/`my_role()` (tabla `users`, no claims).
 - Cada tool (`get_stock`, `crear_orden`) llama a PostgREST con `Authorization: Bearer <JWT del usuario>` + anon key → **hereda el RLS**; `service_role` prohibido en el workflow.
 - El LLM (OpenRouter) decide *qué* llamar, no *a quién* accede; cada consulta queda en `audit_log`.
 
