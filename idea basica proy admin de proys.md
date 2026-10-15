@@ -7,8 +7,8 @@
 7. definir atributos tienda — **Resuelto: ver Modelo de Datos (`stores`)**  
 8. definir atributos distribuidor — **Resuelto: ver Modelo de Datos (`distributors`)**  
 9. definir atributos o relaciones ruta del distribuidor — **Resuelto: `routes` + `route_stops`**   
-10. definir atributos entradas y salidas, sí la clase va separada o junta — **Resuelto: juntas en `movements` con campo `tipo`**  
-11. definir si clase de lista de pedido distribuidor — **Resuelto: sí, `order` + `order_items`**  
+10. definir atributos entradas y salidas, sí la clase va separada o junta — **Resuelto: juntas en `movements` con campo `type`**  
+11. definir si clase de lista de pedido distribuidor — **Resuelto: sí, `orders` + `order_items`**  
 12. Revisar si clase para código QR y las implicaciones — **Resuelto: librería en el cliente (`qrcode`), sin clase propia**  
 13. definir cómo manejar la seguridad y privacidad de la información — **Resuelto: ver sección "Seguridad y Privacidad" (Supabase Auth + RLS + funciones SQL)**  
 14. revisar si falta algo en la base de datos — **Resuelto: users/roles, stock, motives, movements, alerts, credits, chat, audit_log, caducidad**  
@@ -32,14 +32,14 @@ Resuelve los puntos 2, 5, 12, 13, 16, 17 y 18 de la lista anterior. Pendientes: 
 | Frontend web | **React + Vite (SPA)** + **Tailwind CSS** (mobile-first) | App privada/backoffice sin SEO; responsive con una sola base de código |
 | Lenguaje | **TypeScript** (front; workflows n8n en JS), **SQL/plpgsql** (lógica de negocio) | Tipado de extremo a extremo; la lógica crítica vive en el servidor |
 | App móvil futura | React Native o Flutter consumiendo **la misma API de Supabase** | Justificación de escalabilidad: backend independiente del cliente |
-| QR | Librería en cliente (`qrcode`), vinculado a Producto ↔ Tienda | Escaneo en campo sin dependencia del servidor |
+| QR | Librería en cliente (`qrcode`), **0 egress**, para la **asociación Tienda ↔ Distribuidor** (el distribuidor escanea para vincularse) | Escaneo en campo sin dependencia del servidor; no necesita SKU |
 | Mapas / rutas | Google Maps JavaScript API en el front (o OpenFleet) | Requisito explícito DIST-03 |
 | Chatbot | **n8n** (webhook → AI Agent → tools) + **OpenRouter** (LLM multimodelo) | Orquestación visual reutilizable en Fase III (notificaciones); OpenRouter = un endpoint para varios modelos, sin lock-in. Tools invocan PostgREST **con el JWT del usuario** → RLS aplicado |
 
 ## **Pilares de Implementación (obligatorios)**
 
-1. **Toda mutación de stock pasa por funciones SQL** (`SECURITY DEFINER`): entrada/salida + recálculo del umbral + registro en log dentro de una única transacción atómica. Nunca un `UPDATE`/`INSERT` directo desde el front.
-2. **RLS desde el Sprint 1** en todas las tablas nuevas; el bloqueo Premium (SEC-01) se implementa como policy `USING (is_premium())`.
+1. **Toda mutación de stock pasa por funciones SQL** (`SECURITY DEFINER`): entrada/salida + recálculo del stock y evaluación del `threshold` + registro en log dentro de una única transacción atómica. Nunca un `UPDATE`/`INSERT` directo desde el front.
+2. **RLS desde el Sprint 1** en todas las tablas nuevas; el bloqueo Premium (SEC-01) se implementa en RPCs y policies **concretas** (`register_entry`/`register_exit`, `get_dashboard`, QR masivo) — **nunca** como único filtro de una policy de escritura general.
 3. **Chatbot en n8n con seguridad verificada**: el webhook **valida la firma del JWT** (JWT secret de Supabase) y las tools invocan las funciones SQL del punto 1 **con el JWT del usuario** — nunca `service_role` — así el RLS sigue aplicando. LLM vía OpenRouter.
 4. **Realtime de Supabase** para el Dashboard (INT-01) en lugar de montar WebSockets manualmente.
 
@@ -60,93 +60,108 @@ Resuelve los puntos 7-11 y 14. Se parte de una base de datos existente y se exti
 
 | Tabla | Atributos clave | Notas |
 | :---- | :---- | :---- |
-| `unit_types` | id, code (unidad, kg, caja…), nombre | Catálogo — INV-01 |
-| `brands` | id, nombre | Catálogo |
-| `product_categories` | id, nombre, **parent_id** | Jerárquica — **incluida en MVP** |
-| `products` | id, sku, nombre, descripción, unit_type_id, brand_id, category_id, activo | CRUD INV-01 |
-| `price_publication` | id, product_id, store_id, price, published_at, **active** | Precio por tienda: 1 fila activa por par Producto ↔ Tienda |
-| `stores` | id, nombre, dirección, ciudad, **lat, lng**, teléfono, activa | p.7 — INV-02 |
+| `unit_types` | id, name, abbreviation, category | Catálogo — INV-01; sin `code` |
+| `brands` | id, name | Catálogo |
+| `product_categories` | id, name, **parent_id** | Jerárquica — **incluida en MVP** |
+| `products` | id, name, description, unit_type_id, brand_id, category_id, **barcode**, created_by, is_active | Catálogo de uso general — **no existe SKU**: se usa **`barcode`** (el QR asocia tienda ↔ distribuidor y no necesita SKU) — CRUD INV-01 |
+| `price_publications` | id, product_id, store_id, **created_by**, price, **currency** `char(3)` default `'COP'`, **is_active**, **created_at** | **Precio que coloca la tienda a un producto y es PRIVADO de esa tienda**: admin ve todas · operador solo las de sus tiendas · distribuidor **ninguna** (recibe solo `unit_price` congelado en `order_items`); 1 fila activa por par Producto ↔ Tienda; cambio **solo vía `set_price()`** (append-only: inserta fila nueva + desactiva la anterior, **jamás UPDATE del precio**) |
+| `stores` | id, store_type_id, name, address, city, **location** `geography(Point,4326)` (PostGIS), phone, created_by, is_active | p.7 — INV-02; **único punto de verdad geográfico**: la API expone las coordenadas vía la vista **`stores_geo`** (ST_X/ST_Y en servidor) |
 | `roles` | id, name (admin, operador, distribuidor) | Ver sección Roles y Permisos |
-| `users` | id (FK → `auth.users`), nombre, role_id, **premium**, phone, email, contact_preference | Premium = flag, no rol; contact_preference enum(whatsapp/teléfono/email) |
-| `alerts` | id, **tipo** enum(stock_bajo, caducidad_proxima, pedido_retrasado), store_id, product_id?, order_id?, leída, created_at | **Única tabla de alertas** (descarta `stock_alert`); se llena por trigger — INV-06 |
-| `order` | id, distributor_id, store_id, estado enum(pendiente, en_ruta, entregado, cancelado), fecha | p.11 — DIST-02 |
-| `order_items` | order_id, product_id, cantidad_solicitada, cantidad_recibida | Líneas del pedido |
+| `users` | id (FK → `auth.users`), **full_name**, role_id, **premium**, **phone_number**, email, contact_preference, distributor_id, is_active | Premium = flag en la tabla (**no** `app_metadata`), leído con `is_premium()`; contact_preference enum(whatsapp/phone/email) |
+| `alerts` | id, **type** enum(**stock_low, expiry_soon, order_late, credit_overdue**), store_id, product_id?, order_id?, distributor_id?, **message**, **context** jsonb, **read_at**, **resolved_at**, created_at | **Única tabla de alertas** (descarta `stock_alert`); **se materializan al ocurrir la condición** (transiciones de stock, jobs diarios, entrega/cobro) con dedup **por episodio** (`resolved_at IS NULL`) — así no se re-alerta en cada movimiento — INV-06 |
+| `orders` | id, distributor_id, store_id, route_id?, **status** enum(pending, in_route, delivered, cancelled), created_by, **expected_at**, delivered_at?, **cancelled_at**/**cancelled_reason**, created_at | p.11 — DIST-02; **`expected_at`** = fecha prometida/SLA (habilita la alerta `order_late`) |
+| `order_items` | order_id, product_id, **quantity** `numeric(12,3)`, **received_quantity** `numeric(12,3)`, status, **unit_price** (solo premium lo ve) | Líneas del pedido; `unit_price` congelado al crearlo |
 
 ## **Tablas nuevas**
 
 | Tabla | Atributos clave | Notas |
 | :---- | :---- | :---- |
-| `stock` | (product_id, store_id) PK, cantidad, **umbral** | Asignación Producto ↔ Tienda + punto de pedido — INV-03/06. La alerta se **calcula** (`cantidad <= umbral`), no se almacena |
-| `distributors` | id, nombre, NIT, contacto, phone, email, contact_preference, activo | p.8 — DIST-01 |
-| `motives` | id, nombre, tipo_sugerido (entrada/salida) | Catálogo de motivos/origen (requerido en cada movimiento) |
-| `movements` | id, **tipo** enum(entrada, salida), product_id, store_id, **distribuidor_id?**, motive_id, order_id?, user_id, cantidad, **expiry_date?**, created_at | p.10: entradas y salidas **juntas**; append-only; `expiry_date` solo en entradas |
-| `routes` | id, distributor_id, fecha, estado | p.9 — DIST-03 |
-| `route_stops` | route_id, store_id, orden, hora_estimada, estado_visita | Paradas → Google Maps / PostGIS |
-| `credits` | id, order_id, store_id (deudor), monto_total, saldo_pendiente, estado, created_at | **Desde el MVP** — ciclo de vida del fiado |
-| `credit_payments` | credit_id, monto, fecha, user_id, forma_pago | Pagos parciales + historial |
+| `stock` | (product_id, store_id) PK, **quantity** `numeric(12,3)`, **threshold** `numeric(12,3)` NULL, expiry_date, updated_at | Asignación Producto ↔ Tienda + punto de pedido — INV-03/06. **`threshold` es OPCIONAL**: NULL = ese producto **no tiene alerta de stock**; la señal **se materializa en `alerts`** |
+| `distributors` | id, name, nit (UNIQUE), contact_name, phone, email, contact_preference, is_active | p.8 — DIST-01 |
+| `motives` | id, name, **suggested_type** (entry/exit) | Catálogo de motivos/origen (requerido en cada movimiento) — **aquí vive la tipificación DIST-04**: venta / reabastecimiento / devolución / merma / ajuste |
+| `movements` | id, **type** enum(entry, exit), product_id, store_id, **distributor_id?**, motive_id, order_id?, **created_by**, **quantity** `numeric(12,3)`, unit_price?, **expiry_date?**, created_at | p.10: entradas y salidas **juntas**; append-only; `expiry_date` solo en entradas; **`quantity` `numeric(12,3)` en todo** (soporta kg) |
+| `routes` | id, distributor_id, **route_date**, **status** enum(planned, active, completed, cancelled) | p.9 — DIST-03 |
+| `route_stops` | route_id, store_id, **stop_order**, **estimated_time**, **status**, arrived_at | Paradas → Google Maps / PostGIS |
+| `credits` | id, order_id, store_id (deudor), **total_amount**, **currency** `char(3)` default `'COP'`, **balance**, **status** enum(pending, paid, cancelled), **due_date**, settled_at?, cancelled_at/cancelled_reason?, created_by, created_at | **Desde el MVP** — ciclo de vida del fiado; **`due_date`** = vencimiento del fiado (habilita la alerta `credit_overdue`) |
+| `credit_payments` | credit_id, **amount**, **paid_at**, **created_by**, **payment_method** enum(cash, transfer, card, other) | Pagos parciales + historial (append-only; corrección por reverso) |
 | `chat_conversations` | id, user_id, created_at | CHAT-01 |
 | `chat_messages` | conversation_id, role (user/assistant/tool), content, **payload JSONB** | payload = tool-calling del chatbot |
-| `audit_log` | user_id, tabla, acción, registro_id, antes JSONB, después JSONB, created_at | Auditoría: quién, qué, cuándo |
+| `audit_log` | id, **created_by** (sin FK), **table_name**, **action** enum(insert, update, delete), **row_id** (**text** — guarda el uuid de `users` y el bigint del resto de tablas), **diff** jsonb (**solo columnas cambiadas**, no snapshots), created_at | Auditoría: quién, qué, cuándo. **Activo desde Sprint 1**; alcance = 8 tablas (users, price_publications, orders, credits, credit_payments, distributors, products, stores); **NO** audita `movements` (ya es el asiento forense — duplicarlo ~10× el peso) ni chat |
 
 ## **Decisiones de modelado (p. 7-11, 14)**
 
-- **p.10 — Junta**: una sola tabla `movements` con campo `tipo`. Mismos atributos en ambos casos; el Dashboard consulta entradas y salidas juntas; la regla de umbral se escribe una vez. Tablas separadas obligarían a `UNION` y duplicarían la lógica.
-- **p.11 — Sí existe la clase**: `order` + `order_items` — una lista simple no soporta estados por línea ni recepciones parciales.
-- **p.12 — QR no es tabla**: se genera en cliente (`qrcode.react`) sobre el par (product_id, store_id); no persiste nada nuevo.
+- **p.10 — Junta**: una sola tabla `movements` con campo `type`. Mismos atributos en ambos casos; el Dashboard consulta entradas y salidas juntas; la regla de `threshold` se escribe una vez. Tablas separadas obligarían a `UNION` y duplicarían la lógica.
+- **p.11 — Sí existe la clase**: `orders` + `order_items` — una lista simple no soporta estados por línea ni recepciones parciales.
+- **p.12 — QR no es tabla**: se genera en cliente (`qrcode.react`) con **0 egress**; su propósito es la **asociación fácil tienda ↔ distribuidor** (el distribuidor escanea para vincularse) y **no necesita SKU**; no persiste nada nuevo.
 - **p.14 — Completado con**: `stock`, `users`/`roles`, `motives`, `movements`, `credits`, `alerts`, chat y `audit_log`.
-- **Caducidad**: registro simple (`expiry_date` en la entrada) + alerta `caducidad_proxima` por trigger. **Sin lotes FEFO** (complicaría cada salida sin beneficio MVP).
-- **Deudas**: `credits` + `credit_payments` ligadas a `order` (decidido en planificación).
+- **Caducidad**: registro simple (`expiry_date` en la entrada) + alerta **`expiry_soon` materializada** en `alerts` (job diario). **Sin lotes FEFO** (complicaría cada salida sin beneficio MVP).
+- **Deudas**: `credits` + `credit_payments` ligadas a `orders` (decidido en planificación).
 
 ## **Relaciones principales**
 
-- `products` N:N `stores` → vía `stock` (cantidad/umbral) y `price_publication` (precio)
-- `movements` N:1 → products, stores, motives, order; **nullable** distributors
-- `order` N:1 → distributors, stores; 1:N → `order_items`
+- `products` N:N `stores` → vía `stock` (quantity/threshold) y `price_publications` (precio privado por tienda)
+- `movements` N:1 → products, stores, motives, orders; **nullable** `distributor_id`
+- `orders` N:1 → distributors, stores; 1:N → `order_items`
 - `routes` N:1 → distributors; 1:N → `route_stops` N:1 → stores
-- `credits` N:1 → `order`; 1:N → `credit_payments`
+- `credits` N:1 → `orders`; 1:N → `credit_payments`
 - `users` N:1 → roles; `users.id` FK → `auth.users` (Supabase)
 
 # **Roles y Permisos (SEC-01)**
 
 | Operación | Admin | Operador | Distribuidor |
 | :---- | :---- | :---- | :---- |
-| CRUD Productos/Marcas/Categorías (INV-01) | ✔ total (incluye eliminar) | ✔ crear/editar, ✘ eliminar | ✘ |
-| CRUD Tiendas (INV-02) | ✔ total | ✔ crear/editar | ✘ |
-| Asignar Producto↔Tienda, umbrales (INV-03) | ✔ | ✔ | ✘ |
-| Registrar entradas/salidas (INV-04) | ✔ | ✔ | ✘ |
+| CRUD Productos/Marcas/Categorías (INV-01) | ✔ total (incluye eliminar; puede editar **cualquiera**) | ✔ crear/editar, ✘ eliminar — edita **solo los suyos** (`created_by`) | ✔ solo lectura (catálogo de uso general) |
+| CRUD Tiendas (INV-02) — alta solo vía `create_store()` (**tope: 1 tienda activa; 3 si `is_premium()`**; admin exento, auto-asocia al dueño) | ✔ total | ✔ crear/editar (sus tiendas) | ✘ |
+| Asignar Producto↔Tienda, `threshold` (INV-03) | ✔ | ✔ | ✘ |
+| Registrar entradas/salidas manuales (INV-04) — `register_entry`/`register_exit` **exigen `is_premium()`** | ✔ (siempre premium) | ✔ **solo premium** | ✘ |
 | Corregir/anular movimientos existentes | ✔ (reverso) | ✘ | ✘ |
-| Publicar/editar precios (`price_publication`) | ✔ | ✘ solo lectura | ✘ |
+| Publicar/editar precios (`price_publications`, **privados por tienda**) | ✔ (única vía `set_price()`) | ✔ solo lectura (**solo los de sus tiendas**) | ✘ **ninguna** |
 | CRUD Distribuidores (DIST-01) | ✔ | ✘ solo lectura | ✘ |
 | Catálogos (roles, unit_types, store_types, motives, brands, categorías) | ✔ crear/editar | ✘ | ✘ |
-| Pedidos (DIST-02) | ✔ crear/cancelar | ✔ recepción/estados | ✔ **solo los suyos** + confirmar entrega |
+| Pedidos (DIST-02) | ✔ crear/cancelar | ✔ crear (`create_order`), estados y recepción (`confirm_delivery`) de sus tiendas | ✔ **solo los suyos** + confirmar entrega (`confirm_delivery`) |
 | Rutas (DIST-03) | ✔ crear/asignar | ✔ ver | ✔ **solo su ruta** + marcar paradas |
 | Credits: crear/anular | ✔ | ✘ | ✘ |
 | Credits: registrar cobros | ✔ | ✔ | ✘ |
 | Usuarios, roles, flag Premium | ✔ | ✘ | ✘ |
-| Dashboard (INT-01) | ✔ todas las tiendas | ✔ su alcance | ✔ su actividad |
-| QR individual / masivo (INV-05) | ✔ masivo | ✔ individual | ✘ |
+| Dashboard (INT-01) — RPC `get_dashboard(from, to)` + realtime, **exige `is_premium()`** | ✔ todas las tiendas | ✔ agregado **global** (MVP) | ✔ solo lo suyo |
+| QR individual / masivo (INV-05) | ✔ masivo | ✔ individual; **masivo solo `is_premium()`** | ✘ |
 | Chatbot (CHAT-01/02) | ✔ | ✔ (su alcance) | ✔ (solo consulta propia) |
 
-**Patrones**: Admin = configuración + destrucción + usuarios · Operador = ejecución diaria **sin destruir** (no borra, no toca usuarios ni precios) · Distribuidor = RLS filtrado por `distributor_id = mi_id` · **Premium** = flag orthogonal que desbloquea QR masivo y CRUD avanzado (admin siempre premium).
+**Patrones**: Admin = configuración + destrucción + usuarios (siempre premium) · Operador = ejecución diaria **sin destruir** (no borra, no toca usuarios ni precios) · Distribuidor = RLS filtrado por `distributor_id = mi_id` · **Usuario normal (no premium)** = catálogo de productos + `stock` de su tienda + **pedir** (`create_order`) y confirmar recepción (`confirm_delivery`) — **no** registra movimientos manuales ni ve el dashboard analítico · **Premium** = flag en la tabla `users` (leído con `is_premium()`; admin siempre premium) que además habilita **movimientos manuales** (`register_entry`/`register_exit`), **dashboard analítico** (`get_dashboard` + realtime), **QR masivo** y la lectura de `order_items.unit_price` — *esto es el "CRUD avanzado"* · **Productos** = catálogo de uso general: solo el creador (`created_by`) modifica, admin edita cualquiera, todos leen · **Topo de tiendas** = máximo 1 tienda activa; 3 si es premium (admin exento; se crean con `create_store()`, que auto-asocia al dueño) · **Gate de alcance** = toda acción crear/actualizar exige estar asociado a **≥1 tienda** (distribuidor: su `distributor_id`), excepto perfil propio, `create_store()` y chat.
 
 # **Seguridad y Privacidad (p. 13)**
 
 Regla de oro: **el front nunca da seguridad** — solo UX. El enforcement real vive en la BD. Cinco capas:
 
 ## **1. Autenticación — Supabase Auth**
-JWT corto + refresh token. Rol y premium viven en la tabla **`users`** (`role_id`, `premium`) y se leen con `my_role()`/`is_premium()` (SECURITY DEFINER) — nunca en claims del JWT ni en `user_metadata` (el cliente puede escribir `user_metadata` con su propio token y elevarse a premium; los claims quedan stale hasta refrescar el token). Fuente única de verdad: decisión D7 del esquema de BD.
+JWT corto + refresh token. Rol y premium viven en la tabla **`users`** (`role_id`, `premium`) y se leen con `my_role()`/`is_premium()` (SECURITY DEFINER) — nunca en claims del JWT, en `user_metadata` ni en `app_metadata` (el cliente puede escribir metadata con su propio token y elevarse a premium; los claims quedan stale hasta refrescar el token). Fuente única de verdad: decisión D7 del esquema de BD.
 
 ## **2. Autorización — RLS en todas las tablas (desde Sprint 1)**
 
 ```sql
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;  -- default deny
 
+-- Policies POR OPERACIÓN (SELECT/INSERT/UPDATE/DELETE separados):
 CREATE policy leer_products ON products FOR SELECT
-  TO authenticated USING (true);
+  TO authenticated USING (true);                       -- todos leen el catálogo
 
-CREATE policy crud_products ON products FOR ALL
-  TO authenticated USING (public.is_premium());
+CREATE policy insert_products ON products FOR INSERT
+  TO authenticated WITH CHECK (
+    public.my_role() = 'admin'
+    OR (public.my_role() = 'operador' AND public.has_scope()));
+
+CREATE policy update_products ON products FOR UPDATE
+  TO authenticated USING (
+    public.my_role() = 'admin'
+    OR (products.created_by = auth.uid() AND public.has_scope()));  -- solo el creador
+
+CREATE policy delete_products ON products FOR DELETE    -- soft-delete: is_active = false
+  TO authenticated USING (public.my_role() = 'admin');
 ```
+
+**Nunca `FOR ALL` en tablas sensibles**: `FOR ALL` incluye DELETE y violaría el soft-delete (en `products` el DELETE solo debe apagar `is_active`). El gate premium vive en RPCs/policies **concretas** (`register_entry`/`register_exit`, `get_dashboard` + realtime, QR masivo) — **nunca** como único filtro de una policy de escritura general.
+
+**Gate de alcance**: toda acción crear/actualizar exige estar asociado a **≥1 tienda** (`has_scope()`; distribuidor: su `distributor_id`), excepto: perfil propio, `create_store()` y chat.
 
 `is_premium()` es `SECURITY DEFINER` y lee la tabla `users` (no el JWT). "Admin siempre premium" se resuelve en la fórmula, no con constraint:
 
@@ -164,7 +179,7 @@ $$;
 
 ```sql
 REVOKE INSERT, UPDATE, DELETE ON stock, movements FROM authenticated;
-GRANT EXECUTE ON FUNCTION registrar_entrada(...) TO authenticated;
+GRANT EXECUTE ON FUNCTION register_entry(...), register_exit(...) TO authenticated;
 ```
 
 La función valida (cantidad > 0, stock suficiente, tienda existe), actualiza stock, inserta el movimiento y loguea **en una sola transacción**. Un JWT robado o script trucado no puede inflar stock: el ataque se bloquea en la BD.
@@ -176,11 +191,11 @@ La función valida (cantidad > 0, stock suficiente, tienda existe), actualiza st
 
 ## **5. Chatbot (CHAT-01/02) — n8n + OpenRouter**
 - El webhook de n8n **verifica la firma del JWT** con el JWT secret de Supabase (decodificar sin verificar = no cuenta) y extrae solo `user_id` del claim verificado — **nunca del texto del usuario** (anti prompt-injection). Premium y rol se consultan con el JWT del usuario vía `is_premium()`/`my_role()` (tabla `users`, no claims).
-- Cada tool (`get_stock`, `crear_orden`) llama a PostgREST con `Authorization: Bearer <JWT del usuario>` + anon key → **hereda el RLS**; `service_role` prohibido en el workflow.
-- El LLM (OpenRouter) decide *qué* llamar, no *a quién* accede; cada consulta queda en `audit_log`.
+- Cada tool (`get_stock`, `create_order`) llama a PostgREST con `Authorization: Bearer <JWT del usuario>` + anon key → **hereda el RLS**; `service_role` prohibido en el workflow.
+- El LLM (OpenRouter) decide *qué* llamar, no *a quién* accede; la trazabilidad de las consultas/tools del chatbot la lleva **n8n** (un registro por invocación de tool dentro del flujo de trabajo) — los triggers DML de `audit_log` **nunca ven un SELECT**.
 
 ## **6. Higiene básica**
-HTTPS obligatorio, validación Zod en cada formulario, `npm audit` + Dependabot en CI, backups PITR de Supabase, `audit_log` activo desde Sprint 2.
+HTTPS obligatorio, validación Zod en cada formulario, `npm audit` + Dependabot en CI, backups PITR de Supabase, `audit_log` activo desde Sprint 1.
 
 **Requerimientos**
 
@@ -188,29 +203,29 @@ HTTPS obligatorio, validación Zod en cada formulario, `npm audit` + Dependabot 
 
 Objetivo: Administrar el catálogo de bienes, su estado físico y su trazabilidad a través de las tiendas asociadas.
 
-1. CRUD de Productos: Capacidad completa para Crear, Leer, Actualizar y Eliminar productos (incluyendo la definición de Unidad de Medida Base).  
-2. Gestión de Tiendas: CRUD completo de entidades tiendas, incluyendo la capacidad de registrar su ubicación geográfica (Latitud,Longitud).  
+1. CRUD de Productos: Capacidad completa para Crear, Leer, Actualizar y Eliminar productos (incluyendo la definición de Unidad de Medida Base) — catálogo de uso general: **solo el creador** (`created_by`) lo modifica, **admin puede editar cualquiera**, todos leen; eliminar = soft-delete (`is_active`), solo admin (SEC-01).  
+2. Gestión de Tiendas: CRUD completo de entidades tiendas, registrando su ubicación geográfica en **una sola columna `location geography(Point,4326)`** (PostGIS — único punto de verdad geográfico); la API expone las coordenadas a través de la vista **`stores_geo`** (ST_X/ST_Y en servidor). Alta solo vía la RPC **`create_store()`** (auto-asocia al dueño; tope: 1 tienda activa, 3 si es premium, admin exento).  
 3. Asignación de Productos a Tienda: Mapeo lógico para definir qué productos están disponibles en cada punto de venta específico.  
-4. Gestión de Inventario (Transacciones): Registro granular de Entradas y Salidas, obligando la asociación a una entidad tienda y un motivo/origen definido.  
-   * Flag de Alerta de Stock: Mecanismo para señalar automáticamente cuando el inventario cae por debajo de un umbral predefinido (punto de pedido).  
-5. Trazabilidad y QR: Generación de Códigos de Respuesta Rápida (QR) vinculados a la relación Producto ↔ Tienda, facilitando su escaneo para identificación rápida en campo.  
-6. Identificación de Faltantes: Funcionalidad específica para identificar productos que requieren reabastecimiento (Stock \= 0 o Stock ≤ Umbral — alineado con la regla INV-06 del esquema).  
+4. Gestión de Inventario (Transacciones): Registro granular de Entradas y Salidas (RPC `register_entry`/`register_exit`, **solo premium**), obligando la asociación a una entidad tienda y un motivo/origen definido; cantidades **`numeric(12,3)` en todo** (soporta kg).  
+   * Flag de Alerta de Stock: las alertas **se materializan en la tabla `alerts`** cuando el inventario cumple la regla INV-06: `quantity = 0` **o** (`threshold IS NOT NULL` **y** `quantity <= threshold`) — **`threshold` es opcional**: NULL = ese producto no tiene alerta de stock.
+5. Trazabilidad y QR: Generación de Códigos de Respuesta Rápida (QR) para la **asociación fácil Tienda ↔ Distribuidor** (el distribuidor escanea para vincularse); se genera **en cliente (0 egress)** y no necesita SKU.  
+6. Identificación de Faltantes: Funcionalidad específica para identificar productos que requieren reabastecimiento — regla INV-06 exacta: alerta si `quantity = 0` **o** (`threshold IS NOT NULL` **y** `quantity <= threshold`); `threshold` NULL = sin alerta de stock.
 
 ## **Módulo Operacional: Distribuidor y Logística**
 
 Objetivo: Gestionar la entidad comercializadora, sus movimientos de stock asociados a pedidos y optimizar su logística.
 
 1. CRUD de Distribuidores: Gestión completa de las entidades distribuidoras.  
-2. Gestión de Pedidos Pendientes (Stock Asignado): Módulo para visualizar qué productos están asignados a un Distribuidor pero aún no han sido movilizados/recibidos en destino.  
+2. Gestión de Pedidos Pendientes (Stock Asignado): Módulo para visualizar qué productos están asignados a un Distribuidor pero aún no han sido movilizados/recibidos en destino, con su **fecha prometida `expected_at`** (habilita la alerta `order_late`) y su anulación trazable **`cancelled_at` / `cancelled_reason`**.  
 3. Ruta del Distribuidor: Funcionalidad para la planificación y visualización geográfica de las rutas, con soporte explícito para integración vía Google Maps API o OpenFleet.  
-4. Tipificación de Movimientos (Adicional Clave): Capacidad de diferenciar el tipo de movimiento asociado al pedido: *Venta*, *Reabastecimiento*, *Devolución*.
+4. Tipificación de Movimientos (Adicional Clave — DIST-04): vive en la tabla **`motives`** (`name` + `suggested_type` entry/exit), sembrada con *Venta*, *Reabastecimiento*, *Devolución*, *Merma* y *Ajuste*; viaja en cada `movements.motive_id`.
 
 ## **Módulo Interfaz y Servicios Avanzados**
 
 Objetivo: Proveer interfaces interactivas y capacidades avanzadas de consulta.
 
-1. Dashboard Operativo: Vista consolidada que permita monitorear en tiempo real las entradas, salidas y el estado general del inventario agrupado por Distribuidor.  
-2. Control de Acceso (Premium): Mecanismo robusto para validar el estatus *Premium* del usuario, aplicando bloqueos a funcionalidades clave (CRUD avanzado, generación masiva de QR, etc.).  
+1. Dashboard Operativo (INT-01): es la **tabla `dashboard_daily`** — agregado diario por `distributor_id` con **upsert O(1) por movimiento**; **no es una vista** (la vista re-agregaba todo el historial en cada refresco **y evadía RLS**: se ejecuta como owner). Lectura vía RPC **`get_dashboard(from, to)`** (rango por defecto 30 días, filtrado por rol y **exige `is_premium()`**). En tiempo real, `dashboard_daily` y `alerts` están **publicados en Realtime** (entrega = SELECT + RLS ⇒ policy `dashboard_read`: admin · operador global MVP · distribuidor solo lo suyo, **y `is_premium()`**); el front se suscribe **solo mientras la pestaña está visible**.  
+2. Control de Acceso (Premium): flag en la tabla **`users`** (no `app_metadata`) validado con **`is_premium()`**. Desbloquea: **movimientos manuales** (`register_entry`/`register_exit`), **dashboard analítico** de gastos/ingresos (`get_dashboard` + realtime), **QR masivo** y la lectura de `order_items.unit_price` (lo sirve la RPC `get_order_items()`; el distribuidor normal sabe QUÉ y CUÁNTO, no el precio).  
 3. Chatbot Inteligente: Implementación de un agente conversacional con capacidades avanzadas:  
    * Validación Robusta de Usuario: Verificación estricta (ej: token de sesión \+ verificación de nivel premium).  
    * Modelo API/Local: Definición clara del método de servicio para ejecutar consultas o acciones.  
@@ -223,9 +238,9 @@ Estos requisitos no son estrictamente necesarios para un MVP funcional, pero son
 | Requisito | Descripción Detallada | Impacto en la Escalabilidad |
 | :---- | :---- | :---- |
 | Gestión de Categorías | Creación de una tabla jerárquica para clasificar productos (Ej: Bebidas → Refrescos). | Permite consultas complejas y filtros rápidos en el Dashboard. |
-| Historial Detallado (Auditoría) | Registro inmutable de cada evento: Quién, Qué, Cuándo, Por qué. | Esencial para trazabilidad forense; permite auditar discrepancias de inventario con precisión milimétrica. |
+| Historial Detallado (Auditoría) | Registro inmutable de cada evento: Quién, Qué, Cuándo, Por qué. **`audit_log` ya está activo desde Sprint 1** (8 tablas; `diff` jsonb = solo columnas cambiadas; NO audita `movements` ni chat). | Esencial para trazabilidad forense; permite auditar discrepancias de inventario con precisión milimétrica. |
 | Roles y Permisos (RBAC) | Implementación granular del Control de Acceso basado en Roles (ej: Cliente vs. Gerente vs. Operador). | Facilita la gestión de múltiples usuarios en un entorno corporativo sin sobrecargar el login. |
-| Gestión de Precios Dinámicos | Capacidad de aplicar precios variables al mismo producto según el perfil del usuario que consulta (Premium o Standard). | Soporte para diferentes modelos de negocio (Ej: Descuento especial a distribuidores). |
+| Gestión de Precios Dinámicos | Capacidad de aplicar precios variables al mismo producto según el perfil del usuario que consulta (Premium o Standard). **Nota**: en el MVP `price_publications` es **privado por tienda** (admin/operador-scope; el distribuidor recibe solo `unit_price` congelado) — esto sería un cambio de modelo posterior. | Soporte para diferentes modelos de negocio (Ej: Descuento especial a distribuidores). |
 | Notificaciones Proactivas | Sistema de event listeners que dispara alertas automáticas cuando se cumple una condición, incluso sin interacción del usuario. | Mejora drásticamente la usabilidad al avisar antes de que el problema sea grave (Ej: "Stock en 3 días \= Bajo"). |
 | Gestión de Proveedores Externos | Entidad separada para registrar a los proveedores primarios que alimentan a los distribuidores. | Separa la cadena de suministro interna (Distribuidor→Tienda) de la externa (Proveedor→Distribuidor). |
 
@@ -236,16 +251,16 @@ Estos requisitos no son estrictamente necesarios para un MVP funcional, pero son
 | Área Principal | ID Requisito | Descripción Detallada | Prioridad MVP |
 | ----- | ----- | ----- | ----- |
 | Inventario | INV-01 | CRUD Productos (incluye Unidad de Medida Base). | Alta (S2) |
-| Inventario | INV-02 | CRUD Tiendas y Geolocalización (Lat/Lng). | Alta (S1) |
+| Inventario | INV-02 | CRUD Tiendas y Geolocalización (`location geography(Point,4326)` PostGIS + vista `stores_geo`). | Alta (S1) |
 | Inventario | INV-03 | Asignación Producto →Tienda. | Media (S2) |
 | Inventario | INV-04 | Registro de Entradas y Salidas (con asociación). | Alta (S2) |
-| Inventario | INV-05 | Generación QR / Código para Producto/Tienda. | Media (S3) |
+| Inventario | INV-05 | Generación QR para la asociación Tienda ↔ Distribuidor. | Media (S3) |
 | Inventario | INV-06 | Detección de "Productos Faltantes" (Regla clara). | Alta (S2) |
 | Distribuidor | DIST-01 | CRUD Distribuidor. | Alta (S1) |
 | Distribuidor | DIST-02 | Módulo de Pedidos: Gestión y Estado del Ciclo de Vida (Ej: Pendiente → Recibido). | Alta (S3) |
 | Distribuidor | DIST-03 | Ruta Logística con integración Mapas/OpenFleet. | Media (S3) |
-| Interacción | INT-01 | Dashboard (Entradas/Salidas por Distribuidor). | Alta (S3) |
-| Seguridad | SEC-01 | Bloqueo de Acciones basado en Rol Premium. | Alta (S2) |
+| Interacción | INT-01 | Dashboard (tabla `dashboard_daily`: Entradas/Salidas por Distribuidor). | Alta (S3) |
+| Seguridad | SEC-01 | Bloqueo de Acciones basado en Rol Premium. | Alta (**Sprint 2**, unificado con el cronograma) |
 | Chatbot | CHAT-01 | Chatbot: Verificación robusta de usuario y enlace a su información. | Media (S4) |
 | Chatbot | CHAT-02 | Chatbot: Capacidad de realizar consultas/acciones sobre la información del usuario. | Alta (S4) |
 
@@ -255,7 +270,7 @@ Estos requisitos no son estrictamente necesarios para un MVP funcional, pero son
 
 Objetivo: Tener el esqueleto funcional. Guardar, leer y definir quién eres.
 
-* Tareas Clave: Configuración de Infraestructura, Creación de DB Schema, CRUD Tiendas & Productos.  
+* Tareas Clave: Configuración de Infraestructura, Creación de DB Schema, CRUD Tiendas & Productos, RLS (Sprint 1) y **`audit_log` desde Sprint 1**.  
 * Requisitos a Finalizar: INV-01,INV-02,DIST-01.  
 * Entregable (Demo): Poder ingresar datos en el sistema y verlos listados correctamente por tipo de entidad.
 
@@ -263,23 +278,23 @@ Objetivo: Tener el esqueleto funcional. Guardar, leer y definir quién eres.
 
 Objetivo: El sistema debe registrar un evento de negocio real. ¡Ya estamos moviendo stock\!
 
-* Tareas Clave: Implementar Transacciones (INV-04), Mapeo Inv→Tienda, y definir la regla del Poco Stock (INV-06).  
-* Requisitos a Finalizar: INV-03,INV-04,INV-06.  
-* Entregable (Demo): Registrar una entrada de producto, ver cómo el stock de esa tienda se actualiza y que un flag aparece si baja bajo el umbral.
+* Tareas Clave: Implementar Transacciones (INV-04), Mapeo Inv→Tienda, definir la regla del Poco Stock (INV-06) y el bloqueo Premium (**SEC-01**).  
+* Requisitos a Finalizar: INV-03,INV-04,INV-06,**SEC-01** (alineado con el backlog: SEC-01 vive en **Sprint 2**).  
+* Entregable (Demo): Registrar una entrada de producto, ver cómo el stock de esa tienda se actualiza y que una alerta `stock_low` aparece si cruza el `threshold`.
 
 ### ***SPRINT 3: Logística e Interfaz (Semanas 5 \- 6\)***
 
 Objetivo: El sistema es usable por los usuarios finales. ¡Pueden ver dónde están las cosas\!
 
 * Tareas Clave: Implementar la lógica de Pedidos (DIST-02), integrar el mapa (DIST-03) y construir el Dashboard inicial (INT-01).  
-* Requisitos a Finalizar: INV-05,SEC-01,DIST-02,DIST-03,INT-01.  
+* Requisitos a Finalizar: INV-05,DIST-02,DIST-03,INT-01.  
 * Entregable (Demo): Un usuario puede ver el dashboard, hacer clic en un distribuidor y ver su ruta marcada en Google Maps.
 
 ### ***SPRINT 4: Inteligencia y Refinamiento (Semanas 7 \- 8\)***
 
 Objetivo: Añadir la capa de valor añadido y pulir la experiencia. ¡Estamos listos para el lanzamiento\!
 
-* Tareas Clave: Desarrollo del Chatbot (CHAT-01,CHAT-02), cerrar brechas como el Historial Transaccional (Log) y Categorías.  
+* Tareas Clave: Desarrollo del Chatbot (CHAT-01,CHAT-02), cerrar brechas como la vista del Historial (`audit_log`, activo desde Sprint 1) y Categorías.  
 * Requisitos a Finalizar: CHAT-01,CHAT-02, Refinamiento de Logs/Cat..  
 * Entregable (Demo): Un usuario premium puede iniciar sesión, preguntar al bot sobre el estado de un pedido específico y ver la ruta asociada en tiempo real desde el dashboard.
 
@@ -289,7 +304,7 @@ Si cumples los 8 sprints a tiempo, usa este camino para ir construyendo la V2.0:
 
 | Fase | Enfoque Principal | Requisitos a Priorizar |
 | ----- | ----- | ----- |
-| Fase II | Robustez y Análisis | Historial de Transacciones (Log), Categorías de Productos, Tipos de Movimiento (Venta/Devolución). |
+| Fase II | Robustez y Análisis | Historial de Transacciones (la base `audit_log` ya vive desde Sprint 1 — aquí: UI de consulta y retención), Categorías de Productos. |
 | Fase III | Experiencia Avanzada | Precios Dinámicos por Usuario, Notificaciones Proactivas en tiempo real. |
 | Fase IV | Expansión y Gestión Completa | Roles de Acceso Granulares (RBAC), Módulo de Proveedores Externos. |
 

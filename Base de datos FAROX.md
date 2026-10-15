@@ -121,19 +121,22 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `category_id` | integer NOT NULL FK RESTRICT | mod — NØSEE no declara FK explícita; se añade con RESTRICT |
 | `brand_id` | bigint NOT NULL FK RESTRICT | mod — NØSEE usa `ON DELETE CASCADE` (borrar marca borraba productos); RESTRICT protege el historial de movimientos (D14) |
 | `unit_type_id` | integer NOT NULL FK RESTRICT | NØSEE |
+| `created_by` | uuid NOT NULL FK → users RESTRICT | FAROX — **creador = dueño del registro** del catálogo compartido; backfill al admin del seed en la migración (D36) |
 | `base_quantity` | numeric(12,3) NOT NULL CHECK (> 0) | NØSEE + CHECK |
-| `barcode` | text NULL | NØSEE — **no existe `sku`**: se reutiliza `barcode` (D6). El QR de producto↔tienda se genera en cliente y no necesita SKU |
+| `barcode` | text NULL | NØSEE — **no existe `sku`**: se reutiliza `barcode` (D6/D42). El QR asocia **tienda↔distribuidor** (se genera en cliente; 0 egress) y no necesita SKU |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
 | `search_vector` | tsvector GENERATED STORED | mod — **`to_tsvector('spanish', coalesce(name,'') || ' ' || coalesce(description,''))`**: la versión `name ∥ description` **devolvía NULL** para todo producto sin descripción (casi todos los de NØSEE) — bug corregido |
 | `created_at` / `updated_at` | timestamptz | mod — `updated_at` añadido |
 
 **Elimina de NØSEE**: `is_admin_hidden` + 5 columnas `hidden_*` (moderación).
 
+**Escritura**: solo el **creador** (`created_by = auth.uid()`) o **admin** (override) — catálogo de uso general, escritura trazada (D36). Crear requiere `has_scope()` (gate D37).
+
 **Índices**
 - `products_pkey`
 - `uq_products_barcode` — **copiar el funcional de NØSEE** (normaliza y permite repetir espacios/puntuación):
   `CREATE UNIQUE INDEX ... ON products (lower(regexp_replace(barcode,'[^a-zA-Z0-9]','','g'))) WHERE barcode IS NOT NULL AND length(trim(barcode)) > 0;`
-- **Diferidos** (§5): `gin(search_vector)` y `gin(name gin_trgm_ops)` — con 209 productos un seq scan `ILIKE` gana; 2 GIN = escritura gratis perdida. Umbral de activación: ~50.000 productos. **`pg_trgm` NO se instala en el Sprint 1.**
+- **Diferidos** (§5): `gin(search_vector)` y `gin(name gin_trgm_ops)`, `btree (created_by)` — con 209 productos un seq scan `ILIKE` gana; 2 GIN = escritura gratis perdida. Umbral de activación: ~50.000 productos. **`pg_trgm` NO se instala en el Sprint 1.**
 - El front **nunca** debe traer `search_vector` en listados (`select=` explícito).
 
 ### 2.7 `stores`
@@ -149,11 +152,13 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `phone` | text | FAROX — requisito p.7 |
 | `location` | **geography(Point,4326) NOT NULL** | NØSEE — PostGIS (decidido); único punto de verdad geográfico (D12) |
 | `website_url` | text | NØSEE |
-| `created_by` | uuid FK → `users` RESTRICT DEFAULT auth.uid() | mod — NØSEE (patrón de actor); el DEFAULT evita suplantación de actor al crear tienda vía PostgREST |
+| `created_by` | uuid NOT NULL FK → users RESTRICT | mod — **dueño y actor** de la tienda (D33); escrito solo por `create_store()` ⇒ sin suplantación (el DEFAULT de PostgREST no la evitaba: el cliente podía enviar el campo explícito). Backfill al admin del seed en la migración |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
 | `created_at` / `updated_at` | timestamptz | mod — `updated_at` añadido |
 
 **Elimina de NØSEE**: `is_admin_hidden` + 5 `hidden_*`, `evidence_count` (comunidad).
+
+**Alta y tope**: crear tienda solo vía **`create_store()`** (§4) — valida el tope por usuario (**1 tienda activa; 3 si `is_premium()`**; admin exento — D34), inserta la tienda y **auto-asocia al dueño en `user_stores`** (D35) ⇒ el dueño obtiene alcance con el mecanismo RLS existente. UPDATE directo permitido solo al dueño/admin; DELETE admin (soft).
 
 **Índices**: PK · **`GIST (location)` DIFERIDO** — con 25 tiendas el planner elige seq scan siempre; el GiST es la estructura de índice más cara de escribir. Umbral de activación: **~1.000 tiendas** (D22). NØSEE tiene **dos** GIST duplicados sobre `location` — no copiar ninguno todavía. `btree (name)` también diferido (25 filas).
 
@@ -245,6 +250,7 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 
 **Índices**: PK · `UNIQUE (order_id, product_id)` — una línea por producto por pedido (evita duplicados por doble submit) · el índice del unique **cubre** la FK `order_id`; `btree (product_id)` para joins inversos.
 **Nota**: NØSEE deja `order_items` **sin índices FK** — no copiar ese descuido.
+**Precio (D40)**: SELECT **revocado** — las líneas se leen con `get_order_items()`, que **omite `unit_price`** a los no-premium (RLS no filtra columnas ⇒ solo RPC). El flujo de pedido no se gatea: el distribuidor normal ve producto y cantidad.
 
 **Consulta DIST-02** ("asignado a distribuidor, no movilizado") — sin tabla extra: `order_items JOIN orders WHERE orders.distributor_id = X AND orders.status = 'pending' AND order_items.status IN ('pending') AND NOT EXISTS (movements WHERE order_id = orders.id)` (calificado: hay `status` en ambas tablas — NIT corregido). Una sola fuente de verdad del "recibido": `order_items.status/received_quantity` (escritura); `movements` con `order_id` es el **efecto en stock** de esa misma operación atómica (§4 `confirm_delivery` — que **suma** entrada a la tienda destino), no una segunda opinión divergente.
 
@@ -428,6 +434,7 @@ Append-only · **Índices**: PK · `btree (credit_id)`.
 | `created_at` | timestamptz | |
 
 Sin esto, "Dashboard: operador ✔ su alcance" y el RLS por tienda no tienen sobre qué filtrar. PK `(user_id, store_id)` indexa ambas direcciones.
+El dueño se auto-asocia en `create_store()` (D35) — `user_stores` sigue siendo la **única** fuente de alcance.
 
 ### 3.11 `chat_conversations`
 
@@ -467,7 +474,21 @@ Sin esto, "Dashboard: operador ✔ su alcance" y el RLS por tienda no tienen sob
 - **Alcance por rol (A3 — decisión MVP)**: el grano es por **distribuidor** y no existe relación tienda↔distribuidor, por lo que "su alcance" del operador (tiendas) **no es servible** sin re-agregar `movements`. Decisión MVP: **el operador ve el agregado global** (desviación consciente de la matriz SEC-01, anotada en §8 y en la matriz); el distribuidor solo su `distributor_id`. Si el alcance por tienda se vuelve requisito, se añade columna `store_id` al agregado y upsert por tienda (migración aditiva).
 - **`INSERT … ON CONFLICT DO UPDATE`** dentro de `register_entry/register_exit` — 1 upsert barato por movimiento en vez de **re-agregar todo el historial en cada poll** (crítica A2: la vista original leía ~150 MB lógicos por refresco a 1M movements y crecía sin límite de filas).
 - Lectura vía **`get_dashboard(p_from, p_to)`** (§4): RPC `SECURITY DEFINER` con rango por defecto **30 días** y filtro por rol — además resolvía que la vista **evadía RLS** (ejecutaba como owner y el distribuidor veía el agregado de todos).
-- Realtime: la tabla se publica (§5) — el front recibe la fila `(day, distributor_id)` actualizada, payload minúsculo.
+- Realtime: la tabla se publica (§5) — el front recibe la fila `(day, distributor_id)` actualizada (~100 B). **Requisito de entrega**: Supabase Realtime solo emite `postgres_changes` si el suscriptor tiene **SELECT + policy RLS** sobre la tabla ⇒ se **GRANTEA SELECT** con la policy `dashboard_read` (no se revoca; coherencia §4/§8):
+  ```sql
+  GRANT SELECT ON dashboard_daily TO authenticated;
+  CREATE POLICY dashboard_read ON dashboard_daily FOR SELECT TO authenticated
+  USING (
+    is_premium()                                        -- D39: analítica = premium
+    AND (
+      my_role() = 'admin'
+      OR my_role() = 'operador'                         -- A3: agregado global en MVP
+      OR distributor_id = my_distributor_id()           -- distribuidor: solo lo suyo
+    )
+  );
+  ```
+  La policy deja ver **exactamente** lo que `get_dashboard()` devuelve al rol ⇒ sin fuga de datos vía PostgREST directo.
+- **Regla de suscripción (egress)**: suscribir **solo con la pestaña visible** (unsubscribe en `visibilitychange`/unmount) y con `filter=day=eq.<fecha>` — así no se pagan eventos de días que nadie mira.
 
 ### 3.14 `audit_log` — quién, qué, cuándo (append-only, alcance acotado)
 
@@ -487,6 +508,9 @@ Sin esto, "Dashboard: operador ✔ su alcance" y el RLS por tienda no tienen sob
 Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 
 **Índices**: PK · `btree (table_name, row_id)` · **`BRIN (created_at)`**. **Eliminado** `btree (created_by)` — 27 valores distintos, selectividad basura, ~50 MB perdidos; para "qué hizo el usuario X" existe el BRIN por fecha + `table_name` (crítica A1).
+
+**Lectura (D38)**: `GRANT SELECT` + policy `audit_read` (`USING (my_role() = 'admin')`) — el REVOKE original la dejaba ilegible: el admin no tenía ninguna vía (RPC o policy) para leer su propia auditoría. El front lista con **keyset sobre `created_at`** (lo cubre el BRIN) + `LIMIT`; nunca `count=exact`.
+
 ---
 
 ## 4. Funciones RPC (el conjunto completo que hace implementable la matriz SEC-01)
@@ -503,13 +527,14 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 | `update_user_role(p_user, p_role, p_distributor)` | **solo admin** (C2/M11) | Cambia rol: si el nuevo rol es `distribuidor` **exige** `p_distributor NOT NULL`; si no lo es, setea `distributor_id = NULL`. Única vía de asignar alcance de distribuidor |
 | `assign_user_stores(p_user, p_stores bigint[])` | **solo admin** (A1) | Reemplaza el alcance del operador (borra los ausentes, inserta los nuevos, 1 transacción). Única escritura de `user_stores` |
 | `assign_product_to_store(p_product, p_store, p_threshold)` | admin, operador | INV-03: crea/actualiza `stock`, evalúa `stock_low` |
-| `register_entry(...)` | admin, operador | Valida, **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
-| `register_exit(...)` | admin, operador | Igual, con validación de stock suficiente |
+| `register_entry(...)` | admin, operador **+ `is_premium()`** (D39) | Valida, **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
+| `register_exit(...)` | admin, operador **+ `is_premium()`** (D39) | Igual, con validación de stock suficiente |
 | `register_reverse(p_movement_id, p_reason)` | **solo admin** | Inserta movimiento inverso con `reverso_of_id` (1 por original, tipo opuesto, mismo producto/tienda), reevalúa alertas y dashboard |
 | `set_price(p_product, p_store, p_price, p_currency)` | **solo admin** | `SELECT ... FOR UPDATE` del activo previo (serializa concurrentes) + inserta fila nueva + desactiva la anterior — única mutación de precios permitida |
-| `create_order(...)` | admin | Crea `orders` + `order_items` (`unit_price` congelado) |
+| `create_order(...)` | admin · operador (**con tienda en scope**; sin premium — D39) | Crea `orders` + `order_items` (`unit_price` congelado) |
 | `update_order_status(p_order, p_status, p_reason)` | admin, operador (**`cancelled` solo admin**) (A7) | Transiciones `pending → in_route → …`; `delivered` solo la pone `confirm_delivery`; `cancelled` exige rol admin + `p_reason` y escribe `cancelled_at`/`cancelled_reason` (CHECK lo exige) |
-| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos), operador (tiendas de su alcance) (M6) | **`register_entry` por línea, no exit** (C3): la entrega **suma** stock a la tienda destino (`motive_id` = `reabastecimiento` por defecto); `received_quantity`/`status` por línea (`received` si = quantity, `partial` si 0 < recibido < quantity); `delivered_at` + `status = 'delivered'` en el pedido (lo exige el CHECK); deriva `distributor_id`; cierra alertas `order_late` del pedido — todo atómico |
+| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos), operador (tiendas de su alcance) (M6) | **`register_entry` por línea, no exit** (C3): la entrega **suma** stock a la tienda destino (`motive_id` = `reabastecimiento` por defecto); `received_quantity`/`status` por línea (`received` si = quantity, `partial` si 0 < recibido < quantity); `delivered_at` + `status = 'delivered'` en el pedido (lo exige el CHECK); deriva `distributor_id`; cierra alertas `order_late` del pedido — todo atómico; **premium NO exigido** (el flujo de pedido/entrega es feature normal — D39; la entrada interna no re-chequea `is_premium()` en el límite) |
+| `get_order_items(p_order)` | auth con el pedido visible | Devuelve las líneas; **omite `unit_price` si `NOT is_premium()`** (D40) — el distribuidor normal sabe QUÉ y CUÁNTO, no el precio (es el análisis del premium) |
 | `save_route(...)` / `mark_stop(...)` | admin (crear), distribuidor (paradas propias) | **Nombre único `mark_stop`** (nit: antes `update_stop`/`mark_stop`); valida en servidor que la ruta sea del distribuidor del JWT |
 | `update_route_status(p_route, p_status)` | admin; distribuidor solo `completed` de su ruta (A8) | Transiciones `planned → active → completed`/`cancelled` — `route_status` sin esto era decorativo |
 | `create_credit(...)` / `cancel_credit(...)` | **solo admin** | Alta/baja con motivo: `cancel_credit` exige `cancelled_at`/`cancelled_reason` y — si `balance < total_amount` — revertir primero los pagos (A5) |
@@ -517,15 +542,18 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 | `register_payment_reverse(p_payment, p_reason)` | **solo admin** (A5) | Inserta `credit_payments` reverso (`reverso_of_id`), recalcula `credits.balance` (suma el reverso), reabre `status` si estaba `paid` (limpia `settled_at`), cierra/reabre `credit_overdue`, audita — la única corrección de cobros (append-only intacto) |
 | `mark_alert_read(p_alert)` | auth | **`SECURITY DEFINER`** (el UPDATE directo está revocado): valida scope **dentro** de la función (admin · `store_id = ANY(my_store_ids())` · `distributor_id = my_distributor_id()`) y pone `read_at` — la RLS no aplica en DEFINER, el chequeo interno es obligatorio (A2) |
 | `get_stock(p_store bigint, p_limit int DEFAULT 50)` | auth + scope (M3) | Tool del chatbot: filtra `p_store` contra `my_store_ids()`/`my_distributor_id()` en servidor, `LIMIT` duro, columnas mínimas |
-| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth | Lee `dashboard_daily` filtrando por rol: distribuidor su id; **operador ve el agregado global en MVP** (decisión A3 en §3.13) — egress mínimo |
+| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth **+ `is_premium()`** (D39) | Lee `dashboard_daily` filtrando por rol: distribuidor su id; **operador ve el agregado global en MVP** (decisión A3 en §3.13) — egress mínimo. Sin premium no hay dashboard analítico |
 | `create_chat(p_title)` / `send_message(p_conversation, p_content)` | auth, dueño (`user_id = auth.uid()`) (M3) | Chat solo por RPC: valida dueño en servidor, inserta, toca `updated_at` de la conversación |
 | `touch_updated_at()` | trigger | `BEFORE UPDATE` de todas las mutables |
 | `audit_diff()` | trigger | Solo en las tablas del alcance §3.14 (8 tablas) |
 | `prevent_price_update()` | trigger (M2) | `BEFORE UPDATE OF price` en `price_publications`: rechaza si la fila está activa — el mecanismo que §2.8 prometía pero no estaba listado |
 | `sync_email()` | trigger | `auth.users` → `users.email` (edición posterior) |
 | `sanitize_distributor_scope()` | trigger (M11) | `BEFORE INSERT OR UPDATE` en `users`: rol `distribuidor` ⇒ `distributor_id NOT NULL`; otro rol ⇒ `NULL` (red de seguridad además de `update_user_role`) |
+| `has_scope()` | auth | `SECURITY DEFINER STABLE SET search_path` → **true** si el usuario tiene alcance: admin · rol `distribuidor` con `distributor_id` · cualquier usuario con ≥1 fila en `user_stores`. Gate de **"todas las acciones"** (D37) |
+| `create_store(...)` | auth (cualquier usuario) | **Bootstrap exento del gate**: valida tope de tiendas (1 activa; 3 con `is_premium()`; admin exento — D34), inserta la tienda (`created_by = auth.uid()`) y su fila en `user_stores` — dueño ⇒ alcance sin modelo nuevo (D35). Devuelve el `id` de la tienda |
+| `enforce_store_cap()` | trigger | `BEFORE INSERT ON stores`: respaldo del tope D34 — si `auth.uid()` es NULL (seed/migración) o rol admin, deja pasar |
 
-**Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función).
+**Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función). **Gate global (D37)**: toda acción crear/actualizar no-admin exige `has_scope()` — en las tablas con scope (stock, movements, orders, credits…) ya lo garantiza la derivación desde el JWT (scope vacío ⇒ la acción falla); en las tablas **globales** (products, stores) se añade explícitamente a la policy. Excepciones: perfil propio, `create_store()` (bootstrap) y chat.
 
 **Atomicidad del stock (corregido — crítico)**: nunca leer-then-escribir. El UPDATE lleva el guard en el `WHERE` (lock implícito + validación en 1 sentencia):
 ```sql
@@ -550,8 +578,14 @@ REVOKE INSERT, UPDATE, DELETE ON
   price_publications, alerts, routes, route_stops, user_stores,
   dashboard_daily, audit_log, chat_conversations, chat_messages
 FROM authenticated;
--- Lecturas selectivas por RLS: en user_stores/audit_log/dashboard_daily/chat_* también se revoca SELECT
--- (solo RPC las leen: my_store_ids, get_dashboard, etc.) — el resto lee vía RLS.
+-- Alta de tiendas solo por create_store() (D35): el INSERT directo queda revocado;
+-- UPDATE de stores sí se deja vía RLS (dueño/admin) y DELETE admin soft.
+REVOKE INSERT ON stores FROM authenticated;
+-- Lecturas selectivas por RLS: en user_stores/order_items/chat_* también se revoca SELECT
+-- (solo RPC las leen: my_store_ids, get_order_items, etc.) — el resto lee vía RLS.
+-- audit_log NO se revoca: se GRANTEA SELECT con policy `audit_read` (solo admin, D38).
+-- dashboard_daily NO se revoca: realtime (§3.13) exige SELECT + policy `dashboard_read`
+-- (scope por rol, equivalente al resultado de get_dashboard) — revocarlo silencia los eventos en vivo.
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n siempre viaja con JWT de usuario
 ```
@@ -609,7 +643,7 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 | D3 | `timestamptz` en todo | NØSEE mezcla `timestamp without time zone` ⇒ ambigüedad de zona |
 | D4 | Actores = `created_by`, dueños = `user_id` | Un patrón único de auditoría; el .md usaba `user_id` para "quién registró", que confunde con el dueño |
 | D5 | `product_categories.parent_id` **nullable** | Reconcilia el .md (jerárquico) con NØSEE (plano): `NULL` = plana, funciona con datos semilla |
-| D6 | Sin `sku`; se conserva `barcode` de NØSEE | El QR codifica producto↔tienda (cliente); `barcode` ya trae índice único funcional probado |
+| D6 | Sin `sku`; se conserva `barcode` de NØSEE | El QR asocia **tienda↔distribuidor** (cliente, D42); `barcode` ya trae índice único funcional probado |
 | D7 | `premium` vive **solo en `users`**; `is_premium()` = `premium OR rol admin` | El .md tenía premium en tabla **y** en `app_metadata` ⇒ dos fuentes que divergen; la fórmula resuelve además "admin siempre premium" sin constraint |
 | D8 | Tabla **`users`**, no `profiles` | Continuidad con NØSEE; confusión con `auth.users` se mitiga con comentario en DDL |
 | D9 | `orders`/`order_items`: nombre NØSEE, contenido FAROX | Reutiliza el vocabulario conocido; se elimina 100% el flujo delivery/dealer |
@@ -635,6 +669,18 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 | D29 | **1 usuario ↔ 1 distribuidor** (`users.distributor_id`) | Suficiente para RLS del MVP; si un repartidor sirve a 2 distribuidores, se promueve a tabla puente `user_distributors` (migración aditiva). Trigger limpia el scope al cambiar de rol |
 | D30 | `stock.expiry_date` (aproximación) en vez de FEFO | Sin lotes no se sabe qué lote salió; la caducidad "vigente del par" + job diario dan la alerta `expiry_soon` sin el coste de lotes. Limitación documentada: al agotarse el stock, caducidad → NULL |
 | D31 | Reversos: `UNIQUE (reverso_of_id)` + validación en `register_reverse()` | Sin esto: doble reverso (doble corrección de stock) y reverso-de-reverso (cadena infinita) eran imposibles de detectar |
+| D32 | `dashboard_daily`: SELECT con policy `dashboard_read` (no REVOKE) + **realtime elegido sobre polling** por modelo de costo | Realtime exige SELECT+RLS para emitir: un REVOKE silenciaba los eventos en vivo (contradicción §3.13/§4). Costo: realtime = O(cambios) (~150 B × evento real); polling = O(tiempo) (~6 KB/min incondicional ⇒ ~90 MB/mes/usuario con 50 filas). Crossover ~40 mov/min por suscriptor vs proyección ~1M movements/año ≈ 0.7/min ⇒ realtime ~13× más barato, además sin re-renders ni queries en reposo (D20 ya rechazó el agregado en poll por la misma razón) |
+| D33 | Dueño de tienda = `stores.created_by` (sin columna `owner_id` en MVP) | En el flujo self-serve creador y dueño coinciden; separar actor/dueño solo aporta cuando difieren — si algún día existe "admin crea tienda para un usuario", añadir `owner_id` (migración aditiva) |
+| D34 | Topo de tiendas por usuario: **1 activa; 3 si `is_premium()`** (admin exento) | Regla del dueño del producto; contando solo `is_active`. Da al flag premium un gate concreto de negocio además de las features UX. Enforced en `create_store()` + respaldo `enforce_store_cap()` |
+| D35 | `create_store()` RPC + **auto-asociación en `user_stores`** | El dueño obtiene alcance con el mecanismo RLS ya existente (una sola fuente de verdad: `user_stores`) en vez de un segundo modelo de visibilidad. `stores` INSERT revocado ⇒ sin suplantación de `created_by` |
+| D36 | `products.created_by` + edición **solo del creador** (admin = override) | Catálogo de uso general: sin esto cualquier operador con scope editaba productos compartidos. Migrados de NØSEE ⇒ backfill al admin del seed |
+| D37 | **Gate `has_scope()` en TODAS las acciones crear/actualizar no-admin** (versión estricta, decisión del dueño) | Coste aceptado y registrado: policies más pesadas (1 STABLE extra por fila en globals). Mitiga además el riesgo del rol por defecto de `handle_new_user()`: un signup sin tienda no puede escribir en ningún lado (solo perfil/chat/su primera tienda). Excepciones: perfil, `create_store()`, chat |
+| D38 | `audit_log`: GRANT SELECT + policy `audit_read` (solo admin) en vez de REVOKE | El bloque §4 revocaba SELECT "solo RPC las leen" pero **no existía `get_audit()`**: el admin no podía leer su propia auditoría (la matriz §8 lo prometía). Policy admin-only = misma garantía de acceso y grants/§8 coherentes, sin RPC nueva |
+| D39 | **Premium = registrar movimientos manuales + dashboard analítico** (M7 resuelto) | `register_entry`/`register_exit` y `get_dashboard`/`dashboard_read` exigen `is_premium()`. **Flujo de pedido NO** (`create_order`/`confirm_delivery`): "poder pedir" es feature normal — si `confirm_delivery` exigiera premium, el pedido normal nunca podría recibirse; su entrada interna no re-chequea en el límite. Modelo freemium: gratis = catálogo + stock + pedidos; premium = inventario real + analítica de gastos/ingresos |
+| D40 | `order_items.unit_price` **solo premium**: SELECT revocado + RPC `get_order_items()` | RLS no sabe filtrar columnas ⇒ solo RPC puede omitirla. El distribuidor normal sabe QUÉ y CUÁNTO, no el precio — el precio congelado es el análisis del premium y reduce payload/egress de los usuarios gratuitos |
+| D41 | **Precio privado por tienda**: SELECT de `price_publications` = admin (todas) · operador (solo sus tiendas) · distribuidor (ninguno) | El precio lo coloca la tienda y ninguna otra tienda lo ve (ventaja competitiva); el distribuidor recibe el `unit_price` congelado del pedido, no el listado vivo |
+| D42 | QR = asociación **tienda↔distribuidor** (corrige D6) | El dueño aclaró el propósito: el distribuidor escanea para vincularse a la tienda — no codifica producto↔tienda. `barcode` sigue sin necesitar SKU |
+| D43 | `create_order`: **admin · operador con tienda en scope** (sin premium) | "Poder pedir" es feature normal del usuario con tienda (D39): el operador pide a su distribuidor. El §4 anterior decía "solo admin" — contradecía el modelo del .md (usuario normal = catálogo + stock + pedir); alineado en §4 |
 
 ---
 
@@ -652,7 +698,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;   -- jobs diarios de alertas (expiry_soo
 
 -- 4. Aplicar alteraciones de este documento (tips, FKs, columnas, drops, checks)
 
--- 5. Funciones + triggers (§4) — INCLUYE handle_new_user() y sanitize_distributor_scope()
+-- 5. Funciones + triggers (§4) — INCLUYE handle_new_user(), sanitize_distributor_scope(), has_scope(), create_store() y enforce_store_cap()
 --    ANTES de cualquier signup (sin el trigger, el primer login no crea fila users y RLS/permisos caen)
 
 -- 6. Seeds en orden (D19):
@@ -693,6 +739,7 @@ END $$;
 ```
 
 **Preparación de datos (cuando se carguen productos/tiendas/precios)**
+- Backfill de `created_by` (products/stores migrados) con el admin del seed y `NOT NULL` en la misma transacción de carga (§2.6/§2.7).
 - Verificar duplicados de `barcode` normalizado antes del unique.
 - Verificar unicidad de `unit_types.abbreviation` y `distributors.nit` en los datos de origen (si pasa, crear los uniques).
 - Verificar que no existan **2 precios activos** para el mismo (store, product) de NØSEE antes de crear `uq_price_store_product_active` (limpiar dejando el más reciente).
@@ -719,13 +766,13 @@ END $$;
 | Tabla | SELECT | INSERT | UPDATE | DELETE |
 |---|---|---|---|---|
 | `roles`, `unit_types`, `store_types`, `motives`, `brands`, `product_categories` | `true` | admin | admin | admin (soft-delete: solo `is_active`) |
-| `products` | `true` | admin, operador | admin, operador | admin (solo `is_active = false`) |
-| `stores` | `true` | admin, operador | admin, operador | admin (solo `is_active = false`) |
+| `products` | `true` | admin · operador (`has_scope()`) | admin · **creador** (`created_by = mine`, con `has_scope()`) | admin (solo `is_active = false`) |
+| `stores` | `true` | — RPC `create_store` | admin · dueño (`created_by = mine`) | admin (solo `is_active = false`) |
 | `distributors` | admin, operador | admin | admin | admin (solo `is_active = false`) |
-| `price_publications` | admin, operador | — RPC `set_price` | — RPC `set_price` | admin (soft) |
+| `price_publications` | admin (todas) · operador (**solo `store_id = ANY(my_store_ids())`** — precio privado por tienda, D41; distribuidor: **ninguno**) | — RPC `set_price` | — RPC `set_price` | admin (soft) |
 | `users` | fila propia, o admin | — RPC `update_user_role` / trigger | admin (rol/premium/actividad) | — (baja = `is_active`) |
 | `orders` | admin · operador (`store_id ∈ my_store_ids()`) · distribuidor (`distributor_id = mine`) | — RPC `create_order` | — RPC `update_order_status`/`confirm_delivery` | — |
-| `order_items` | hereda del `orders` visible | — RPC | — RPC | — |
+| `order_items` | — RPC `get_order_items` (SELECT revocado; `unit_price` solo premium — D40) | — RPC | — RPC | — |
 | `stock` | admin · operador (`store_id ∈ mine`) · distribuidor (tiendas de sus pedidos/ruta) | — RPC | — RPC | — |
 | `movements` | admin · operador (`store_id ∈ mine`) · distribuidor (solo `distributor_id = mine`) | — RPC | — (append-only) | — |
 | `routes`/`route_stops` | admin · operador · distribuidor (`distributor_id = mine`) | — RPC | — RPC | — |
@@ -733,14 +780,15 @@ END $$;
 | `alerts` | admin (todas) · operador (`store_id ∈ mine`) · distribuidor (**solo `distributor_id = mine`** — nunca NULL, A4) | — jobs/trigger | — RPC `mark_alert_read` | — |
 | `user_stores` | fila propia, admin | — RPC admin | — | — RPC admin |
 | `chat_conversations`/`chat_messages` | `user_id = auth.uid()` / conversación propia | — RPC `create_chat`/`send_message` | — (trigger solo) | — |
-| `audit_log` | admin | — trigger | — (append-only) | — |
-| `dashboard_daily` | solo RPC `get_dashboard` (SELECT revocado) | — upsert interno RPC | — | — |
+| `audit_log` | admin (policy `audit_read`) | — trigger | — (append-only) | — |
+| `dashboard_daily` | policy `dashboard_read` (admin · operador global A3 · distribuidor `distributor_id = mine`) + RPC `get_dashboard` | — upsert interno RPC | — | — |
 
 **Reglas de composición**:
 - Policies **por operación** (`SELECT`/`INSERT`/`UPDATE`/`DELETE` separados). **Prohibido `FOR ALL`** en tablas sensibles: el ejemplo `crud_products FOR ALL USING (is_premium())` del `.md` principal incluiría DELETE y violaría la matriz.
 - "Eliminar" de la matriz = **soft-delete** (`is_active = false`) — las FK `RESTRICT` bloquean hard delete con historial.
 - `is_premium()` como gate **solo** donde la matriz lo diga explícitamente (QR masivo, features premium) — nunca como único filtro de una policy de escritura general.
 - Alcance del operador **solo** se modifica con `assign_user_stores()` (solo admin); nadie más escribe `user_stores`.
+- **Gate de alcance (D37 — estricto)**: toda INSERT/UPDATE no-admin exige `has_scope()`. En tablas con scope ya lo garantiza la derivación de RPC/RLS; en **globales** (products, stores) se suma a la policy. **Excepciones**: perfil propio, `create_store()` (bootstrap) y chat (`create_chat`/`send_message`) — el canal de onboarding no se bloquea. Si se quiere endurecer después, quitar chat de las excepciones es un renglón.
 - Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1 (default deny).
 - **Desviación MVP registrada (A3)**: `get_dashboard` da al operador el agregado **global** (no por tienda) mientras `dashboard_daily` sea por `(day, distributor_id)` — ver §3.13.
 
@@ -751,12 +799,14 @@ END $$;
 - [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7.
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
 - [x] Premium alineado en el `.md` principal (tabla `users`, no `app_metadata`; `is_premium()` única y con `SET search_path`).
-- [ ] Alinear el `.md` principal (resto): `order` → `orders`, `price_publication` → `price_publications`, `umbral` → `threshold`, `user_id` de movimientos → `created_by`, `leída` → `read_at`, **eliminar el ejemplo `FOR ALL is_premium()`** (§8), `phone` → `phone_number`, DIST-04 en `motives`, `quantity` en kg (`numeric`), `expected_at`/`due_date`/`currency` como nuevos campos de requisito.
+- [x] **.md principal alineado** (pasada completa: vocabulario, precios privados por tienda, alertas materializadas, audit Sprint 1, dashboard tabla+realtime, SEC-01 → S2, M7/M8, QR tienda↔distribuidor, campos nuevos expected_at/due_date/currency).
 - [ ] **Umbrales de índices diferidos (D22)**: crear `GIST(location)` al llegar a ~1.000 tiendas; `pg_trgm`+GIN al llegar a ~50.000 productos — revisar con `pg_stat_statements` en cada sprint.
 - [ ] Validar `unit_types.abbreviation` único en seed (§7).
+- [ ] Revisar con `pg_stat_statements` el costo de `has_scope()` en policies de products/stores (D37) — si aparece en el top, materializar el flag en columna.
+- [ ] Lectura de chat_* (mitad pendiente del ALTO-3): elegir entre RPC de listado (keyset §3.12) o GRANT SELECT + policy de dueño (`user_id = auth.uid()`) — hoy §4 revoca SELECT y no hay RPC ⇒ historial ilegible (contradice §8).
 - [ ] Confirmar nombre de proyecto (checklist p.4) → afecta `project_ref` en el MCP.
-- [ ] Definir en la matriz SEC-01 del `.md` **qué es exactamente "CRUD avanzado" premium** (M7): hoy solo QR masivo está concreto y es UX-only (se genera en cliente, D6) — listar operaciones premium server-side o quitar el gate de la matriz.
-- [ ] Expectativa del `.md` "cada consulta del chatbot queda en audit_log" (M8): los triggers DML no auditan SELECT. Decidir: quitar la frase o añadir mecanismo de lecturas (pgAudit/future).
+- [x] **M7 resuelto (D39/D40)**: CRUD premium = registrar movimientos manuales + dashboard analítico + QR masivo + `unit_price`; normal = catálogo + stock + pedidos.
+- [x] **M8 resuelto**: se elimina la frase del .md — los triggers DML no auditan SELECT; la trazabilidad de tools del chatbot la lleva **n8n** (un registro por invocación en el flujo de trabajo).
 - [ ] Decisión pendiente (A4/§3.9): si el distribuidor debe ver `stock_low`/`expiry_soon`, requerirá relación tienda↔distribuidor (hoy no existe); MVP: no las ve.
 - [ ] Decisión pendiente (A3/§3.13): si el operador requiere dashboard "por su alcance", añadir `store_id` a `dashboard_daily` (MVP: agregado global).
 
