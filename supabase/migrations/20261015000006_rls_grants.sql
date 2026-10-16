@@ -380,12 +380,23 @@ GRANT SELECT ON public.dashboard_daily TO authenticated;
 GRANT SELECT ON public.chat_conversations, public.chat_messages TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- EXECUTE de funciones (§4): authenticated puede llamar las RPC; anon nunca
--- (el chatbot/n8n siempre viaja con JWT de usuario). PUBLIC conserva EXECUTE
--- por defecto de PG: handle_new_user()/sync_email() se ejecutan como
--- supabase_auth_admin durante el signup vía ese grant — NO revocar PUBLIC.
+-- EXECUTE de funciones (§4): authenticated puede llamar las RPC; anon y
+-- PUBLIC nunca (el chatbot/n8n siempre viaja con el JWT del usuario).
+--
+-- REVOKE ... FROM PUBLIC es LA pieza crítica (B3 del review): todo grant de
+-- funciones en PG "cae hacia abajo" a PUBLIC, así que sin revocarlo los
+-- REVOKE por rol de abajo (internos, jobs) eran INEFECTIVOS y anon podía
+-- invocar cualquier RPC sin sesión — con guards NULL-inseguros eso daba
+-- escalada a admin (update_user_role sin header Authorization).
+--
+-- handle_new_user()/sync_email() NO se afectan: son trigger-functions y PG
+-- no chequea EXECUTE al disparar el trigger (el chequeo es al CREATE
+-- TRIGGER); además su owner (postgres) conserva su EXECUTE propio, igual
+-- que pg_cron (los jobs corren como postgres = owner). Los scans job_scan_*
+-- y los helpers internos quedan solo para owner/definer.
 -- ---------------------------------------------------------------------------
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;
 
 -- Helpers internos 4.2 (NO para clientes): los RPC los invocan en contexto

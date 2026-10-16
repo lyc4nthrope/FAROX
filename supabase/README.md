@@ -61,28 +61,24 @@ SELECT id, email FROM public.users ORDER BY created_at;
 
 ```sql
 -- Cambiá <UUID> por el id del paso 2:
-SELECT public.update_user_role('<UUID>', 'admin', NULL);
+UPDATE public.users u
+SET role_id = r.id
+FROM public.roles r
+WHERE u.id = '<UUID>'::uuid AND r.name = 'admin';
 ```
 
-> **¿Desde el SQL editor y no desde la app?** Porque el RPC
-> `update_user_role` exige `my_role() = 'admin'` y el primer usuario recién
-> llega como `operador` — un operador no puede autopromoverse. La sesión del
-> SQL editor corre sin `auth.uid()`, `my_role()` devuelve NULL y el chequeo no
-> aplica: es el único camino legítimo de bootstrap (C2). **Una vez promovido,
-> el admin solo opera desde la app como cualquier authenticated.**
+> **¿Por qué un `UPDATE` directo y no `update_user_role()`?** El RPC exige
+> caller admin (`my_role() IS DISTINCT FROM 'admin'` ⇒ RAISE, endurecido en
+> el review de seguridad B3: el bypass por sesión sin `auth.uid()` quedó
+> cerrado a propósito) y el primer usuario llega como `operador` — un
+> operador no puede autopromoverse. El SQL editor corre como `postgres`,
+> dueño de las tablas: salta RLS y los grants por columna (D45). Es el único
+> camino legítimo de bootstrap (C2). **Una vez promovido, el admin opera
+> desde la app como cualquier authenticated** — `update_user_role()` desde
+> la app sirve para los siguientes usuarios.
 >
-> Alternativa vía API (si preferís no tocar el SQL editor): logueate como el
-> usuario en la app, copiá su `access_token` del storage del navegador y:
->
-> ```bash
-> curl -X POST 'https://<PROJECT-REF>.supabase.co/rest/v1/rpc/update_user_role' \
->   -H 'apikey: <ANON-KEY>' \
->   -H 'Authorization: Bearer <ACCESS_TOKEN_DEL_USUARIO>' \
->   -H 'Content-Type: application/json' \
->   -d '{"p_user": "<UUID>", "p_role": "admin", "p_distributor": null}'
-> ```
->
-> (No funciona con el anon key solo: `authenticated` necesita su JWT.)
+> (La vía API con el `access_token` del usuario **no sirve** para la
+> promoción inicial: su JWT es de `operador` y el guard lo rechaza.)
 
 ## ¿Cómo verifico que funcionó?
 
@@ -106,8 +102,9 @@ el orden 1→8 no se salta.
 **Opción B — CLI local:** `supabase db push` (o `supabase migration up`) — el
 orden numérico de los filenames se respeta automáticamente. El paso manual no
 lo automatiza nadie: hacélo entre 0005 y 0006 (o después de 0006/0007, que no
-impiden el signup — el REVOKE de anon en funciones no toca al signup de Auth;
-la advertencia de "antes de RLS" viene del §7 y aplica al ideal, no a un
+impiden el signup — los REVOKE de EXECUTE (anon/PUBLIC) no tocan a los
+triggers de auth.users: PG no chequea EXECUTE al disparar un trigger; la
+advertencia de "antes de RLS" viene del §7 y aplica al ideal, no a un
 bloqueo duro).
 
 **Requisitos previos:** extensiones `postgis` y `pg_cron` disponibles en el

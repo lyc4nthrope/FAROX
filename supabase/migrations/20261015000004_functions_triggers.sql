@@ -548,7 +548,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role_id integer;
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'update_user_role: solo admin';
   END IF;
   IF p_role = 'distribuidor' AND p_distributor IS NULL THEN
@@ -577,7 +577,7 @@ CREATE OR REPLACE FUNCTION public.set_user_premium(
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'set_user_premium: solo admin';
   END IF;
   UPDATE public.users
@@ -594,7 +594,7 @@ CREATE OR REPLACE FUNCTION public.set_user_active(
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'set_user_active: solo admin';
   END IF;
   UPDATE public.users
@@ -613,7 +613,7 @@ CREATE OR REPLACE FUNCTION public.assign_user_stores(
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'assign_user_stores: solo admin';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_user) THEN
@@ -677,7 +677,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := public.my_role();
 BEGIN
-  IF v_role NOT IN ('admin', 'operador') THEN
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'operador') THEN
     RAISE EXCEPTION 'assign_product_to_store: solo admin/operador';
   END IF;
   IF v_role = 'operador' AND NOT (p_store = ANY (public.my_store_ids())) THEN
@@ -702,7 +702,7 @@ DECLARE
   v_prev bigint;
   v_id   bigint;
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'set_price: solo admin';
   END IF;
   IF p_price IS NULL OR p_price <= 0 THEN
@@ -737,7 +737,7 @@ DECLARE
   v_price numeric(12,2);
   v_id    bigint;
 BEGIN
-  IF v_role NOT IN ('admin', 'operador') THEN
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'operador') THEN
     RAISE EXCEPTION 'register_entry: solo admin/operador';
   END IF;
   IF NOT public.is_premium() THEN
@@ -754,8 +754,9 @@ BEGIN
     SELECT distributor_id, store_id INTO v_dist, v_price
     FROM public.orders WHERE id = p_order_id;
     IF NOT FOUND THEN RAISE EXCEPTION 'pedido inexistente: %', p_order_id; END IF;
-    IF v_price IS DISTINCT FROM p_store THEN  -- reuse: comparación correcta abajo
-      NULL;
+    IF v_price IS DISTINCT FROM p_store THEN
+      RAISE EXCEPTION 'register_entry: pedido % pertenece a la tienda %, no a %',
+                      p_order_id, v_price::bigint, p_store;
     END IF;
     SELECT oi.unit_price INTO v_price FROM public.order_items oi
     WHERE oi.order_id = p_order_id AND oi.product_id = p_product;
@@ -788,7 +789,7 @@ DECLARE
   v_price numeric(12,2);
   v_id    bigint;
 BEGIN
-  IF v_role NOT IN ('admin', 'operador') THEN
+  IF v_role IS NULL OR v_role NOT IN ('admin', 'operador') THEN
     RAISE EXCEPTION 'register_exit: solo admin/operador';
   END IF;
   IF NOT public.is_premium() THEN
@@ -801,8 +802,8 @@ BEGIN
     RAISE EXCEPTION 'register_exit: quantity debe ser > 0';
   END IF;
   IF p_order_id IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM public.orders WHERE id = p_order_id) THEN
-      RAISE EXCEPTION 'pedido inexistente: %', p_order_id;
+    IF NOT EXISTS (SELECT 1 FROM public.orders WHERE id = p_order_id AND store_id = p_store) THEN
+      RAISE EXCEPTION 'register_exit: pedido % inexistente o de otra tienda', p_order_id;
     END IF;
     SELECT oi.unit_price INTO v_price FROM public.order_items oi
     WHERE oi.order_id = p_order_id AND oi.product_id = p_product;
@@ -834,7 +835,7 @@ DECLARE
   v_opp public.movement_type;
   v_id  bigint;
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'register_reverse: solo admin';
   END IF;
   IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
@@ -997,6 +998,12 @@ BEGIN
   ELSE
     RAISE EXCEPTION 'confirm_delivery: sin alcance sobre el pedido %', p_order;
   END IF;
+  -- Anti doble-entrega: una 2ª llamada re-sumaría stock por cada línea
+  -- (received_quantity se sobreescribe, pero internal_stock_entry ya no
+  -- distingue). delivered/cancelled no son re-entregables.
+  IF o.status IN ('delivered', 'cancelled') THEN
+    RAISE EXCEPTION 'confirm_delivery: pedido % en estado % (no re-entregable)', p_order, o.status;
+  END IF;
   IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' THEN
     RAISE EXCEPTION 'confirm_delivery: items requeridos';
   END IF;
@@ -1128,10 +1135,10 @@ BEGIN
   JOIN public.routes r ON r.id = rs.route_id
   WHERE rs.id = p_stop FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'parada inexistente: %', p_stop; END IF;
-  IF NOT (v_role = 'admin'
+  IF NOT COALESCE(v_role = 'admin'
           OR (v_role = 'distribuidor'
               AND s.route_id IN (SELECT r.id FROM public.routes r
-                                  WHERE r.distributor_id = public.my_distributor_id()))) THEN
+                                  WHERE r.distributor_id = public.my_distributor_id())), false) THEN
     RAISE EXCEPTION 'mark_stop: sin alcance sobre la parada %', p_stop;
   END IF;
   IF s.status NOT IN ('pending', 'arrived') AND p_status <> s.status THEN
@@ -1188,7 +1195,7 @@ DECLARE
   v_store bigint;
   v_id    bigint;
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'create_credit: solo admin';
   END IF;
   SELECT o.store_id INTO v_store FROM public.orders o WHERE o.id = p_order;
@@ -1217,7 +1224,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   c public.credits%ROWTYPE;
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'cancel_credit: solo admin';
   END IF;
   IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
@@ -1247,7 +1254,7 @@ DECLARE
   v_id   bigint;
   v_bal  numeric(14,2);
 BEGIN
-  IF public.my_role() NOT IN ('admin', 'operador') THEN
+  IF public.my_role() IS NULL OR public.my_role() NOT IN ('admin', 'operador') THEN
     RAISE EXCEPTION 'register_payment: solo admin/operador';
   END IF;
   IF p_amount IS NULL OR p_amount <= 0 THEN
@@ -1289,7 +1296,7 @@ DECLARE
   v_id   bigint;
   v_bal  numeric(14,2);
 BEGIN
-  IF public.my_role() <> 'admin' THEN
+  IF public.my_role() IS DISTINCT FROM 'admin' THEN
     RAISE EXCEPTION 'register_payment_reverse: solo admin';
   END IF;
   IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
@@ -1341,9 +1348,9 @@ BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'mark_alert_read: requiere sesión'; END IF;
   SELECT * INTO a FROM public.alerts WHERE id = p_alert FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'alerta inexistente: %', p_alert; END IF;
-  IF NOT (public.my_role() = 'admin'
+  IF NOT COALESCE(public.my_role() = 'admin'
           OR (a.store_id IS NOT NULL AND a.store_id = ANY (public.my_store_ids()))
-          OR (a.distributor_id IS NOT NULL AND a.distributor_id = public.my_distributor_id())) THEN
+          OR (a.distributor_id IS NOT NULL AND a.distributor_id = public.my_distributor_id()), false) THEN
     RAISE EXCEPTION 'mark_alert_read: sin alcance sobre la alerta %', p_alert;
   END IF;
   UPDATE public.alerts SET read_at = now() WHERE id = p_alert AND read_at IS NULL;

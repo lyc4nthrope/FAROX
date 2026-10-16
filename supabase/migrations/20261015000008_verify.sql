@@ -5,7 +5,7 @@
 -- (RAISE NOTICE + SELECTs finales). Todo "OK" = esquema sano; cualquier
 -- WARNING = investigar antes de continuar con el Sprint 2.
 -- Requiere haber corrido 0001…0007 en orden (y el paso manual de
--- supabase/README.md: signup del primer admin + update_user_role).
+-- supabase/README.md: signup del primer admin + promoción en SQL editor).
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -36,9 +36,14 @@ DECLARE
   v_funcs   integer;
   v_trig    integer;
 BEGIN
+  -- Objetos de extensiones excluidos (postgis instala spatial_ref_sys +
+  -- ~cientos de funciones en public sin ser de FAROX): deptype = 'e'.
   SELECT count(*) INTO v_tables FROM pg_catalog.pg_class c
    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-   WHERE n.nspname = 'public' AND c.relkind = 'r';
+   WHERE n.nspname = 'public' AND c.relkind = 'r'
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d
+                     WHERE d.classid = 'pg_catalog.pg_class'::regclass
+                       AND d.objid = c.oid AND d.deptype = 'e');
   IF v_tables = 25 THEN
     RAISE NOTICE 'V2 OK — 25 tablas en public';
   ELSE
@@ -47,7 +52,10 @@ BEGIN
 
   SELECT count(*) INTO v_enums FROM pg_catalog.pg_type t
    JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
-   WHERE n.nspname = 'public' AND t.typtype = 'e';
+   WHERE n.nspname = 'public' AND t.typtype = 'e'
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d
+                     WHERE d.classid = 'pg_catalog.pg_type'::regclass
+                       AND d.objid = t.oid AND d.deptype = 'e');
   IF v_enums = 11 THEN
     RAISE NOTICE 'V2 OK — 11 enums en public';
   ELSE
@@ -56,10 +64,13 @@ BEGIN
 
   -- 47 funciones = 5 helpers scope + 5 internos + 8 trigger-fn + 29 RPC/jobs
   -- (stores_geo es vista, no cuenta). Sin nombres duplicados: ver el GROUP BY
-  -- HAVING de abajo.
+  -- HAVING de abajo. Extensiones excluidas (deptype 'e').
   SELECT count(*) INTO v_funcs FROM pg_catalog.pg_proc p
    JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public';
+   WHERE n.nspname = 'public'
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d
+                     WHERE d.classid = 'pg_catalog.pg_proc'::regclass
+                       AND d.objid = p.oid AND d.deptype = 'e');
   IF v_funcs = 47 THEN
     RAISE NOTICE 'V2 OK — 47 funciones en public';
   ELSE
@@ -99,6 +110,9 @@ BEGIN
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
+      AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d
+                      WHERE d.classid = 'pg_catalog.pg_class'::regclass
+                        AND d.objid = c.oid AND d.deptype = 'e')  -- p.ej. spatial_ref_sys
   LOOP
     RAISE WARNING 'V3 — RLS DESHABILITADO en %.%', 'public', r.relname;
     n := n + 1;
@@ -154,7 +168,7 @@ DO $$
 DECLARE r record; n integer := 0;
 BEGIN
   FOR r IN
-    SELECT DISTINCT c.relname AS tbl, p.polcmd
+    SELECT DISTINCT c.relname AS tbl, a.privilege_type AS polcmd
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     JOIN LATERAL aclexplode(c.relacl) a(grantor, grantee, privilege_type, is_grantable)
@@ -176,43 +190,49 @@ BEGIN
   END IF;
 END $$;
 
+-- PUBLIC = grantee 0 en las ACLs (no figura en pg_roles): sin este chequeo el
+-- grant de PUBLIC pasaba desapercibido y el bloque devolvía "OK" falso (B3).
 DO $$
 DECLARE r record; n integer := 0;
 BEGIN
   FOR r IN
-    SELECT p.proname
+    SELECT p.proname, COALESCE(rl.rolname, 'PUBLIC') AS who
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-    JOIN LATERAL aclexplode(p.proacl) a(grantor, grantee, privilege_type, is_grantable)
+    JOIN LATERAL aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner)))
+      a(grantor, grantee, privilege_type, is_grantable)
       ON true
-    JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
-    WHERE n.nspname = 'public' AND rl.rolname = 'anon'
+    LEFT JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
+    WHERE n.nspname = 'public'
       AND a.privilege_type = 'EXECUTE'
+      AND (a.grantee = 0 OR rl.rolname = 'anon')
   LOOP
-    RAISE WARNING 'V5 — anon puede ejecutar %()', r.proname;
+    RAISE WARNING 'V5 — % puede ejecutar %()', r.who, r.proname;
     n := n + 1;
   END LOOP;
   IF n = 0 THEN
-    RAISE NOTICE 'V5 OK — anon sin EXECUTE en ninguna función';
+    RAISE NOTICE 'V5 OK — ni anon ni PUBLIC con EXECUTE en ninguna función de public';
   END IF;
 END $$;
 
--- Los helpers internos NO deben ser ejecutables por authenticated:
+-- Los helpers internos NO deben ser ejecutables por clientes (ni vía PUBLIC):
 DO $$
 DECLARE r record; n integer := 0;
 BEGIN
   FOR r IN
-    SELECT p.proname
+    SELECT p.proname, COALESCE(rl.rolname, 'PUBLIC') AS who
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-    JOIN LATERAL aclexplode(p.proacl) a(grantor, grantee, privilege_type, is_grantable)
+    JOIN LATERAL aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner)))
+      a(grantor, grantee, privilege_type, is_grantable)
       ON true
-    JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
-    WHERE n.nspname = 'public' AND rl.rolname = 'authenticated'
+    LEFT JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
+    WHERE n.nspname = 'public'
       AND p.proname LIKE 'internal\_%'
       AND a.privilege_type = 'EXECUTE'
+      AND (a.grantee = 0 OR rl.rolname = 'authenticated')
   LOOP
-    RAISE WARNING 'V5 — authenticated puede ejecutar helper interno %()', r.proname;
+    RAISE WARNING 'V5 — % puede ejecutar helper interno %()', r.who, r.proname;
     n := n + 1;
   END LOOP;
   IF n = 0 THEN
@@ -226,18 +246,19 @@ DO $$
 DECLARE r record; n integer := 0;
 BEGIN
   FOR r IN
-    SELECT rl.rolname, p.proname
+    SELECT COALESCE(rl.rolname, 'PUBLIC') AS who, p.proname
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-    JOIN LATERAL aclexplode(p.proacl) a(grantor, grantee, privilege_type, is_grantable)
+    JOIN LATERAL aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner)))
+      a(grantor, grantee, privilege_type, is_grantable)
       ON true
-    JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
+    LEFT JOIN pg_catalog.pg_roles rl ON rl.oid = a.grantee
     WHERE n.nspname = 'public'
-      AND rl.rolname IN ('authenticated', 'anon')
       AND p.proname LIKE 'job\_scan\_%'
       AND a.privilege_type = 'EXECUTE'
+      AND (a.grantee = 0 OR rl.rolname IN ('authenticated', 'anon'))
   LOOP
-    RAISE WARNING 'V5 — % puede ejecutar job %()', r.rolname, r.proname;
+    RAISE WARNING 'V5 — % puede ejecutar job %()', r.who, r.proname;
     n := n + 1;
   END LOOP;
   IF n = 0 THEN
@@ -365,14 +386,15 @@ DECLARE
   v_open  integer;
 BEGIN
   -- Primer admin promovido (paso manual del README): si no existe, el demo
-  -- no puede administrar nada (update_user_role exige caller admin).
+  -- no puede administrar nada (update_user_role exige caller admin; la
+  -- promoción inicial es un UPDATE directo en SQL editor, como postgres).
   SELECT u.id INTO v_admin FROM public.users u
   JOIN public.roles r ON r.id = u.role_id
   WHERE r.name = 'admin' AND u.is_active LIMIT 1;
   IF v_admin IS NOT NULL THEN
     RAISE NOTICE 'V10 OK — existe al menos 1 admin activo';
   ELSE
-    RAISE WARNING 'V10 — SIN ADMIN ACTIVO: falta el paso manual (signup + update_user_role, ver supabase/README.md)';
+    RAISE WARNING 'V10 — SIN ADMIN ACTIVO: falta el paso manual (signup + promoción, ver supabase/README.md)';
   END IF;
 
   -- Dedup de alertas: uq_alert_open debe estar sin violaciones (toda la

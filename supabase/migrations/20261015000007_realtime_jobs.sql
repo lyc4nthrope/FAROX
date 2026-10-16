@@ -58,25 +58,38 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- Cada job es idempotente en SU lógica (ON CONFLICT sobre uq_alert_open con el
 -- target exacto + cierre de episodios caducos, A6) y aquí lo es también el
--- schedule: unschedule previo por nombre ⇒ re-ejecutar esta migración no
--- duplica jobs. La 6ª columna del cron es la time zone (pg_cron ≥ 1.4).
+-- schedule: unschedule previo de lo que haya ⇒ re-ejecutar esta migración no
+-- duplica jobs.
+--
+-- B1: cron.unschedule(nombre) ERRORA si el job no existe (BD limpia ⇒ la
+-- migración abortaba y 0008 nunca corría); se desagenda SOLO lo presente en
+-- cron.job. tz: schedule usa 5 campos — la "6ª columna timezone" no es
+-- sintaxis soportada y también abortaba. Supabase corre en UTC: 11:00 UTC =
+-- 06:00 America/Bogota (UTC−5, Colombia sin horario de verano).
+DO $$
+DECLARE j record;
+BEGIN
+  FOR j IN
+    SELECT jobid FROM cron.job
+    WHERE jobname IN ('farox_expiry_soon', 'farox_order_late', 'farox_credit_overdue')
+  LOOP
+    PERFORM cron.unschedule(j.jobid);
+  END LOOP;
+END $$;
 
 -- expiry_soon: stock.expiry_date <= CURRENT_DATE + 15 AND quantity > 0;
 --   también cierra episodios que salieron del horizonte.
-SELECT cron.unschedule('farox_expiry_soon');
-SELECT cron.schedule('farox_expiry_soon', '0 6 * * * America/Bogota',
+SELECT cron.schedule('farox_expiry_soon', '0 11 * * *',
   $$SELECT public.job_scan_expiry_soon();$$);
 
 -- order_late: expected_at vencido, sin entregar y sin cancelar; también cierra
 --   episodios (confirm_delivery/update_order_status lo cierran en caliente).
-SELECT cron.unschedule('farox_order_late');
-SELECT cron.schedule('farox_order_late', '0 6 * * * America/Bogota',
+SELECT cron.schedule('farox_order_late', '0 11 * * *',
   $$SELECT public.job_scan_order_late();$$);
 
 -- credit_overdue: due_date vencido con balance > 0; también cierra episodios
 --   (register_payment/register_payment_reverse/cancel_credit en caliente).
-SELECT cron.unschedule('farox_credit_overdue');
-SELECT cron.schedule('farox_credit_overdue', '0 6 * * * America/Bogota',
+SELECT cron.schedule('farox_credit_overdue', '0 11 * * *',
   $$SELECT public.job_scan_credit_overdue();$$);
 
 -- Los jobs corren como el usuario que los agenda (postgres, dueño de las
@@ -84,4 +97,6 @@ SELECT cron.schedule('farox_credit_overdue', '0 6 * * * America/Bogota',
 -- de cron ni de RLS. Verificación: 0008 (tabla cron.job con los 3 nombres).
 
 -- Fin paso 7/8. Verificación: 0008. PASO MANUAL ENTRE 0005 y 0006:
--- ver supabase/README.md — signup del primer admin + update_user_role.
+-- ver supabase/README.md — signup del primer admin + promoción (UPDATE en
+-- SQL editor; update_user_role() exige caller admin y el SQL editor corre
+-- como postgres).
