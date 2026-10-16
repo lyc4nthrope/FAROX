@@ -525,6 +525,7 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 | `my_distributor_id()` | auth | `users.distributor_id` del usuario |
 | `handle_new_user()` | trigger (C2) | `AFTER INSERT ON auth.users` → inserta la fila `public.users`: `role_id` = **`operador`** por defecto (rol neutro de ejecución; admin luego reasigna con `update_user_role`), `full_name` desde metadata o email, `email` copiado. **Sin esto el primer login no tiene fila y todo el sistema de permisos cae** |
 | `update_user_role(p_user, p_role, p_distributor)` | **solo admin** (C2/M11) | Cambia rol: si el nuevo rol es `distribuidor` **exige** `p_distributor NOT NULL`; si no lo es, setea `distributor_id = NULL`. Única vía de asignar alcance de distribuidor |
+| `set_user_premium(p_user_id, p_value)` / `set_user_active(p_user_id, p_value)` | **solo admin** (D47) | **Cierran el gap de columnas privilegiadas D45**: única ruta vía PostgREST para `premium`/`is_active` (UPDATE de tabla completa revocado a todos los roles). Mismo patrón que `update_user_role`: guard solo-admin, SET de su columna + `updated_at`; la auditoría la escribe el trigger `audit_diff` sobre `users` |
 | `assign_user_stores(p_user, p_stores bigint[])` | **solo admin** (A1) | Reemplaza el alcance del operador (borra los ausentes, inserta los nuevos, 1 transacción). Única escritura de `user_stores` |
 | `assign_product_to_store(p_product, p_store, p_threshold)` | admin, operador | INV-03: crea/actualiza `stock`, evalúa `stock_low` |
 | `register_entry(...)` | admin, operador **+ `is_premium()`** (D39) | Valida, **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
@@ -552,6 +553,15 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 | `has_scope()` | auth | `SECURITY DEFINER STABLE SET search_path` → **true** si el usuario tiene alcance: admin · rol `distribuidor` con `distributor_id` · cualquier usuario con ≥1 fila en `user_stores`. Gate de **"todas las acciones"** (D37) |
 | `create_store(...)` | auth (cualquier usuario) | **Bootstrap exento del gate**: valida tope de tiendas (1 activa; 3 con `is_premium()`; admin exento — D34), inserta la tienda (`created_by = auth.uid()`) y su fila en `user_stores` — dueño ⇒ alcance sin modelo nuevo (D35). Devuelve el `id` de la tienda |
 | `enforce_store_cap()` | trigger | `BEFORE INSERT ON stores`: respaldo del tope D34 — si `auth.uid()` es NULL (seed/migración) o rol admin, deja pasar |
+
+> **D44 — trigger de confirmación de email (resuelto 2026-10-15: DESCARTADO)**:
+> NØSEE tiene además `handle_user_email_confirmed()` (`AFTER UPDATE ON auth.users`:
+> `email_confirmed_at` NULL → NOT NULL ⇒ `users.is_verified = TRUE`; patrón
+> probado en Supabase — trigger sobre `auth` desde SQL). Aprobado para recrear
+> (2026-10-15) y luego **reversado**: se **confirma la eliminación de §2.9**
+> (`users.is_verified` fuera, 0002: "la verifica Supabase Auth") ⇒ sin la columna
+> el trigger fallaría en runtime en la primera confirmación de email.
+> **No se materializa**: ni trigger, ni columna, ni cambios de conteo.
 
 **Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función). **Gate global (D37)**: toda acción crear/actualizar no-admin exige `has_scope()` — en las tablas con scope (stock, movements, orders, credits…) ya lo garantiza la derivación desde el JWT (scope vacío ⇒ la acción falla); en las tablas **globales** (products, stores) se añade explícitamente a la policy. Excepciones: perfil propio, `create_store()` (bootstrap) y chat.
 
@@ -581,6 +591,12 @@ FROM authenticated;
 -- Alta de tiendas solo por create_store() (D35): el INSERT directo queda revocado;
 -- UPDATE de stores sí se deja vía RLS (dueño/admin) y DELETE admin soft.
 REVOKE INSERT ON stores FROM authenticated;
+-- D45: UPDATE de users = SOLO columnas de perfil (policy propia + grant por
+-- columna; los privilegiados — role_id, email, distributor_id, premium,
+-- is_active — se mutan solo vía RPC/trigger/SQL editor; D47 añade
+-- set_user_premium()/set_user_active() para premium/is_active):
+REVOKE UPDATE ON public.users FROM authenticated, anon;
+GRANT UPDATE (full_name, phone_number, contact_preference) ON public.users TO authenticated;
 -- Lecturas selectivas por RLS: en user_stores/order_items/chat_* también se revoca SELECT
 -- (solo RPC las leen: my_store_ids, get_order_items, etc.) — el resto lee vía RLS.
 -- audit_log NO se revoca: se GRANTEA SELECT con policy `audit_read` (solo admin, D38).
@@ -681,6 +697,10 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 | D41 | **Precio privado por tienda**: SELECT de `price_publications` = admin (todas) · operador (solo sus tiendas) · distribuidor (ninguno) | El precio lo coloca la tienda y ninguna otra tienda lo ve (ventaja competitiva); el distribuidor recibe el `unit_price` congelado del pedido, no el listado vivo |
 | D42 | QR = asociación **tienda↔distribuidor** (corrige D6) | El dueño aclaró el propósito: el distribuidor escanea para vincularse a la tienda — no codifica producto↔tienda. `barcode` sigue sin necesitar SKU |
 | D43 | `create_order`: **admin · operador con tienda en scope** (sin premium) | "Poder pedir" es feature normal del usuario con tienda (D39): el operador pide a su distribuidor. El §4 anterior decía "solo admin" — contradecía el modelo del .md (usuario normal = catálogo + stock + pedir); alineado en §4 |
+| D44 | Trigger `handle_user_email_confirmed()` de NØSEE: `auth.users.email_confirmed_at` NULL→NOT NULL ⇒ `users.is_verified = TRUE` — **aprobada 2026-10-15, luego reversada: confirma eliminación §2.9 (la verifica Supabase Auth); no se materializa** | El §4 del doc era silencioso y NØSEE lo tenía (patrón probado sobre `auth.users`), pero `users.is_verified` se **eliminó en §2.9/§2** ⇒ recrear el trigger sin la columna rompería la confirmación de email en runtime. Sin trigger, ni columna, ni cambios de conteo |
+| D45 | **Perfil propio editable** (cierra la excepción D37 de "perfil"): policy `users_update_own` (`USING/WITH CHECK (id = auth.uid())`) + `GRANT UPDATE (full_name, phone_number, contact_preference)`; UPDATE de tabla completa revocado a `authenticated`/`anon` | La matriz §8 decía UPDATE = solo admin y no había RPC de perfil: un usuario no podía editar ni su propio nombre/teléfono. Grants ≠ RLS: la policy decide QUÉ filas, el grant QUÉ columnas. Consecuencia aceptada: el admin también comparte el grant (rol PG `authenticated`); los privilegiados (`role_id`, `email`, `distributor_id`, `premium`, `is_active`) se mutan solo vía RPC/trigger/SQL editor — el gap de `premium`/`is_active` ("sin RPC, solo SQL editor") **queda cerrado por D47** |
+| D46 | `REVOKE EXECUTE` de `job_scan_*` (las 3 funciones de pg_cron) para `authenticated`/`anon` | Endurecimiento más allá del doc-literal: pg_cron corre como postgres (owner) y conserva EXECUTE; un cliente autenticado no debe disparar los scans a demanda |
+| D47 | RPCs `set_user_premium(p_user_id, p_value)` y `set_user_active(p_user_id, p_value)` — **cierran el gap de columnas privilegiadas D45** | `premium`/`is_active` sin ruta vía PostgREST (UPDATE de tabla completa revocado a todos los roles ⇒ solo SQL editor). Mismo patrón que `update_user_role`: `SECURITY DEFINER` + `SET search_path`, guard solo-admin, SET de su columna + `updated_at`, audit vía trigger `audit_diff` sobre `users`, `GRANT EXECUTE` blanket de 0006 |
 
 ---
 
@@ -770,7 +790,7 @@ END $$;
 | `stores` | `true` | — RPC `create_store` | admin · dueño (`created_by = mine`) | admin (solo `is_active = false`) |
 | `distributors` | admin, operador | admin | admin | admin (solo `is_active = false`) |
 | `price_publications` | admin (todas) · operador (**solo `store_id = ANY(my_store_ids())`** — precio privado por tienda, D41; distribuidor: **ninguno**) | — RPC `set_price` | — RPC `set_price` | admin (soft) |
-| `users` | fila propia, o admin | — RPC `update_user_role` / trigger | admin (rol/premium/actividad) | — (baja = `is_active`) |
+| `users` | fila propia, o admin | — RPC `update_user_role` / trigger | **admin** (rol/premium/actividad) · **fila propia** — solo columnas de perfil vía `GRANT` (D45: `full_name`, `phone_number`, `contact_preference`; el resto solo RPC/SQL editor) | — (baja = `is_active`) |
 | `orders` | admin · operador (`store_id ∈ my_store_ids()`) · distribuidor (`distributor_id = mine`) | — RPC `create_order` | — RPC `update_order_status`/`confirm_delivery` | — |
 | `order_items` | — RPC `get_order_items` (SELECT revocado; `unit_price` solo premium — D40) | — RPC | — RPC | — |
 | `stock` | admin · operador (`store_id ∈ mine`) · distribuidor (tiendas de sus pedidos/ruta) | — RPC | — RPC | — |
@@ -789,6 +809,7 @@ END $$;
 - `is_premium()` como gate **solo** donde la matriz lo diga explícitamente (QR masivo, features premium) — nunca como único filtro de una policy de escritura general.
 - Alcance del operador **solo** se modifica con `assign_user_stores()` (solo admin); nadie más escribe `user_stores`.
 - **Gate de alcance (D37 — estricto)**: toda INSERT/UPDATE no-admin exige `has_scope()`. En tablas con scope ya lo garantiza la derivación de RPC/RLS; en **globales** (products, stores) se suma a la policy. **Excepciones**: perfil propio, `create_store()` (bootstrap) y chat (`create_chat`/`send_message`) — el canal de onboarding no se bloquea. Si se quiere endurecer después, quitar chat de las excepciones es un renglón.
+- **Perfil propio (D45 — materializa la excepción "perfil" de D37)**: UPDATE de `users` = policy `users_update_own` (`USING/WITH CHECK (id = auth.uid())`) **+** `GRANT UPDATE (full_name, phone_number, contact_preference)` con el UPDATE de tabla completa revocado. Son dos mecanismos independientes (**grants ≠ RLS**): la policy decide QUÉ **filas**, el grant QUÉ **columnas**. `role_id`, `email` y `distributor_id` siguen sin RPC de mutación (solo trigger/SQL editor); `premium`/`is_active` se mutan con `set_user_premium`/`set_user_active` (D47 — cierra el gap registrado en D45).
 - Todas las tablas con `ENABLE ROW LEVEL SECURITY` desde el Sprint 1 (default deny).
 - **Desviación MVP registrada (A3)**: `get_dashboard` da al operador el agregado **global** (no por tienda) mientras `dashboard_daily` sea por `(day, distributor_id)` — ver §3.13.
 
