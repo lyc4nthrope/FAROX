@@ -231,7 +231,7 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 
 **Elimina de NØSEE**: `delivery_address`, `delivery_location`, `total_*` (4), `savings_percentage`, `stores`/`items`/`checked_items` jsonb, `delivery_fee`, `service_fee`, `strategy`, `payment_*`, `abandoned_*`, `delivery_pin`+`pin_verified_at`, `compromiso_*`, `llegando_at`, `local_id`, `dealer_*`, `is_priority`, `dealer_cancel_*`, `delivery_mode`, `delivery_coords`, `delivery_name/phone/apartment/instructions` — ~35 columnas de flujo de delivery que no aplican.
 
-**Índices**: PK · `btree (distributor_id, status)` · `btree (store_id, created_at DESC)`. `route_id` **sin índice** (los pedidos en ruta por ruta son pocos; añadir si la consulta aparece en `pg_stat_statements`).
+**Índices**: PK · `btree (distributor_id, status)` · `btree (store_id, created_at DESC)` · **parcial `btree (expected_at) WHERE expected_at IS NOT NULL AND status NOT IN ('delivered','cancelled')`** (0010/R9: el job de pedidos tardíos no paga índice por cerrados). `route_id` **sin índice** (los pedidos en ruta por ruta son pocos; añadir si la consulta aparece en `pg_stat_statements`).
 
 ### 2.11 `order_items`
 
@@ -269,7 +269,7 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 | `expiry_date` | date NULL | **Caducidad vigente del par** producto↔tienda (la más próxima del remanente). Mantenida por `register_*`: entrada ⇒ `LEAST(actual, nueva)`; salida ⇒ `NULL` al llegar a 0. **Aproximación documentada**: sin lotes FEFO no se sabe qué lote salió (D30) |
 | `updated_at` | timestamptz | Mutable (lo escriben las funciones de movimiento) |
 
-- **Índices**: PK · `btree (store_id)` — la PK solo cubre filtros por `product_id`; el dashboard consulta "stock de esta tienda".
+- **Índices**: PK · `btree (store_id)` — la PK solo cubre filtros por `product_id`; el dashboard consulta "stock de esta tienda" · **parcial `btree (expiry_date) WHERE expiry_date IS NOT NULL`** (0010/R8: **es lo que escanea el job diario** `expiry_soon` — reemplaza al `idx_movements_expiry` de la tabla equivocada, §3.4).
 - **Sin índice parcial** `WHERE quantity <= threshold`: la condición es volátil (cambia el umbral) y el conjunto es productos×tiendas (miles de filas) ⇒ escanearlo es gratis; la señal **se materializa** en `alerts` (D11).
 - Escritura **solo** vía `assign_product_to_store` / `register_entry` / `register_exit` (REVOKE a `authenticated`).
 - **Regla INV-06 exacta** (documentada, no improvisada): alerta si `quantity = 0` **o** (`threshold IS NOT NULL` y `quantity <= threshold`). La evaluación ocurre **solo en transiciones** (assign + register_*), nunca por batch — así cada cruce = 1 alerta por episodio (D24).
@@ -323,7 +323,7 @@ ALTER TABLE stock SET (fillfactor = 85, autovacuum_vacuum_scale_factor = 0.02, a
 | `created_at` | timestamptz NOT NULL DEFAULT now() | |
 
 - **Append-only**: ni `updated_at` ni UPDATEs (REVOKE completo).
-- **Índices (reducidos de 7 a 6, de los cuales 3 parciales + 1 BRIN)**:
+- **Índices (reducidos de 7 a 5 secundarios — 0010 elimina el parcial de `expiry_date` de acá, ver §3.1; quedan 2 parciales + 1 BRIN)**:
   - PK
   - `btree (store_id, created_at DESC)` — historial por tienda
   - `btree (product_id, created_at DESC)` — historial por producto
@@ -332,7 +332,7 @@ ALTER TABLE stock SET (fillfactor = 85, autovacuum_vacuum_scale_factor = 0.02, a
   - **`BRIN (created_at)`** — rango global del dashboard (D18)
   - **Eliminado**: `btree (created_by)` — 27 usuarios distintos ≈ selectividad nula; el BRIN por rango + `(table_name, created_at)` del audit cubren al usuario (crítica A6: ~60 MB y 2 estructuras menos por INSERT)
   - **Sin índice en `motive_id`**: cardinalidad bajísima y siempre se filtra dentro de tienda/fecha
-  - **Parcial** `btree (expiry_date) WHERE expiry_date IS NOT NULL` — alimenta el job diario de `expiry_soon` (§7); ~1-2 MB a 1M
+  - **Parcial** `btree (expiry_date) WHERE expiry_date IS NOT NULL` — **eliminado en 0010 (R8)**: este índice estaba en la tabla EQUIVOCADA — el job diario de `expiry_soon` escanea `stock.expiry_date`, no `movements` (el índice jamás se alimentaba). El parcial correcto vive en `stock` (§3.1)
 - **Sin partición de por vida** (D23): 1M filas ≈ 180 MB de heap + BRIN; particionar rompería la FK `reverso_of_id` (PK de partición no es única globalmente) sin beneficio real. `audit_log`/`chat_messages` sí podrían `ATTACH` en el futuro (no tienen FKs entrantes).
 
 ### 3.5 `routes`
@@ -423,7 +423,7 @@ Append-only · **Índices**: PK · `btree (credit_id)`.
   - Sin este cierre, el dedup `WHERE resolved_at IS NULL` impediría re-alertar **para siempre** tras la primera vez (A6).
 - **Anti-duplicados por episodio** (corregido): índice **nombrado** `uq_alert_open` = `UNIQUE (type, coalesce(store_id,0), coalesce(product_id,0), coalesce(order_id,0)) WHERE resolved_at IS NULL` — con el dedup viejo (`WHERE NOT is_read`), marcar como leída y seguir por debajo del umbral re-alertaba **en cada movimiento** (spam + realtime + egress). Ahora: 1 alerta abierta por episodio; se re-abre solo cuando la condición se normaliza y vuelve a cruzarse. **El `ON CONFLICT` debe referenciar `ON CONFLICT (type, coalesce(...), ...) WHERE resolved_at IS NULL` carácter a carácter igual que la definición del índice** (si no, Postgres no matchea el índice y lanza error en caliente) (nit).
 - Todo INSERT de alertas usa **`ON CONFLICT ... DO NOTHING` con el target completo** (expresiones COALESCE incluidas) — nunca `EXCEPTION` (subtransacción en el camino caliente) ni SELECT previo (carrera).
-- **Índices**: PK · el único parcial cubre "alertas sin resolver" (el listado principal) · `btree (distributor_id)`.
+- **Índices**: PK · parcial `uq_alert_open` (dedup por episodio, arriba) · **parcial `btree (store_id) WHERE resolved_at IS NULL`** (0010/R13: el listado de alertas **activas** por tienda — los resueltos no ocupan índice) · `btree (distributor_id)`.
 
 ### 3.10 `user_stores` — alcance del operador
 
@@ -519,40 +519,41 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 
 | Función | Rol permitido | Qué hace |
 |---|---|---|
-| `my_role()` | auth | `SECURITY DEFINER STABLE SET search_path` → nombre del rol del JWT (helper de todas las validaciones) |
-| `is_premium()` | auth | `SECURITY DEFINER STABLE SET search_path` → **`premium OR my_role() = 'admin'`** leído de `users` (nunca del JWT) (D7) |
-| `my_store_ids()` | auth | ids de `user_stores` del usuario (RLS del operador evaluado 1 vez) |
-| `my_distributor_id()` | auth | `users.distributor_id` del usuario |
+| `my_role()` | auth | `SECURITY DEFINER STABLE SET search_path` → nombre del rol del JWT (helper de todas las validaciones); desde 0009 exige `users.is_active` — inactivo ⇒ `NULL` (D50) |
+| `is_premium()` | auth | `SECURITY DEFINER STABLE SET search_path` → **`premium OR my_role() = 'admin'`** leído de `users` (nunca del JWT) (D7); exige `is_active` desde 0009 (D50) |
+| `my_store_ids()` | auth | ids de `user_stores` del usuario (RLS del operador evaluado 1 vez); vacío si el usuario está inactivo (0009, D50) |
+| `my_distributor_id()` | auth | `users.distributor_id` del usuario; `NULL` si está inactivo (0009, D50) |
 | `handle_new_user()` | trigger (C2) | `AFTER INSERT ON auth.users` → inserta la fila `public.users`: `role_id` = **`operador`** por defecto (rol neutro de ejecución; admin luego reasigna con `update_user_role`), `full_name` desde metadata o email, `email` copiado. **Sin esto el primer login no tiene fila y todo el sistema de permisos cae** |
-| `update_user_role(p_user, p_role, p_distributor)` | **solo admin** (C2/M11) | Cambia rol: si el nuevo rol es `distribuidor` **exige** `p_distributor NOT NULL`; si no lo es, setea `distributor_id = NULL`. Única vía de asignar alcance de distribuidor |
-| `set_user_premium(p_user_id, p_value)` / `set_user_active(p_user_id, p_value)` | **solo admin** (D47) | **Cierran el gap de columnas privilegiadas D45**: única ruta vía PostgREST para `premium`/`is_active` (UPDATE de tabla completa revocado a todos los roles). Mismo patrón que `update_user_role`: guard solo-admin, SET de su columna + `updated_at`; la auditoría la escribe el trigger `audit_diff` sobre `users` |
+| `assert_admin()` | **sin grant para clientes** (0011) | **Nuevo (D49)** — `SECURITY DEFINER STABLE SET search_path`; reemplaza los ~15 guards `my_role() <> 'admin'` de las RPC solo-admin (NULL-bypass: rol inexistente/inactivo ⇒ NULL ⇒ el IF no se tomaba). Pasa si `session_user() = 'postgres' AND auth.uid() IS NULL` — **sólo la sesión del SQL editor/MCP: bootstrap del primer admin (C2/R16.3)**; en PostgREST `session_user = 'authenticator'` ⇒ ningún cliente toma el bypass (NO usar `current_user`: dentro de `DEFINER` es siempre el owner) — o si `auth.uid()` es admin **activo** (`EXISTS users JOIN roles ... AND is_active`; `EXISTS` nunca es NULL). Si no: **`RAISE 'solo admin'`** (mensaje uniforme, contrato de test negativo de 0012). Fuera de la whitelist: la invocan las RPC `DEFINER` como owner postgres |
+| `update_user_role(p_user, p_role, p_distributor)` | **solo admin** (C2/M11) | Cambia rol: si el nuevo rol es `distribuidor` **exige** `p_distributor NOT NULL`; si no lo es, setea `distributor_id = NULL`. Única vía de asignar alcance de distribuidor. Guard vía `assert_admin()` desde 0011 (D49) |
+| `set_user_premium(p_user_id, p_value)` / `set_user_active(p_user_id, p_value)` | **solo admin** (D47) | **Cierran el gap de columnas privilegiadas D45**: única ruta vía PostgREST para `premium`/`is_active` (UPDATE de tabla completa revocado a todos los roles). Mismo patrón que `update_user_role`: guard **`assert_admin()`** desde 0011 (D49), SET de su columna + `updated_at`; la auditoría la escribe el trigger `audit_diff` sobre `users` |
 | `assign_user_stores(p_user, p_stores bigint[])` | **solo admin** (A1) | Reemplaza el alcance del operador (borra los ausentes, inserta los nuevos, 1 transacción). Única escritura de `user_stores` |
 | `assign_product_to_store(p_product, p_store, p_threshold)` | admin, operador | INV-03: crea/actualiza `stock`, evalúa `stock_low` |
-| `register_entry(...)` | admin, operador **+ `is_premium()`** (D39) | Valida, **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
-| `register_exit(...)` | admin, operador **+ `is_premium()`** (D39) | Igual, con validación de stock suficiente |
+| `register_entry(...)` | admin, operador **+ `is_premium()`** (D39) | Valida (pedido **existe** y **pertenece a la tienda** ⇒ RAISE **desde 0009** — reemplaza el check muerto que aceptaba pedidos de otra tienda y filtraba `unit_price` privado, D41 —; producto pertenece al pedido ⇒ RAISE; tienda en alcance del operador — ya en 0004, COALESCE NULL-safe desde 0009), **actualiza stock atómicamente**, inserta `movements` (+`unit_price`), evalúa alertas, upsert `dashboard_daily`, audita — 1 transacción |
+| `register_exit(...)` | admin, operador **+ `is_premium()`** (D39) | Igual, con validación de stock suficiente; mismos guards de pedido/tienda que `register_entry` desde 0009 (0004 no chequeaba FOUND en el SELECT de `order_items` ⇒ un producto ajeno al pedido entraba con precio NULL) |
 | `register_reverse(p_movement_id, p_reason)` | **solo admin** | Inserta movimiento inverso con `reverso_of_id` (1 por original, tipo opuesto, mismo producto/tienda), reevalúa alertas y dashboard |
 | `set_price(p_product, p_store, p_price, p_currency)` | **solo admin** | `SELECT ... FOR UPDATE` del activo previo (serializa concurrentes) + inserta fila nueva + desactiva la anterior — única mutación de precios permitida |
-| `create_order(...)` | admin · operador (**con tienda en scope**; sin premium — D39) | Crea `orders` + `order_items` (`unit_price` congelado) |
+| `create_order(...)` | admin · operador (**con tienda en scope**; sin premium — D39) | Crea `orders` + `order_items` (`unit_price` congelado); `items > 0` (0004). Desde 0009 exige tienda, distribuidor y productos **activos** (`is_active` — el soft-delete no es borrado, R5); desde 0010 es **set-based** (`jsonb_to_recordset` → validación por PASS + 1 INSERT) con RAISE si un `product_id` está repetido |
 | `update_order_status(p_order, p_status, p_reason)` | admin, operador (**`cancelled` solo admin**) (A7) | Transiciones `pending → in_route → …`; `delivered` solo la pone `confirm_delivery`; `cancelled` exige rol admin + `p_reason` y escribe `cancelled_at`/`cancelled_reason` (CHECK lo exige) |
-| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos), operador (tiendas de su alcance) (M6) | **`register_entry` por línea, no exit** (C3): la entrega **suma** stock a la tienda destino (`motive_id` = `reabastecimiento` por defecto); `received_quantity`/`status` por línea (`received` si = quantity, `partial` si 0 < recibido < quantity); `delivered_at` + `status = 'delivered'` en el pedido (lo exige el CHECK); deriva `distributor_id`; cierra alertas `order_late` del pedido — todo atómico; **premium NO exigido** (el flujo de pedido/entrega es feature normal — D39; la entrada interna no re-chequea `is_premium()` en el límite) |
+| `confirm_delivery(p_order, p_items)` | distribuidor (los suyos), operador (tiendas de su alcance) (M6) | **`register_entry` por línea, no exit** (C3): la entrega **suma** stock a la tienda destino (`motive_id` = `reabastecimiento` por defecto); `received_quantity`/`status` por línea (`received` si = quantity, `partial` si 0 < recibido < quantity); `delivered_at` + `status = 'delivered'` en el pedido (lo exige el CHECK); deriva `distributor_id`; cierra alertas `order_late` del pedido — todo atómico; **premium NO exigido** (el flujo de pedido/entrega es feature normal — D39; la entrada interna no re-chequea `is_premium()` en el límite). **Guards (R1 — endurecidos en 0009/0010)**: pedido ya `delivered`/`cancelled` ⇒ RAISE (imposible re-recibir; nuevo en 0009); `p_items` NULL/no-array/vacío ⇒ RAISE (ya en 0004, refinado en 0009); `product_id` repetido ⇒ RAISE (0010 — sin dedup el stock se duplicaba en silencio); `received_quantity > quantity` lo rechaza el CHECK `<= quantity` de `order_items` (0002) con `check_violation` — el guard custom de 0009 es defensa en profundidad inalcanzable (review batch1); producto que no pertenece al pedido ⇒ RAISE. Cierre **race-safe**: `UPDATE orders ... WHERE status <> 'delivered'` + `IF NOT FOUND` ⇒ exactamente UNA llamada gana (R1.6). Líneas procesadas **ordenadas por `product_id`** (0010, anti-deadlock). **0010/D51**: UN solo upsert a `dashboard_daily` por entrega (delta acumulado; `quantity` y `unit_price` salen del `RETURNING` del UPDATE de líneas ⇒ 0 subconsultas) ⇒ **1 evento realtime por entrega** en vez de 1 por línea |
 | `get_order_items(p_order)` | auth con el pedido visible | Devuelve las líneas; **omite `unit_price` si `NOT is_premium()`** (D40) — el distribuidor normal sabe QUÉ y CUÁNTO, no el precio (es el análisis del premium) |
 | `save_route(...)` / `mark_stop(...)` | admin (crear), distribuidor (paradas propias) | **Nombre único `mark_stop`** (nit: antes `update_stop`/`mark_stop`); valida en servidor que la ruta sea del distribuidor del JWT |
 | `update_route_status(p_route, p_status)` | admin; distribuidor solo `completed` de su ruta (A8) | Transiciones `planned → active → completed`/`cancelled` — `route_status` sin esto era decorativo |
-| `create_credit(...)` / `cancel_credit(...)` | **solo admin** | Alta/baja con motivo: `cancel_credit` exige `cancelled_at`/`cancelled_reason` y — si `balance < total_amount` — revertir primero los pagos (A5) |
-| `register_payment(p_credit, p_amount, p_method)` | admin, operador | Valida `amount <= balance`, inserta pago, recalcula `balance`, pone `paid`+`settled_at` si llega a 0, **cierra alertas `credit_overdue`**, audita |
+| `create_credit(...)` / `cancel_credit(...)` | **solo admin** | Alta/baja con motivo. Desde 0009 `create_credit` exige el pedido en estado **`delivered`** (R6/D53: el fiado se registra sobre lo entregado — `cancelled`/pendientes ⇒ RAISE) y tienda activa; **`total_amount = Σ unit_price × quantity` es LO PEDIDO, no lo recibido** — `received_quantity` no entra en la fórmula (caveat pre-existente de 0004, aclarado acá: review batch1 lo difirió a docs). `cancel_credit` exige `cancelled_at`/`cancelled_reason` y — si `balance < total_amount` — revertir primero los pagos (A5) |
+| `register_payment(p_credit, p_amount, p_method)` | admin, operador | Valida `amount <= balance`, inserta pago, recalcula `balance`, pone `paid`+`settled_at` si llega a 0, **cierra alertas `credit_overdue`**, audita. Desde 0009 el operador sólo cobra créditos **de sus tiendas**: scope post-`FOR UPDATE` ⇒ RAISE `'crédito fuera del alcance'` (D37/D52 — `credit_payments` no tiene policy de UPDATE, todo pasa por RPC) |
 | `register_payment_reverse(p_payment, p_reason)` | **solo admin** (A5) | Inserta `credit_payments` reverso (`reverso_of_id`), recalcula `credits.balance` (suma el reverso), reabre `status` si estaba `paid` (limpia `settled_at`), cierra/reabre `credit_overdue`, audita — la única corrección de cobros (append-only intacto) |
 | `mark_alert_read(p_alert)` | auth | **`SECURITY DEFINER`** (el UPDATE directo está revocado): valida scope **dentro** de la función (admin · `store_id = ANY(my_store_ids())` · `distributor_id = my_distributor_id()`) y pone `read_at` — la RLS no aplica en DEFINER, el chequeo interno es obligatorio (A2) |
 | `get_stock(p_store bigint, p_limit int DEFAULT 50)` | auth + scope (M3) | Tool del chatbot: filtra `p_store` contra `my_store_ids()`/`my_distributor_id()` en servidor, `LIMIT` duro, columnas mínimas |
-| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth **+ `is_premium()`** (D39) | Lee `dashboard_daily` filtrando por rol: distribuidor su id; **operador ve el agregado global en MVP** (decisión A3 en §3.13) — egress mínimo. Sin premium no hay dashboard analítico |
+| `get_dashboard(p_from date DEFAULT CURRENT_DATE-30, p_to date DEFAULT CURRENT_DATE)` | auth **+ `is_premium()`** (D39) | Lee `dashboard_daily` filtrando por rol: distribuidor su id; **operador ve el agregado global en MVP** (decisión A3 en §3.13) — egress mínimo. Sin premium no hay dashboard analítico. Rango acotado a **≤366 días** desde 0010 (R11): mayor rango ⇒ RAISE `'rango ... excede el máximo de 366'` (egress acotado) |
 | `create_chat(p_title)` / `send_message(p_conversation, p_content)` | auth, dueño (`user_id = auth.uid()`) (M3) | Chat solo por RPC: valida dueño en servidor, inserta, toca `updated_at` de la conversación |
 | `touch_updated_at()` | trigger | `BEFORE UPDATE` de todas las mutables |
 | `audit_diff()` | trigger | Solo en las tablas del alcance §3.14 (8 tablas) |
 | `prevent_price_update()` | trigger (M2) | `BEFORE UPDATE OF price` en `price_publications`: rechaza si la fila está activa — el mecanismo que §2.8 prometía pero no estaba listado |
 | `sync_email()` | trigger | `auth.users` → `users.email` (edición posterior) |
 | `sanitize_distributor_scope()` | trigger (M11) | `BEFORE INSERT OR UPDATE` en `users`: rol `distribuidor` ⇒ `distributor_id NOT NULL`; otro rol ⇒ `NULL` (red de seguridad además de `update_user_role`) |
-| `has_scope()` | auth | `SECURITY DEFINER STABLE SET search_path` → **true** si el usuario tiene alcance: admin · rol `distribuidor` con `distributor_id` · cualquier usuario con ≥1 fila en `user_stores`. Gate de **"todas las acciones"** (D37) |
+| `has_scope()` | auth | `SECURITY DEFINER STABLE SET search_path` → **true** si el usuario tiene alcance: admin · rol `distribuidor` con `distributor_id` · cualquier usuario con ≥1 fila en `user_stores`. Gate de **"todas las acciones"** (D37); exige `is_active` desde 0009 (D50) |
 | `create_store(...)` | auth (cualquier usuario) | **Bootstrap exento del gate**: valida tope de tiendas (1 activa; 3 con `is_premium()`; admin exento — D34), inserta la tienda (`created_by = auth.uid()`) y su fila en `user_stores` — dueño ⇒ alcance sin modelo nuevo (D35). Devuelve el `id` de la tienda |
-| `enforce_store_cap()` | trigger | `BEFORE INSERT ON stores`: respaldo del tope D34 — si `auth.uid()` es NULL (seed/migración) o rol admin, deja pasar |
+| `enforce_store_cap()` | trigger | `BEFORE INSERT ON stores`: respaldo del tope D34 — si `auth.uid()` es NULL (seed/migración) o rol admin, deja pasar. **+ `trg_stores_cap_reactivate` (0009, D34/D53)**: `BEFORE UPDATE ON stores FOR EACH ROW WHEN (OLD.is_active = FALSE AND NEW.is_active = TRUE)` — el tope también aplica al **reactivar** (antes el trigger era INSERT-only: desactivar → crear → reactivar evadía el límite) |
 
 > **D44 — trigger de confirmación de email (resuelto 2026-10-15: DESCARTADO)**:
 > NØSEE tiene además `handle_user_email_confirmed()` (`AFTER UPDATE ON auth.users`:
@@ -562,6 +563,8 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 > (`users.is_verified` fuera, 0002: "la verifica Supabase Auth") ⇒ sin la columna
 > el trigger fallaría en runtime en la primera confirmación de email.
 > **No se materializa**: ni trigger, ni columna, ni cambios de conteo.
+
+> **Hardening 0009→0011 (R20 — qué cambia en esta tabla)**: los 5 helpers exigen `users.is_active` (D50); el guard admin unificado de las RPC solo-admin es **`assert_admin()`** (D49); y **toda la tabla depende de grants explícitos**: desde 0011 sólo la whitelist de 31 firmas (26 RPC + 5 helpers) tiene `EXECUTE` para `authenticated`/`service_role` — una RPC futura **sin `GRANT` explícito no es invocable por clientes** (deny-by-default, D48; ver bloque REVOKE/GRANT abajo).
 
 **Scope de alcance — regla fija**: ninguna RPC acepta `distributor_id` ni `store_id` como parámetro de alcance. El scope se deriva **siempre** en servidor desde el JWT: `my_distributor_id()` (distribuidor) o `my_store_ids()` (operador). Los parámetros de entrada son solo de **contenido** (qué producto, cuánta cantidad), nunca de **visibilidad** — así un JWT robado o un argumento manipulado no puede leer datos ajenos (RLS + derivación en la misma función). **Gate global (D37)**: toda acción crear/actualizar no-admin exige `has_scope()` — en las tablas con scope (stock, movements, orders, credits…) ya lo garantiza la derivación desde el JWT (scope vacío ⇒ la acción falla); en las tablas **globales** (products, stores) se añade explícitamente a la policy. Excepciones: perfil propio, `create_store()` (bootstrap) y chat.
 
@@ -576,11 +579,13 @@ IF NOT FOUND THEN RAISE EXCEPTION 'stock insuficiente o fila inexistente'; END I
 -- Entrada (register_entry / confirm_delivery): SIN guard de suficiencia — la entrega suma
 UPDATE stock SET quantity = quantity + p_qty, expiry_date = LEAST(...), updated_at = now()
 WHERE product_id = p_pid AND store_id = p_sid;
--- confirm_delivery ordena las filas por (product_id, store_id) para adquirir locks en mismo orden (anti-deadlock).
+-- confirm_delivery procesa las líneas ORDENADAS por product_id (0010) para adquirir los locks
+-- en mismo orden (anti-deadlock): todas las líneas del pedido son de la MISMA tienda —
+-- order_items NO tiene store_id (corregido: la nota anterior prometía un orden por (product_id, store_id) inexistente).
 -- Prohibido EXCEPTION WHEN unique_violation como control de flujo → usar ON CONFLICT.
 ```
 
-**REVOKE/GRANT (A1 — ampliado; antes faltaban 6 tablas)**:
+**REVOKE/GRANT (A1 — ampliado; antes faltaban 6 tablas; endurecido por 0011, D48)**:
 ```sql
 -- Todas las tablas mutables por RPC/trigger (nunca directo desde el cliente):
 REVOKE INSERT, UPDATE, DELETE ON
@@ -599,11 +604,75 @@ REVOKE UPDATE ON public.users FROM authenticated, anon;
 GRANT UPDATE (full_name, phone_number, contact_preference) ON public.users TO authenticated;
 -- Lecturas selectivas por RLS: en user_stores/order_items/chat_* también se revoca SELECT
 -- (solo RPC las leen: my_store_ids, get_order_items, etc.) — el resto lee vía RLS.
--- audit_log NO se revoca: se GRANTEA SELECT con policy `audit_read` (solo admin, D38).
+-- audit_log NO se revoca SELECT: se GRANTEA con policy `audit_read` (solo admin, D38);
 -- dashboard_daily NO se revoca: realtime (§3.13) exige SELECT + policy `dashboard_read`
 -- (scope por rol, equivalente al resultado de get_dashboard) — revocarlo silencia los eventos en vivo.
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
-REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n siempre viaja con JWT de usuario
+
+-- ══ 0011 (D48/D-5) — Grants de FUNCIONES: deny-by-default ══
+-- El bloque de funciones anterior tenía el MISMO flaw CRIT-1: `GRANT EXECUTE ALL TO
+-- authenticated` + `REVOKE ... FROM anon` NO dejaba a anon sin funciones — PostgreSQL
+-- concede EXECUTE a PUBLIC por defecto y anon lo heredaba (RPCs admin incluidas).
+-- 1) Default privileges FUTURAS. PUBLIC SIN cláusula IN SCHEMA (bug PG #8685: la
+--    combinación IN SCHEMA + FROM PUBLIC es un no-op silencioso); roles concretos SÍ
+--    con IN SCHEMA ⇒ toda función futura nace sin EXECUTE para clientes y toda
+--    migración nueva debe traer su GRANT explícito (convención, D48).
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
+-- 2) Sweep inmediato (mata el grant a PUBLIC = CRIT-1; anon queda sin UNA función):
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM authenticated;
+-- 3) Whitelist explícita: 26 RPC de §4 + 5 helpers = 31 firmas → authenticated y
+--    service_role (firmas exactas con typmods — ver 0011; verificado por 0012 H1).
+--    Los 5 helpers (my_role, is_premium, my_store_ids, my_distributor_id, has_scope)
+--    DEBEN estar: las policies RLS los invocan como el rol consultante ⇒ sin grant,
+--    RLS revienta. service_role además CONSERVA EXECUTE en internal_*, job_scan_*,
+--    assert_admin, triggers y funciones futuras (su default-privilege no se revoca):
+--    es bypassrls y por ahí viaja n8n — negarlo no sumaba seguridad (D-5 resuelto,
+--    review batch 3). Deny para anon Y authenticated: internal_* (5), job_scan_* (3),
+--    assert_admin y las 8 trigger functions (los RPC/jobs/triggers los invocan como
+--    owner postgres).
+GRANT EXECUTE ON FUNCTION
+  public.my_role(), public.is_premium(), public.my_store_ids(),
+  public.my_distributor_id(), public.has_scope(),
+  public.update_user_role(uuid, text, bigint), public.set_user_premium(uuid, boolean),
+  public.set_user_active(uuid, boolean), public.assign_user_stores(uuid, bigint[]),
+  public.create_store(text, integer, text, text, text, public.geography(Point,4326), text, char(2)),
+  public.assign_product_to_store(bigint, bigint, numeric(12,3)),
+  public.set_price(bigint, bigint, numeric(12,2), char(3)),
+  public.register_entry(bigint, bigint, numeric(12,3), bigint, bigint, date),
+  public.register_exit(bigint, bigint, numeric(12,3), bigint, bigint),
+  public.register_reverse(bigint, text),
+  public.create_order(bigint, bigint, jsonb, timestamptz, text),
+  public.update_order_status(bigint, public.order_status, text),
+  public.confirm_delivery(bigint, jsonb),
+  public.get_order_items(bigint),
+  public.save_route(bigint, date, jsonb),
+  public.mark_stop(bigint, public.stop_status, timestamptz),
+  public.update_route_status(bigint, public.route_status),
+  public.create_credit(bigint, date), public.cancel_credit(bigint, text),
+  public.register_payment(bigint, numeric(14,2), public.payment_method),
+  public.register_payment_reverse(bigint, text),
+  public.mark_alert_read(bigint), public.get_stock(bigint, integer),
+  public.get_dashboard(date, date),
+  public.create_chat(text), public.send_message(bigint, text)
+TO authenticated, service_role;
+-- 4) PostGIS: stores_geo (WITH security_invoker) ejecuta st_x/st_y y el cast
+--    geography→geometry COMO CLIENTE — el sweep (2) les revocó EXECUTE:
+GRANT EXECUTE ON FUNCTION public.st_x(public.geometry), public.st_y(public.geometry),
+  public.geometry(public.geography) TO authenticated;
+-- 5) Tablas: anon pierde TODA vía (Supabase les grantea ALL por defecto — R17.1)
+--    y service_role pierde UPDATE/DELETE sobre audit_log (append-only — R17.2;
+--    SELECT e INSERT los conserva):
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon;
+REVOKE UPDATE, DELETE ON public.audit_log FROM service_role;
+-- Triggers y jobs OK: PostgreSQL exige EXECUTE sólo en CREATE TRIGGER (no al
+-- dispararse) ⇒ signup (handle_new_user), touch_updated_at, audit_diff… siguen
+-- vivos con el sweep; los jobs pg_cron corren como postgres (owner).
 ```
 `user_stores` **solo** se escribe con `assign_user_stores(p_user, p_stores)` (solo admin) — sin esto un operador podría auto-insertarse filas y **escalar su propio alcance RLS** (A1). `dashboard_daily` solo se escribe en el upsert interno de `register_*` y se lee con `get_dashboard` — un cliente no puede falsificar cifras.
 
@@ -616,7 +685,7 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 **Espacio (storage)**
 - `bigint` en IDs internos; enums de 4B; BRIN en append-only (KB vs MB de btree).
 - `audit_log` con alcance acotado + `diff` JSONB: ~50 MB a 1M movements en vez de ~500 MB.
-- `movements`: 6 índices secundarios (3 parciales + BRIN) en vez de 7 → ~55 MB menos y ~7% menos CPU por INSERT (recuento corregido: M4).
+- `movements`: 5 índices secundarios (2 parciales + BRIN) en vez de 7 (6 tras M4; 0010 mudó el parcial de `expiry_date` a `stock`) → ~55 MB menos y ~7% menos CPU por INSERT (recuento corregido: M4).
 - `updated_at` solo donde hay UPDATEs; nada de `hidden_*`/votos de NØSEE (~15 columnas muertas no viajan).
 - **Sin partición** (D23): 1M movements ≈ 180 MB no justifican la deuda; `audit_log`/`chat_messages` pueden `ATTACH` luego (sin FKs entrantes).
 - `fillfactor`/`autovacuum` en las tablas con UPDATEs frecuentes: `stock` (85 / 0.02 / 0.01), `credits` (90 / 0.05), `alerts` (90) — `stock` recibe 1 UPDATE por movimiento del sistema.
@@ -651,6 +720,8 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 ---
 
 ## 6. Registro de decisiones
+
+> **D48–D55 — hardening `sprint1-hardening` (migraciones 0009→0012, 2026-10-16)**: continúan la numeración tras D47. En el design de ese change están etiquetadas D-1…D-8 (con guion); acá mandan D48-D55.
 
 | # | Decisión | Por qué (y alternativa descartada) |
 |---|---|---|
@@ -701,6 +772,14 @@ REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM anon;  -- el chatbot/n8n s
 | D45 | **Perfil propio editable** (cierra la excepción D37 de "perfil"): policy `users_update_own` (`USING/WITH CHECK (id = auth.uid())`) + `GRANT UPDATE (full_name, phone_number, contact_preference)`; UPDATE de tabla completa revocado a `authenticated`/`anon` | La matriz §8 decía UPDATE = solo admin y no había RPC de perfil: un usuario no podía editar ni su propio nombre/teléfono. Grants ≠ RLS: la policy decide QUÉ filas, el grant QUÉ columnas. Consecuencia aceptada: el admin también comparte el grant (rol PG `authenticated`); los privilegiados (`role_id`, `email`, `distributor_id`, `premium`, `is_active`) se mutan solo vía RPC/trigger/SQL editor — el gap de `premium`/`is_active` ("sin RPC, solo SQL editor") **queda cerrado por D47** |
 | D46 | `REVOKE EXECUTE` de `job_scan_*` (las 3 funciones de pg_cron) para `authenticated`/`anon` | Endurecimiento más allá del doc-literal: pg_cron corre como postgres (owner) y conserva EXECUTE; un cliente autenticado no debe disparar los scans a demanda |
 | D47 | RPCs `set_user_premium(p_user_id, p_value)` y `set_user_active(p_user_id, p_value)` — **cierran el gap de columnas privilegiadas D45** | `premium`/`is_active` sin ruta vía PostgREST (UPDATE de tabla completa revocado a todos los roles ⇒ solo SQL editor). Mismo patrón que `update_user_role`: `SECURITY DEFINER` + `SET search_path`, guard solo-admin, SET de su columna + `updated_at`, audit vía trigger `audit_diff` sobre `users`, `GRANT EXECUTE` blanket de 0006 |
+| D48 | **Lockdown de grants deny-by-default** (0011): `REVOKE EXECUTE` de `PUBLIC`/`anon`/`authenticated` en TODA la `public` + whitelist explícita de **31 firmas** (26 RPC + 5 helpers) a `authenticated` **y** `service_role`; PostGIS `st_x`/`st_y`/`geometry(geography)` re-grant a `authenticated`; `anon` sin DML; `audit_log` sin UPDATE/DELETE para `service_role` | El esquema previo (`GRANT EXECUTE ALL TO authenticated` + `REVOKE FROM anon`) era **CRIT-1**: PostgreSQL concede EXECUTE a **PUBLIC** por defecto ⇒ anon ejecutaba cualquier RPC (admin incluidas) e `internal_*`. Y el `REVOKE ... IN SCHEMA ... FROM PUBLIC` es no-op silencioso (**bug PG #8685**) ⇒ el REVOKE de PUBLIC va **sin** `IN SCHEMA`. Deny-list descartada (exponía helpers futuros); whitelist dinámica vía `pg_proc` descartada como mecanismo de grant (sólo como verificación en 0012). `service_role` **conserva** EXECUTE (whitelist + default-privileges): es bypassrls y viaja n8n — negarlo no sumaba seguridad (design D-5) |
+| D49 | **`assert_admin()`: guard admin NULL-safe con bypass sólo de sesión SQL-editor** (0011) | Los ~15 guards `my_role() <> 'admin'`/`NOT IN (...)` eran **NULL-bypass** (rol inexistente o usuario inactivo ⇒ NULL ⇒ el IF no se tomaba ⇒ pasaba). El helper `SECURITY DEFINER` distingue sesión del SQL editor — `session_user() = 'postgres' AND auth.uid() IS NULL` ⇒ bootstrap C2 intacto — de cualquier cliente (PostgREST: `session_user = 'authenticator'` ⇒ jamás bypassea). **`current_user` NO sirve**: dentro de `DEFINER` es siempre el owner ⇒ dejaría pasar a todos. Mensaje uniforme `'solo admin'` (design D-4) |
+| D50 | **`is_active` enforced en los 5 helpers** (0009): `my_role`, `is_premium`, `my_store_ids`, `my_distributor_id`, `has_scope` | Desactivar un usuario no bajaba su acceso: rol/alcance/premium seguían evaluándose sobre la fila. Los helpers son `SECURITY DEFINER` (owner postgres) ⇒ **sin recursión** users→policy→my_role()→users. **Ventana**: 0009 deja `my_role() = NULL` para inactivos y los guards `<> 'admin'` viejos son NULL-bypass ⇒ aplicar 0009→0011 **sin huecos** en UNA ventana de mantenimiento. Descartado: `is_active` en el JWT (Supabase no lo refleja sin re-login) (design D-3) |
+| D51 | **UN solo upsert de `dashboard_daily` por entrega** (0010): delta acumulado en el loop + 1 upsert antes del cierre | Antes: 1 upsert **por línea** ⇒ N eventos realtime pagos por entrega (uno por cada línea). El `RETURNING` del UPDATE de líneas trae `quantity` y `unit_price` ⇒ 0 subconsultas extra. Descartado: trigger sobre `movements` (duplicaría los upserts de los 4 call-sites actuales y propaga el bug de día histórico; CTE única no compone con `internal_stock_entry` que es plpgsql con RAISE) (design D-2) |
+| D52 | **Policies RLS scoped de `credits`/`credit_payments`/`routes`/`route_stops`** (0009) | La matriz decía "admin, operador (cobros)" **sin filtro de tienda**: cualquier operador leía créditos, cobros y rutas ajenos. Ahora patrón idéntico a `orders_select`: operador sólo sus tiendas (`credits.store_id = ANY(my_store_ids())`; `credit_payments` hereda el scope del padre; rutas vía `EXISTS` de `route_stops`); sin rama distribuidor en credits (el fiado de su tienda no es suyo). + scope post-`FOR UPDATE` en `register_payment` (D37 — `credit_payments` no tiene policy de UPDATE) (design D-7) |
+| D53 | **Validaciones de negocio de 0009**: `register_entry`/`exit` con pedido existente y de la MISMA tienda (RAISE — reemplaza el check muerto que filtraba `unit_price` de tienda ajena, D41), `create_order` exige tienda/distribuidor/producto **activos**, `create_credit` exige pedido **`delivered`**, tope de tiendas también al **reactivar** (`trg_stores_cap_reactivate`) | Soft-delete no es borrado: pedir a un distribuidor inactivo o fiar sobre un pedido `cancelled` corrompía el negocio. El fiado se registra sobre lo entregado; **`total_amount = Σ unit_price × quantity` = LO PEDIDO** (no lo recibido — `received_quantity` no entra; caveat pre-existente de 0004 aclárase en §4). El trigger de tope era INSERT-only ⇒ "desactivar → crear → reactivar" evadía el límite (design D-6) |
+| D54 | **Migraciones 0009→0012 append-only, autocontenidas y en UNA ventana** (fecha 2026-10-16, secuencia 0009-0012) | 0008 ya aplicada ⇒ no se edita (el fix del V5 vive sólo en 0012). Cada función tocada se reemplaza con `CREATE OR REPLACE` **completo** (0010 reescribe `confirm_delivery`/`create_order` con los fixes de 0009 — autocontención; sin "parches" sobre texto). Bloque `-- INVERSE:` **comentado/inerte por convención**: el SQL editor ejecuta el archivo de punta a punta ⇒ SQL vivo en el INVERSE se dispararía contra la DB recién migrada (regla aprendida en la review del batch 2). `git revert` por batch (design D-1) |
+| D55 | **Verificación del hardening en H1-H4 con `has_function_privilege`/`has_table_privilege`** (0012) | El V5 de 0008 (`aclexplode` + join `pg_roles`) **no ve el grant a PUBLIC** (grantee oid 0 descartado) ⇒ falso OK — justo el flaw CRIT-1 que había que detectar. H1 grants estáticos · H2 whitelist de 31 firmas con `EXECUTE` (H2.1 `authenticated`, H2.2 `service_role`) · H3 tests negativos RPC por batch (fixtures propias: cleanup explícito en orden inverso de FK + assert de cero residuo H3.14 — el rollback del statement es sólo fallback ante un error no capturado; los helpers ejecutables desde policies RLS son H3.13) · H4 RLS + PostGIS. No modifica el esquema; 0012 se SKIPea con NOTICE si falta algún batch (design D-8) |
 
 ---
 
@@ -756,6 +835,17 @@ END $$;
 -- + probar: signup (¿fila users creada con operador?) → update_user_role → assign_user_stores
 --   → assign → entry → exit (concurrente) → reverse → set_price → payment → payment_reverse
 --   → create_order → confirm_delivery (STOCK SUMA, no resta) → routes → mark_stop → alertas (alta y cierre)
+
+-- Hardening (sprint1-hardening — migraciones 0009→0012, 2026-10-16):
+--    Se pegan en ORDEN y en UNA SOLA ventana de mantenimiento (nota ALTO D50:
+--    0009 deja my_role()=NULL para inactivos con guards viejos NULL-bypass ⇒ un
+--    hueco entre batches deja la ventana abierta). Cada archivo es autocontenido
+--    (CREATE OR REPLACE completo) e idempotente; bloque `-- INVERSE:` COMENTADO
+--    por convención (el SQL editor corre el archivo de punta a punta — D54).
+-- 12. 20261016000009_negocio.sql — helpers con is_active · guards de confirm_delivery y register_entry/exit · create_order is_active · create_credit sólo-delivered · policies scoped de credits/credit_payments/routes/route_stops · tope al reactivar tienda (D50/D52/D53)
+-- 13. 20261016000010_perf.sql — confirm_delivery con dedup y UN solo upsert de dashboard (1 evento realtime) · índices parciales stock(expiry_date)/orders(expected_at)/alerts(store_id) · audit_diff precalculado · get_dashboard ≤366 días · create_order set-based (D51)
+-- 14. 20261016000011_seguridad.sql — assert_admin() + guards unificados · lockdown de grants: REVOKE de PUBLIC (bug #8685), whitelist de 31, PostGIS re-grant, anon sin DML, audit_log append-only (D48/D49)
+-- 15. 20261016000012_verify_hardening.sql — verificación H1-H4 (grants con has_*_privilege · whitelist de 31 firmas · tests negativos RPC con fixtures, cleanup en orden inverso de FK y cero-residuo; helpers en policies = H3.13 · RLS+PostGIS); NO modifica el esquema (D55)
 ```
 
 **Preparación de datos (cuando se carguen productos/tiendas/precios)**
@@ -795,8 +885,8 @@ END $$;
 | `order_items` | — RPC `get_order_items` (SELECT revocado; `unit_price` solo premium — D40) | — RPC | — RPC | — |
 | `stock` | admin · operador (`store_id ∈ mine`) · distribuidor (tiendas de sus pedidos/ruta) | — RPC | — RPC | — |
 | `movements` | admin · operador (`store_id ∈ mine`) · distribuidor (solo `distributor_id = mine`) | — RPC | — (append-only) | — |
-| `routes`/`route_stops` | admin · operador · distribuidor (`distributor_id = mine`) | — RPC | — RPC | — |
-| `credits`/`credit_payments` | admin, operador (cobros) | — RPC | — RPC | — |
+| `routes`/`route_stops` | admin · operador (**sólo rutas con paradas en sus tiendas / paradas de sus tiendas** — policies scoped 0009, D52) · distribuidor (`distributor_id = mine`) | — RPC | — RPC | — |
+| `credits`/`credit_payments` | admin · operador (**sólo créditos de SUS tiendas** — policies scoped 0009, D52; `credit_payments` hereda el scope del crédito padre; sin rama distribuidor) | — RPC | — RPC | — |
 | `alerts` | admin (todas) · operador (`store_id ∈ mine`) · distribuidor (**solo `distributor_id = mine`** — nunca NULL, A4) | — jobs/trigger | — RPC `mark_alert_read` | — |
 | `user_stores` | fila propia, admin | — RPC admin | — | — RPC admin |
 | `chat_conversations`/`chat_messages` | `user_id = auth.uid()` / conversación propia | — RPC `create_chat`/`send_message` | — (trigger solo) | — |
@@ -817,7 +907,7 @@ END $$;
 
 ## 9. Pendientes
 
-- [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7.
+- [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7 (**incluye el hardening 0009→0012: pegar en orden y en UNA sola ventana de mantenimiento** — nota ALTO D50).
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
 - [x] Premium alineado en el `.md` principal (tabla `users`, no `app_metadata`; `is_premium()` única y con `SET search_path`).
 - [x] **.md principal alineado** (pasada completa: vocabulario, precios privados por tienda, alertas materializadas, audit Sprint 1, dashboard tabla+realtime, SEC-01 → S2, M7/M8, QR tienda↔distribuidor, campos nuevos expected_at/due_date/currency).
@@ -830,6 +920,10 @@ END $$;
 - [x] **M8 resuelto**: se elimina la frase del .md — los triggers DML no auditan SELECT; la trazabilidad de tools del chatbot la lleva **n8n** (un registro por invocación en el flujo de trabajo).
 - [ ] Decisión pendiente (A4/§3.9): si el distribuidor debe ver `stock_low`/`expiry_soon`, requerirá relación tienda↔distribuidor (hoy no existe); MVP: no las ve.
 - [ ] Decisión pendiente (A3/§3.13): si el operador requiere dashboard "por su alcance", añadir `store_id` a `dashboard_daily` (MVP: agregado global).
+- [ ] **Aplicar 0009→0012 a la DB real** en UNA ventana de mantenimiento + smoke §7.11 — bloqueado por R19.2: confirmar que la conexión MCP apunta al proyecto FAROX `tzyqstnxbzyfmdxeuyvz` y si `0008_verify.sql` ya corrió en él (si nunca corrió, aplicar también el fix del V5 en 0008; si corrió, no editarla — vive sólo en 0012).
+- [ ] **Reverso de un movimiento de OTRO día contamina el dashboard de HOY** (diferido en D51/review batch 2): `register_reverse` resta la contribución del día ORIGINAL en la fila de HOY (clampeada a 0 — dato incorrecto igual que hoy). El fix real = recomputar la fila del día original; un trigger sobre `movements` centralizaría el upsert (M6) pero NO arregla la semántica ⇒ candidato a change posterior, no a este hardening.
+- [ ] **Baja de acceso efectiva = DB + ban manual en Supabase Auth** (D50): `is_active` corta rol/alcance/premium en DB, pero el JWT ya emitido sigue válido hasta expirar; auto-ban vía Auth API (edge function) queda fuera del MVP — el producto decide.
+- [ ] **Convención deny-by-default (D48)**: toda migración futura debe traer su `GRANT` explícito sobre `public` — propagar a las convenciones de `sdd-init` y a las reviews de migraciones (junto a la regla "bloques `-- INVERSE:` inertes", D54).
 
 ### Inconsistencias detectadas entre este doc y `idea basica proy admin de proys.md`
 *(agente revisor; corregir al alinear el .md — son nombres/semántica, este doc manda)*

@@ -1,8 +1,10 @@
 # FAROX — Migraciones Supabase (Sprint 1)
 
 Materialización del esquema según `Base de datos FAROX.md` (documento **autoridad**).
-8 migraciones numeradas que se ejecutan **en orden estricto** — el orden numérico
-del filename ES el orden de materialización del §7.
+12 migraciones numeradas que se ejecutan **en orden estricto** — el orden numérico
+del filename ES el orden de materialización del §7. Las 4 últimas (0009→0012)
+son el hardening de `sprint1-hardening` y comparten UNA ventana de mantenimiento
+(ver "Hardening 0009→0012" abajo).
 
 | # | Archivo | Qué hace |
 |---|---------|----------|
@@ -15,6 +17,10 @@ del filename ES el orden de materialización del §7.
 | 6 | `20261015000006_rls_grants.sql` | ENABLE RLS en las 25 tablas + policies + REVOKE/GRANT (§8/§4) |
 | 7 | `20261015000007_realtime_jobs.sql` | Publicación realtime podada + 3 jobs pg_cron diarios (§5/§7.10) |
 | 8 | `20261015000008_verify.sql` | Diagnóstico completo — no modifica nada (§7.11) |
+| 9 | `20261016000009_negocio.sql` | Hardening de negocio: helpers con `is_active`, guards de `confirm_delivery`/`register_entry`/`exit`, `create_order` con `is_active`, `create_credit` sólo sobre pedidos `delivered`, policies scoped de créditos/rutas (§4/§8) |
+| 10 | `20261016000010_perf.sql` | Performance: `confirm_delivery` con dedup y UN solo upsert de dashboard (1 evento realtime por entrega), índices parciales (`stock.expiry_date`, `orders.expected_at`, `alerts.store_id`), `audit_diff` precalculado, `get_dashboard` ≤366 días, `create_order` set-based |
+| 11 | `20261016000011_seguridad.sql` | Seguridad: `assert_admin()` (guard admin NULL-safe) + lockdown de grants deny-by-default (REVOKE de PUBLIC — bug PG #8685 —, whitelist de 31 firmas, PostGIS re-grant, `anon` sin DML) |
+| 12 | `20261016000012_verify_hardening.sql` | Verificación del hardening — no modifica nada (checks H1-H4) |
 
 ---
 
@@ -68,17 +74,59 @@ WHERE u.id = '<UUID>'::uuid AND r.name = 'admin';
 ```
 
 > **¿Por qué un `UPDATE` directo y no `update_user_role()`?** El RPC exige
-> caller admin (`my_role() IS DISTINCT FROM 'admin'` ⇒ RAISE, endurecido en
-> el review de seguridad B3: el bypass por sesión sin `auth.uid()` quedó
-> cerrado a propósito) y el primer usuario llega como `operador` — un
-> operador no puede autopromoverse. El SQL editor corre como `postgres`,
-> dueño de las tablas: salta RLS y los grants por columna (D45). Es el único
-> camino legítimo de bootstrap (C2). **Una vez promovido, el admin opera
-> desde la app como cualquier authenticated** — `update_user_role()` desde
-> la app sirve para los siguientes usuarios.
+> caller admin: el guard quedó NULL-safe en el review de seguridad B3 —
+> `my_role() IS DISTINCT FROM 'admin'` ⇒ RAISE, con el bypass por sesión
+> sin `auth.uid()` cerrado a propósito — y el primer usuario llega como
+> `operador`, que no puede autopromoverse. El SQL editor corre como
+> `postgres`, dueño de las tablas: salta RLS y los grants por columna
+> (D45). Es el único camino legítimo de bootstrap (C2) y funciona con o
+> sin 0011 aplicado. **Una vez promovido, el admin opera desde la app como
+> cualquier authenticated** — `update_user_role()` desde la app sirve para
+> los siguientes usuarios.
 >
-> (La vía API con el `access_token` del usuario **no sirve** para la
-> promoción inicial: su JWT es de `operador` y el guard lo rechaza.)
+> **Desde 0011 el guard de las RPC solo-admin es `assert_admin()`**
+> (NULL-safe): deja pasar **solo** a un admin activo o a la sesión del SQL
+> editor — `session_user() = 'postgres' AND auth.uid() IS NULL`
+> (bootstrap C2). En PostgREST `session_user` es `authenticator`, así que
+> ninguna app, CLI o caller con anon key toma ese bypass: un cliente con
+> `auth.uid()` NULL recibe `'solo admin'`. *(El bypass implícito del
+> guard original `my_role() <> 'admin'` — sin JWT, `my_role()` es NULL y
+> la comparación no aplicaba — ya no existe en la secuencia actual: 0004
+> lo cerró con `IS DISTINCT FROM` (B3) y 0011 lo re-abre **sólo**,
+> explícito, para la sesión del SQL editor.)*
+>
+> Cambio de roles vía API (sólo **después** del bootstrap, no lo reemplaza):
+> con un admin activo ya promovido, logueate como ese admin en la app, copiá
+> su `access_token` del storage del navegador y:
+>
+> ```bash
+> curl -X POST 'https://<PROJECT-REF>.supabase.co/rest/v1/rpc/update_user_role' \
+>   -H 'apikey: <ANON-KEY>' \
+>   -H 'Authorization: Bearer <ACCESS_TOKEN_DEL_ADMIN>' \
+>   -H 'Content-Type: application/json' \
+>   -d '{"p_user": "<UUID>", "p_role": "admin", "p_distributor": null}'
+> ```
+>
+> **No sirve para dar de alta al primer admin**: el JWT del primer usuario
+> (recién llegado como `operador`) recibe `'solo admin'` — pre-0011 el
+> guard `my_role() IS DISTINCT FROM 'admin'` (B3) y post-0011
+> `assert_admin()`. El bootstrap del primer admin es y sigue siendo
+> **sólo** el paso 3, desde el SQL editor.
+>
+> (El Bearer debe ser el **JWT del admin**, no el anon key. "No funciona
+> con el anon key solo" era **falso en el guard original** — el
+> NULL-bypass de `<> 'admin'` dejaba pasar a cualquier caller sin rol —
+> pero es verdad en la secuencia actual, por capas: 0004 cierra el bypass
+> (B3) y 0006 suma `REVOKE EXECUTE ... FROM PUBLIC/anon`, así que con el
+> anon key la llamada ya revienta con `permission denied` ANTES de correr
+> el body; 0011 refuerza esa capa para el futuro — `ALTER DEFAULT
+> PRIVILEGES` (sin `IN SCHEMA` para PUBLIC, que con la bug PG #8685 sería
+> no-op) + sweep + whitelist explícita de 31 firmas (26 RPC + 5 helpers)
+> que sólo devuelve `EXECUTE` a `authenticated`/`service_role`, de modo que
+> toda función que agregue una migración futura nace sin EXECUTE para
+> clientes; y si un cliente autenticado la invocara, `assert_admin()`
+> responde `'solo admin'`. `service_role` sí conserva EXECUTE — es la vía
+> de integración n8n/servidor (D-5), no la de bootstrap.)
 
 ## ¿Cómo verifico que funcionó?
 
@@ -96,19 +144,48 @@ FROM public.users u JOIN public.roles r ON r.id = u.role_id;
 
 **Opción A — Supabase SQL editor (la del §7):** abrir cada archivo en orden
 numérico y ejecutarlo. Los archivos son idempotentes donde importa (enums con
-`IF NOT EXISTS`, seeds con `ON CONFLICT`, policies/REVOKE deterministas), pero
-el orden 1→8 no se salta.
+`IF NOT EXISTS`, seeds con `ON CONFLICT`, policies/REVOKE deterministas, y
+0009-0012 enteros por `CREATE OR REPLACE`/`DROP IF EXISTS`/`CREATE INDEX IF
+NOT EXISTS` — re-pegarlos no duplica nada), pero el orden 1→12 no se salta.
 
 **Opción B — CLI local:** `supabase db push` (o `supabase migration up`) — el
 orden numérico de los filenames se respeta automáticamente. El paso manual no
-lo automatiza nadie: hacélo entre 0005 y 0006 (o después de 0006/0007, que no
-impiden el signup — los REVOKE de EXECUTE (anon/PUBLIC) no tocan a los
-triggers de auth.users: PG no chequea EXECUTE al disparar un trigger; la
-advertencia de "antes de RLS" viene del §7 y aplica al ideal, no a un
-bloqueo duro).
+lo automatiza nadie: hacélo entre 0005 y 0006 (o después de 0006/0007 —
+ninguna migración posterior impide el signup: los REVOKE de EXECUTE
+(anon/PUBLIC) no tocan a los triggers de auth.users y 0011 lo confirma —
+además PG no chequea EXECUTE al disparar un trigger, sólo lo exige al
+CREATE TRIGGER; la advertencia de "antes de RLS" viene del §7 y aplica al
+ideal, no a un bloqueo duro).
 
 **Requisitos previos:** extensiones `postgis` y `pg_cron` disponibles en el
 proyecto (Supabase las ofrece; 0001 las crea).
+
+---
+
+## Hardening 0009→0012: UNA sola ventana de mantenimiento
+
+Las 4 migraciones del hardening (0009→0012) se pegan **en orden y en UNA
+sola ventana de mantenimiento**, sin huecos entre archivos (nota ALTO del
+change `sprint1-hardening`): 0009 hace que `my_role()` devuelva `NULL` para
+usuarios inactivos, y desde ahí cualquier guard no NULL-safe queda como
+bypass activo para ellos hasta que 0011 reemplace todos los guards
+solo-admin por `assert_admin()`. En DB limpia los cuerpos de 0004 (B3:
+`IS DISTINCT FROM`) y los re-bodies de 0009 (COALESCE en el DECLARE) ya
+son NULL-safe, pero si la DB arrastra 0004 pre-B3 la ventana es real y se
+cierra recién con 0011 aplicado — en cualquier caso el batch se aplica
+entero. El authoring/copy puede ser archivo por archivo; lo que no debe
+partirse es la **ejecución**.
+
+Convención de bloques `-- INVERSE:` (aprendida en la review del batch 2):
+van **comentados/inertes** — cada sentencia lleva prefijo `-- `. El SQL
+editor ejecuta el archivo de punta a punta, así que un INVERSE con SQL vivo
+se dispararía contra la misma DB que acabás de migrar. Para rollback:
+descomentar el bloque a mano **en una transacción**, o `git revert` del
+batch correspondiente.
+
+`0012_verify_hardening.sql` exige 0009+0010+0011 ya aplicados; si falta
+alguno, sus checks se SKIPean con NOTICE en vez de fallar (degradación
+elegante). Verificá con H1-H4 (ver "Verificación post-migración").
 
 ## Qué NO está en estas migraciones (pendientes conscientes, §9/D22)
 
@@ -126,6 +203,22 @@ proyecto (Supabase las ofrece; 0001 las crea).
 
 Corré `20261015000008_verify.sql` y esperá los NOTICE `V1 … OK` a `V10 OK`.
 Cualquier WARNING indica un bloque incompleto — el mensaje dice cuál.
+
+Tras aplicar el hardening, corré `20261016000012_verify_hardening.sql`: extiende
+el patrón de 0008 con las secciones **H1-H4** (los checks de 0008 son V1…V10;
+los de 0012 se llaman H): **H1** grants estáticos vía
+`has_function_privilege`/`has_table_privilege`, que sí resuelven el grant
+a PUBLIC (oid 0) — el V5 original de 0008 no lo veía y daba falso OK, ya
+corregido allí mismo por B3 (chequea además el grantee 0); **H2** las 31
+firmas de la whitelist con
+`EXECUTE` (H2.1 `authenticated`, H2.2 `service_role`); **H3** tests negativos
+RPC por batch (anon → `permission denied`, operador → `'solo admin'`, doble
+`confirm_delivery`, pedido de otra tienda…, y helpers ejecutables desde
+policies RLS);
+**H4** RLS + PostGIS. No modifica el esquema: termina con conteo de veredictos
+y un `SELECT` de todos los checks — cualquier FAIL investigalo antes de dar
+por bueno el hardening. Si falta algún batch (0009-0011), los checks
+dependientes salen SKIP con NOTICE.
 
 Después, el smoke test manual del §7.11 (signup → rol → tienda → producto →
 precio → entry/exit → pedido → entrega → ruta → crédito → pago → alertas →
