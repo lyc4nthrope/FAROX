@@ -7,6 +7,7 @@ import * as authApi from "../features/auth/api";
 import * as distributorsApi from "../features/distributors/api";
 import * as productsApi from "../features/products/api";
 import * as profileApi from "../features/profile/api";
+import * as storesApi from "../features/stores/api";
 import { AuthProvider } from "./providers/AuthProvider";
 import { AppRoutes } from "./router";
 
@@ -44,6 +45,19 @@ vi.mock("../features/products/api", () => ({
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
+}));
+// B7 (T7.2): /stores ya no es placeholder — el api de la feature se mockea
+// COMPLETO como en el resto de los tests: sin esto, el módulo real importa el
+// cliente supabase, que valida el env en el arranque (V0-1).
+vi.mock("../features/stores/api", () => ({
+  fetchStores: vi.fn(),
+  fetchStore: vi.fn(),
+  fetchStoreGeo: vi.fn(),
+  fetchStoreTypes: vi.fn(),
+  createStore: vi.fn(),
+  updateStore: vi.fn(),
+  deactivateStore: vi.fn(),
+  deleteStore: vi.fn(),
 }));
 
 const SESSION = { userId: "u1", email: "demo@farox.app" };
@@ -95,6 +109,14 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
       rows: [],
       error: null,
     });
+    vi.mocked(storesApi.fetchStores).mockResolvedValue({
+      rows: [],
+      count: 0,
+      error: null,
+    });
+    vi.mocked(storesApi.fetchStore).mockResolvedValue({ row: null, error: null });
+    vi.mocked(storesApi.fetchStoreGeo).mockResolvedValue({ geo: null, error: null });
+    vi.mocked(storesApi.fetchStoreTypes).mockResolvedValue({ rows: [], error: null });
     conSesion("admin");
   });
 

@@ -4,6 +4,7 @@ import { LoginPage } from "../features/auth";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { ProfilePage } from "../features/profile";
+import { StoreFormPage, StoresPage } from "../features/stores";
 import type { RoleName } from "../features/auth/types";
 import { RequireAuth } from "./guards/RequireAuth";
 import { RequireRole } from "./guards/RequireRole";
@@ -23,6 +24,12 @@ import { HomePage } from "./shell/HomePage";
 //   "distribuidor read-only" ⇒ denied en la ruta de alta).
 // · /distributors/:id entra para operador (lectura, SEC-01 "read-only"); los
 //   controles de escritura los oculta el feature distributors (B5, idea:119).
+// · /stores (lista y form) exige admin|operador en las TRES rutas (B7): en
+//   tiendas el distribuidor es ✘ total (SEC-01 idea:114, §S2 "distribuidor
+//   NO — ruta oculta"); stores_select es USING true (0006:164-165), así que
+//   ahí el guard es UX — el enforcement es de RLS en escritura (idea:134).
+//   RequireRole además garantiza el role resuelto ANTES de montar StoresPage,
+//   cuyo scope "mine"/"all" depende del rol (§S2 "operador own").
 const ADMIN_ONLY: readonly RoleName[] = ["admin"];
 const ADMIN_OR_OPERATOR: readonly RoleName[] = ["admin", "operador"];
 
@@ -71,7 +78,7 @@ export function AppRoutes() {
             path="/stores"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Tiendas" batch="B7" />
+                <StoresPage />
               </RequireRole>
             }
           />
@@ -79,7 +86,7 @@ export function AppRoutes() {
             path="/stores/new"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Nueva tienda" batch="B7" />
+                <StoreFormPage />
               </RequireRole>
             }
           />
@@ -87,7 +94,7 @@ export function AppRoutes() {
             path="/stores/:id"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Tienda" batch="B7" />
+                <StoreFormPage />
               </RequireRole>
             }
           />
