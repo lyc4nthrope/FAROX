@@ -1,2 +1,3 @@
-// Scaffold B1 · D1 (obs #486): componentes compartidos (EmptyState/ErrorBanner, B3).
-export {};
+// B3 (T3.2 · D1/D4, obs #486): componentes compartidos de listados.
+export { EmptyState } from "./EmptyState";
+export { ErrorBanner } from "./ErrorBanner";
