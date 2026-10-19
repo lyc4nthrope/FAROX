@@ -1,0 +1,78 @@
+# F3.1 · DEV-08 + DEV-09 — schema-check en stack fresco (CI-only: sin Docker local, obs #495).
+# Batch B2 del cambio devops-ci-cd (sdd-apply; forma del job: design #507 §2.6).
+# Host: workflow SEPARADO de ci.yml — restricción de lote (ci.yml = hotfix de fase 1, intacto).
+# El CHECK requerido por DEV-13 (amendado: `quality` + `schema-check`) es el NOMBRE DEL JOB,
+# así que la config de G3 no cambia: job id = `schema-check`, SIN `name:` a nivel de job.
+# Sin ningún secret ⇒ ejecutable en pull_request de forks sin exponer nada (DEV-06 sc3).
+# Sin npm/lockfile ⇒ NO depende de T0.1; si sale rojo, los mensajes dicen qué falta (design §4 filas 11-12).
+
+name: Schema Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  schema-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        # U5 (design #507 §1): sin input de versión — el nombre del input de versión de
+        # setup-cli es UNVERIFIED ("default latest first"). Confirmar antes de fijar versión.
+
+      - name: "Self-test del parser — prove-by-break con fixtures (DEV-09 · design §2.6/§9)"
+        run: |
+          set -euo pipefail
+          node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-healthy.log
+          node scripts/parse-verify-output.mjs --expect=verify scripts/fixtures/verify-output-healthy.log
+          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-fail.log; then
+            echo "::error::self-test: el parser salió 0 con el fixture [FAIL] — parser roto, no confiar en él (DEV-09 prove-by-break)"
+            exit 1
+          fi
+          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-truncated.log; then
+            echo "::error::self-test: el parser salió 0 con output truncado (PARSE-MISS) — parser roto (D7)"
+            exit 1
+          fi
+          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0"
+
+      - name: "supabase init — gap de config.toml (#506); condicional por T4.2 (se commitea después)"
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          test -f supabase/config.toml || { echo "::error::supabase/config.toml ausente tras init — schema-check no puede correr (design §2.4 P6)"; exit 1; }
+
+      - name: "DEV-08: db start AS-IS (sin db reset — binding decision 2), captura stdout+stderr"
+        run: |
+          set -euo pipefail
+          supabase db start 2>&1 | tee db-start.log
+
+      - name: "Presencia — las 12 aplicaciones deben evidenciarse (protección de DEV-08, D7)"
+        run: |
+          set -euo pipefail
+          missing=0
+          for v in 20261015000001 20261015000002 20261015000003 20261015000004 20261015000005 20261015000006 20261015000007 20261015000008 20261016000009 20261016000010 20261016000011 20261016000012; do
+            if ! grep -q "$v" db-start.log; then
+              echo "::error::sin evidencia de la migración $v en la salida de db start — no se aplicaron las 12 (DEV-08). Si db start no aplica migraciones en esta versión del CLI, escalar: design #507 §6.2 contempla supabase start -x como forma alternativa."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          echo "presencia OK — 12/12 versiones evidenciadas en db-start.log"
+
+      - name: "DEV-09: parseo severity-map — 0012 FAIL-as-WARNING ⇒ rojo (D7 presence-then-count)"
+        run: |
+          set -euo pipefail
+          node scripts/parse-verify-output.mjs --expect=apply db-start.log
+
+      - name: "supabase db lint --fail-on=warning (design §2.6; objetivo local por defecto — docs db-lint)"
+        run: |
+          set -euo pipefail
+          supabase db lint --fail-on=warning
