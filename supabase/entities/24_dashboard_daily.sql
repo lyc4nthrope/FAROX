@@ -60,13 +60,9 @@ CREATE POLICY dashboard_read ON public.dashboard_daily
               OR distributor_id = public.my_distributor_id()));
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial) + :378 (GRANT SELECT)
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- D38/D32: estas dos NO se revocan; se GRANTEAN SELECT con su policy
 -- (audit_log: admin la lee; dashboard_daily: realtime exige SELECT+RLS, D32).
 GRANT SELECT ON public.dashboard_daily TO authenticated;
@@ -85,7 +81,7 @@ CREATE OR REPLACE FUNCTION public.internal_dashboard_upsert(
   p_entries_value  numeric,
   p_exits_value    numeric
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   INSERT INTO public.dashboard_daily AS d (day, distributor_id, entries_count, exits_count, entries_value, exits_value)
   VALUES (CURRENT_DATE, COALESCE(p_distributor_id, 0), p_entries_count, p_exits_count, p_entries_value, p_exits_value)
@@ -116,7 +112,7 @@ RETURNS TABLE (
   entries_value   numeric(14,2),
   exits_value     numeric(14,2)
 )
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_from date := COALESCE(p_from, CURRENT_DATE - 30);  -- R11: mismos defaults que el WHERE original
   v_to   date := COALESCE(p_to, CURRENT_DATE);

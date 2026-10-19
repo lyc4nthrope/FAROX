@@ -102,7 +102,7 @@ CREATE TABLE public.movements (
   created_at       timestamptz NOT NULL DEFAULT now(),
   -- Máx. 1 reverso por movimiento; prohíbe doble reverso (D31). La validación
   -- de tipo opuesto / mismo producto-tienda vive en register_reverse().
-  CONSTRAINT uq_movements_reverso UNIQUE (reverso_of_id) WHERE reverso_of_id IS NOT NULL,
+  CONSTRAINT uq_movements_reverso UNIQUE (reverso_of_id),
   CONSTRAINT chk_movements_entry_expiry CHECK (type = 'entry' OR expiry_date IS NULL)
   -- Sin updated_at ni UPDATEs (REVOKE completo en 0006)
 );
@@ -161,7 +161,7 @@ CREATE TABLE public.credit_payments (
   paid_at         timestamptz NOT NULL DEFAULT now(),
   -- corrección de cobros: un pago mal registrado se revierte con su reverso,
   -- nunca con UPDATE (append-only intacto)
-  CONSTRAINT uq_credit_payments_reverso UNIQUE (reverso_of_id) WHERE reverso_of_id IS NOT NULL
+  CONSTRAINT uq_credit_payments_reverso UNIQUE (reverso_of_id)
 );
 
 CREATE INDEX idx_credit_payments_credit ON public.credit_payments (credit_id);

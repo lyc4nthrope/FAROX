@@ -1,4 +1,4 @@
--- Entity: NEGOCIO (RPC multi-entidad) | Source: 0004_functions_triggers.sql:L185-244 (internal_stock_entry), L635-666 (create_store) · 20261016000009_negocio.sql:L91-210 (register_entry/register_exit, versión FINAL) · 20261016000010_perf.sql:L41-272 (confirm_delivery/create_order, versión FINAL) · 20261016000011_seguridad.sql:L84-139 (update_user_role/set_user_premium/set_user_active) + L189-231 (register_reverse, versión FINAL) | Order: AFTER 01..25 (necesita stores, user_stores, orders, order_items, stock, movements, price_publications, products, distributors, motives, credits + los helpers de 00_foundation)
+-- Entity: NEGOCIO (RPC multi-entidad) | Source: 0004_functions_triggers.sql:L185-244 (internal_stock_entry), L635-666 (create_store) + L1362-1387 (get_stock, MOVIDA de 15_stock.sql: LANGUAGE sql + refs a routes/route_stops) · 20261016000009_negocio.sql:L91-210 (register_entry/register_exit, versión FINAL) · 20261016000010_perf.sql:L41-272 (confirm_delivery/create_order, versión FINAL) · 20261016000011_seguridad.sql:L84-139 (update_user_role/set_user_premium/set_user_active) + L189-231 (register_reverse, versión FINAL) | Order: AFTER 01..25 (necesita stores, user_stores, orders, order_items, stock, movements, price_publications, products, distributors, motives, credits, routes, route_stops + los helpers de 00_foundation)
 -- ════════════════════════════════════════════════════════════════════════════
 -- RPCs multi-entidad: cada una toca 3+ tablas o codifica un flujo de negocio
 -- transversal. Cuerpos VERBATIM de la MIGRACIÓN que define la VERSIÓN FINAL
@@ -28,10 +28,12 @@
 --   · create_credit/cancel_credit/register_payment  → 19_credits.sql
 --   · register_payment_reverse → 20_credit_payments.sql
 --   · set_price → 12_price_publications.sql · assign_user_stores → 11
---   · assign_product_to_store/get_stock → 15_stock.sql · mark_stop → 18
+--   · assign_product_to_store → 15_stock.sql · mark_stop → 18
 --   · mark_alert_read + internal_alert_* → 21_alerts.sql
 --   · internal_dashboard_upsert/get_dashboard → 24_dashboard_daily.sql
 --   · job_scan_* → 60_jobs.sql (no es RPC de clientes)
+-- MOVIDA acá desde 15_stock.sql (§11): get_stock — ver §11 por el porqué
+-- (orden de creación: LANGUAGE sql + referencias a routes/route_stops).
 -- ════════════════════════════════════════════════════════════════════════════
 
 -- ---------------------------------------------------------------------------
@@ -657,6 +659,44 @@ BEGIN
   RETURN v_id;
 END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- 11. get_stock — VERBATIM 20261015000004_functions_triggers.sql:1362-1387
+--     (0011 solo la GRANTEA, 0011:508). MOVIDA desde 15_stock.sql por ORDEN:
+--     es LANGUAGE sql, así que su cuerpo se analiza AL CREARLA (a diferencia
+--     de plpgsql, que difiere a runtime) y referencia public.routes (17) y
+--     public.route_stops (18) — ambos posteriores a 15, lo que rompía el paste
+--     de esa entidad. Acá corre después de 01..25 ⇒ existe todo lo que lee.
+--     Lectura multi-entidad: stock + products (nombre) + orders + routes +
+--     route_stops (alcance por rol). Cuerpo IDÉNTICO al de 0004.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_stock(
+  p_store bigint, p_limit int DEFAULT 50
+)
+RETURNS TABLE (
+  product_id   bigint,
+  product_name text,
+  quantity     numeric(12,3),
+  threshold    numeric(12,3),
+  expiry_date  date
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT s.product_id, p.name, s.quantity, s.threshold, s.expiry_date
+  FROM public.stock s
+  JOIN public.products p ON p.id = s.product_id
+  WHERE s.store_id = p_store
+    AND (public.my_role() = 'admin'
+         OR (public.my_role() = 'operador' AND s.store_id = ANY (public.my_store_ids()))
+         OR (public.my_role() = 'distribuidor'
+             AND (s.store_id IN (SELECT o.store_id FROM public.orders o
+                                  WHERE o.distributor_id = public.my_distributor_id())
+                  OR s.store_id IN (SELECT rs.store_id FROM public.route_stops rs
+                                      JOIN public.routes r ON r.id = rs.route_id
+                                     WHERE r.distributor_id = public.my_distributor_id()))))
+  ORDER BY s.product_id
+  LIMIT LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100);  -- LIMIT duro
+$$;
+-- GRANT EXECUTE get_stock(bigint, integer) TO authenticated, service_role — 0011:508.
 
 -- Fin 30_negocio. Siguiente: 40_seeds.sql (los seeds de catálogos que estas
 -- RPC asumen en runtime — p.ej. confirm_delivery exige motives 'reabastecimiento').

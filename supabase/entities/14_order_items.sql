@@ -45,17 +45,12 @@ ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 
 -- GRANTs — deny-all de lectura (D40):
 -- 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE a authenticated.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
--- 0006_rls_grants.sql:373 (VERBATIM): SELECT revocado a authenticated.
-REVOKE SELECT ON public.user_stores, public.order_items FROM authenticated;
--- 0011_seguridad.sql:547 (VERBATIM): SELECT revocado también a anon.
-REVOKE SELECT ON public.user_stores, public.order_items FROM anon;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
+-- SELECT revocado (0006:371-373 a authenticated + 0011:547 a anon): CONSOLIDADO
+-- en 90_security.sql. Ambas tablas existen acá, pero el mismo bloque vivía
+-- también en 11_user_stores, donde order_items aun no existe (forward ref).
 
 -- ============================================================================
 -- RPC de LECTURA (única vía de leer la tabla; omite unit_price a no-premium, D40)
@@ -71,7 +66,7 @@ RETURNS TABLE (
   status             public.order_item_status,
   unit_price         numeric(12,2)
 )
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   SELECT oi.id, oi.product_id, p.name, oi.quantity, oi.received_quantity, oi.status,
          CASE WHEN public.is_premium() THEN oi.unit_price END  -- no-premium: sabe QUÉ y CUÁNTO, no el precio
   FROM public.order_items oi

@@ -1,4 +1,4 @@
--- Entity: stock | Source: 0003_tables_farox.sql:L35-55 (tabla+índice+ALTER fillfactor), 0004_functions_triggers.sql:L463-466 (trg_updated_at), L126-158 (internal_eval_stock_alert), L673-693 (assign_product_to_store), L1362-1387 (get_stock), 0006_rls_grants.sql:L40 (RLS), L232-244 (policy), L351-357 (REVOKE), 0010_perf.sql:L366-368 (idx_stock_expiry), 0011_seguridad.sql:L361-381 (assign_product_to_store final) | Order: after products, stores, alerts (eval), motives (vía movements)
+-- Entity: stock | Source: 0003_tables_farox.sql:L35-55 (tabla+índice+ALTER fillfactor), 0004_functions_triggers.sql:L463-466 (trg_updated_at), L126-158 (internal_eval_stock_alert), L673-693 (assign_product_to_store), L1362-1387 (get_stock → MOVIDA a 30_negocio.sql §11), 0006_rls_grants.sql:L40 (RLS), L232-244 (policy stock_select → MOVIDA a 90_security.sql §4ter), L351-357 (REVOKE → CONSOLIDADO en 90_security.sql §4bis), 0010_perf.sql:L366-368 (idx_stock_expiry), 0011_seguridad.sql:L361-381 (assign_product_to_store final) | Order: after products, stores, alerts (eval), motives (vía movements)
 
 -- ============================================================================
 -- stock — asignación Producto ↔ Tienda (PK compuesta). La tabla con más UPDATEs
@@ -50,29 +50,16 @@ EXECUTE FUNCTION public.touch_updated_at();
 -- · distribuidor (tiendas de sus pedidos O de su ruta). Escritura solo RPC.
 ALTER TABLE public.stock ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY stock_select ON public.stock
-  FOR SELECT TO authenticated
-  USING (public.my_role() = 'admin'
-         OR (public.my_role() = 'operador'
-             AND store_id = ANY (public.my_store_ids()))
-         OR (public.my_role() = 'distribuidor' AND (
-              EXISTS (SELECT 1 FROM public.orders o
-                      WHERE o.distributor_id = public.my_distributor_id()
-                        AND o.store_id = stock.store_id)
-              OR EXISTS (SELECT 1 FROM public.route_stops rs
-                          JOIN public.routes r ON r.id = rs.route_id
-                          WHERE r.distributor_id = public.my_distributor_id()
-                            AND rs.store_id = stock.store_id))));
+-- Policy stock_select: CONSOLIDADA en 90_security.sql (§4ter) — VERBATIM
+-- 0006:232-244. El cuerpo de una policy se analiza AL CREARLA y este hace
+-- EXISTS contra public.route_stops (18) y public.routes (17), posteriores a
+-- esta entidad: acá rompería el paste. Ver 90_security.sql.
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- a authenticated (escritura pasa por RPC SECURITY DEFINER). SELECT no se revoca (policy stock_select).
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 
 -- ============================================================================
 -- RPCs SOBRE ESTA TABLA (estado FINAL = última migración)
@@ -82,7 +69,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.assign_product_to_store(
   p_product bigint, p_store bigint, p_threshold numeric(12,3) DEFAULT NULL
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := COALESCE(public.my_role(), '');  -- D-4: '' no es ningún rol ⇒ NOT IN rechaza
 BEGIN
@@ -102,34 +89,8 @@ END;
 $$;
 -- GRANT EXECUTE assign_product_to_store(bigint, bigint, numeric(12,3)) TO authenticated, service_role — 0011:491.
 
--- get_stock — lectura para el chatbot (LIMIT duro, alcance por rol).
--- Definitiva en 0004_functions_triggers.sql:1362-1387 (0011 solo la GRANTEA). Toca stock+products.
-CREATE OR REPLACE FUNCTION public.get_stock(
-  p_store bigint, p_limit int DEFAULT 50
-)
-RETURNS TABLE (
-  product_id   bigint,
-  product_name text,
-  quantity     numeric(12,3),
-  threshold    numeric(12,3),
-  expiry_date  date
-)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public $$
-  SELECT s.product_id, p.name, s.quantity, s.threshold, s.expiry_date
-  FROM public.stock s
-  JOIN public.products p ON p.id = s.product_id
-  WHERE s.store_id = p_store
-    AND (public.my_role() = 'admin'
-         OR (public.my_role() = 'operador' AND s.store_id = ANY (public.my_store_ids()))
-         OR (public.my_role() = 'distribuidor'
-             AND (s.store_id IN (SELECT o.store_id FROM public.orders o
-                                  WHERE o.distributor_id = public.my_distributor_id())
-                  OR s.store_id IN (SELECT rs.store_id FROM public.route_stops rs
-                                      JOIN public.routes r ON r.id = rs.route_id
-                                     WHERE r.distributor_id = public.my_distributor_id()))))
-  ORDER BY s.product_id
-  LIMIT LEAST(GREATEST(COALESCE(p_limit, 50), 1), 100);  -- LIMIT duro
-$$;
--- GRANT EXECUTE get_stock(bigint, integer) TO authenticated, service_role — 0011:508.
+-- get_stock: MOVIDA a 30_negocio.sql (§11) — es LANGUAGE sql, su cuerpo se
+-- analiza AL CREARLA y referencia public.routes (17) y public.route_stops (18),
+-- posteriores a esta entidad. Versión VERBATIM 0004:1362-1387 allí.
 -- internal_stock_entry / register_entry / register_exit / confirm_delivery / register_reverse
 -- mutan stock ⇒ MULTI-ENTIDAD, ver NEGOCIO.

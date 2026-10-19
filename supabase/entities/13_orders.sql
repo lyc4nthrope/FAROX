@@ -37,10 +37,11 @@ ALTER TABLE public.orders
   ADD CONSTRAINT orders_distributor_id_fkey
   FOREIGN KEY (distributor_id) REFERENCES public.distributors(id) ON DELETE RESTRICT;
 
--- RESTRICT corrige el SET NULL que desenganchaba pedidos in_route de su ruta en silencio
-ALTER TABLE public.orders
-  ADD CONSTRAINT orders_route_id_fkey
-  FOREIGN KEY (route_id) REFERENCES public.routes(id) ON DELETE RESTRICT;
+-- RESTRICT corrige el SET NULL que desenganchaba pedidos in_route de su ruta en
+-- silencio. FK routes: DEFINIDA acá en texto pero EJECUTADA en
+-- 17_routes.sql (§"FK entrante") — su REFERENCES public.routes(id) no resuelve
+-- antes de que exista routes (archivo 17). Está duplicada allí; si corriera en
+-- ambos archivos, el segundo paste fallaría por constraint ya existente.
 
 -- Índice job order_late — 0010_perf.sql:374-376 (VERBATIM)
 CREATE INDEX IF NOT EXISTS idx_orders_expected_open
@@ -74,13 +75,9 @@ CREATE POLICY orders_select ON public.orders
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated. SELECT no se revoca (queda la policy orders_select).
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 
 -- ============================================================================
 -- RPCs SOBRE ESTA TABLA (estado FINAL = última migración)
@@ -90,7 +87,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.update_order_status(
   p_order bigint, p_status public.order_status, p_reason text DEFAULT NULL
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := public.my_role();
   o      public.orders%ROWTYPE;

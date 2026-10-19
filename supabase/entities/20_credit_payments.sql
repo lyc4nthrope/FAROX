@@ -16,7 +16,7 @@ CREATE TABLE public.credit_payments (
   paid_at         timestamptz NOT NULL DEFAULT now(),
   -- corrección de cobros: un pago mal registrado se revierte con su reverso,
   -- nunca con UPDATE (append-only intacto)
-  CONSTRAINT uq_credit_payments_reverso UNIQUE (reverso_of_id) WHERE reverso_of_id IS NOT NULL
+  CONSTRAINT uq_credit_payments_reverso UNIQUE (reverso_of_id)
 );
 
 -- Índice — 0003_tables_farox.sql:167 (VERBATIM)
@@ -63,13 +63,9 @@ CREATE POLICY credit_payments_select ON public.credit_payments
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated (escritura solo RPC SECURITY DEFINER). SELECT NO se
 -- revoca (queda la policy credit_payments_select); no hay GRANT SELECT explícito.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- GRANT EXECUTE register_payment(bigint, numeric(14,2), public.payment_method) TO authenticated, service_role — 0011:505 (INSERTa acá; cuerpo en 19_credits.sql).
 -- GRANT EXECUTE register_payment_reverse(bigint, text) TO authenticated, service_role — 0011:506.
 -- service_role: 0011:554 REVOKE UPDATE, DELETE ON public.audit_log FROM service_role (audit_log, ver 25_audit_log.sql).
@@ -84,7 +80,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.register_payment_reverse(
   p_payment bigint, p_reason text
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   p      public.credit_payments%ROWTYPE;
   c      public.credits%ROWTYPE;

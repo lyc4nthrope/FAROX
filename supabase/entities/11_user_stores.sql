@@ -54,19 +54,15 @@ CREATE POLICY user_stores_select ON public.user_stores
 -- ============================================================================
 
 -- Tablas mutables por RPC/trigger (nunca directo desde el cliente):
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- 20261015000006_rls_grants.sql:351-357 (user_stores está en la lista)
 
 -- Lecturas selectivas: user_stores e order_items se leen solo por RPC
 -- (my_store_ids, get_order_items con D40). chat_* NO se revoca — ver (1).
-REVOKE SELECT ON public.user_stores, public.order_items FROM authenticated;
--- 20261015000006_rls_grants.sql:371-373
+-- REVOKE SELECT de user_stores/order_items: CONSOLIDADO en 90_security.sql
+-- (0006:371-373, VERBATIM) — acá tocaba order_items, que recién existe en 14.
 
 -- Contradicción (2) del encabezado de 0006 (verbatim, 0006:16-19):
 --  (2) §4 revoca SELECT sobre user_stores (lectura vía my_store_ids()) pero
@@ -77,7 +73,8 @@ REVOKE SELECT ON public.user_stores, public.order_items FROM authenticated;
 -- Hardening anon (verbatim — 20261016000011_seguridad.sql:545-549):
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
-REVOKE SELECT ON public.user_stores, public.order_items FROM anon;
+-- REVOKE SELECT de user_stores/order_items a anon: CONSOLIDADO en
+-- 90_security.sql (0011:545-549, VERBATIM) — tocaba order_items (archivo 14).
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon;
 -- (0011:607 es la línea equivalente COMMENTADA del bloque INVERSE de rollback, no se ejecuta)

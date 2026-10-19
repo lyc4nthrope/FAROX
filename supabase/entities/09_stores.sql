@@ -36,7 +36,33 @@ CREATE TABLE public.stores (
 -- D22 y nunca se creó). Unicidad de nombre: tampoco hay unique sobre name.
 
 -- ============================================================================
--- 3. TRIGGERS (verbatim)
+-- 3. TRIGGER-FUNCTION enforce_store_cap (verbatim — 0009:485-501; cuerpo
+--    idéntico al original 0004:364-380, reemplazado por convención D-1)
+--    VA ANTES QUE SUS TRIGGERS: CREATE TRIGGER resuelve la función en el
+--    catálogo al crearla ("The trigger function must be defined before the
+--    trigger itself can be created" — docs PostgreSQL, 37.1 Overview).
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.enforce_store_cap() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  v_count integer;
+  v_cap   integer;
+BEGIN
+  IF auth.uid() IS NULL OR public.my_role() = 'admin' THEN
+    RETURN NEW;
+  END IF;
+  SELECT count(*) INTO v_count FROM public.stores WHERE created_by = auth.uid() AND is_active;
+  v_cap := CASE WHEN public.is_premium() THEN 3 ELSE 1 END;  -- 1 activa; 3 si premium; admin exento
+  IF v_count >= v_cap THEN
+    RAISE EXCEPTION 'D34: tope de tiendas alcanzado (% activas, tope %)', v_count, v_cap;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ============================================================================
+-- 4. TRIGGERS (verbatim) — van DESPUÉS de enforce_store_cap (ver nota en §3)
 -- ============================================================================
 
 DROP TRIGGER IF EXISTS trg_stores_updated_at ON public.stores;
@@ -63,29 +89,6 @@ BEFORE UPDATE ON public.stores FOR EACH ROW
 WHEN (OLD.is_active = FALSE AND NEW.is_active = TRUE)
 EXECUTE FUNCTION public.enforce_store_cap();
 -- 20261016000009_negocio.sql:503-507 (cierra evasión del tope D34: desactivar + crear + reactivar)
-
--- ============================================================================
--- 4. TRIGGER-FUNCTION enforce_store_cap (verbatim — 0009:485-501; cuerpo
---    idéntico al original 0004:364-380, reemplazado por convención D-1)
--- ============================================================================
-
-CREATE OR REPLACE FUNCTION public.enforce_store_cap() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE
-  v_count integer;
-  v_cap   integer;
-BEGIN
-  IF auth.uid() IS NULL OR public.my_role() = 'admin' THEN
-    RETURN NEW;
-  END IF;
-  SELECT count(*) INTO v_count FROM public.stores WHERE created_by = auth.uid() AND is_active;
-  v_cap := CASE WHEN public.is_premium() THEN 3 ELSE 1 END;  -- 1 activa; 3 si premium; admin exento
-  IF v_count >= v_cap THEN
-    RAISE EXCEPTION 'D34: tope de tiendas alcanzado (% activas, tope %)', v_count, v_cap;
-  END IF;
-  RETURN NEW;
-END;
-$$;
 
 -- ============================================================================
 -- 5. VISTA stores_geo (verbatim — 0004:1536-1548)

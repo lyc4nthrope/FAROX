@@ -24,7 +24,7 @@ CREATE TABLE public.movements (
   created_at       timestamptz NOT NULL DEFAULT now(),
   -- Máx. 1 reverso por movimiento; prohíbe doble reverso (D31). La validación
   -- de tipo opuesto / mismo producto-tienda vive en register_reverse().
-  CONSTRAINT uq_movements_reverso UNIQUE (reverso_of_id) WHERE reverso_of_id IS NOT NULL,
+  CONSTRAINT uq_movements_reverso UNIQUE (reverso_of_id),
   CONSTRAINT chk_movements_entry_expiry CHECK (type = 'entry' OR expiry_date IS NULL)
   -- Sin updated_at ni UPDATEs (REVOKE completo en 0006)
 );
@@ -64,13 +64,9 @@ CREATE POLICY movements_select ON public.movements
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- a authenticated (append-only: la escritura es solo por RPC/trigger SECURITY DEFINER).
 -- SELECT no se revoca (queda la policy movements_select).
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 
 -- ============================================================================
 -- RPCs SOBRE ESTA TABLA (estado FINAL = última migración)

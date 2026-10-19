@@ -83,7 +83,10 @@ CREATE TABLE public.users (
   -- Eliminadas de NØSEE: reputation_points, avatar_url, mp_customer_id, onboarding_completed, is_verified
 );
 
-CREATE INDEX idx_users_distributor_id ON public.users (btree (distributor_id));
+CREATE INDEX idx_users_distributor_id ON public.users (distributor_id);
+-- btree = access method por DEFECTO; el método NO se escribe dentro de la lista
+-- de columnas (ahí se parsea como columna y falla). Otros métodos van como
+-- "ON tabla USING brin (...)" — ver idx_movements_created_at_brin (0003:119).
 -- Diferidos (D22): btree (role_id), btree (lower(full_name)) — 27 usuarios ⇒ ruido puro.
 
 -- 2.6 products ---------------------------------------------------------------

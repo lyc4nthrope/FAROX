@@ -22,8 +22,10 @@ CREATE UNIQUE INDEX uq_routes_distributor_day
   ON public.routes (distributor_id, route_date) WHERE status <> 'cancelled';
 CREATE INDEX idx_routes_route_date ON public.routes (route_date);  -- "rutas de hoy"
 
--- FK entrante — 0003_tables_farox.sql:285-287 (VERBATIM; la define orders:
--- detalle en 13_orders.sql — orders.route_id ON DELETE RESTRICT corrige el SET NULL)
+-- FK entrante — 0003_tables_farox.sql:285-287 (VERBATIM; la define orders).
+-- ÚNICO punto de ejecución: 13_orders.sql la cita pero no la ejecuta (routes
+-- recién nace acá; allí rompería el paste) — ver puntero en 13_orders.sql.
+-- orders.route_id ON DELETE RESTRICT corrige el SET NULL.
 ALTER TABLE public.orders
   ADD CONSTRAINT orders_route_id_fkey
   FOREIGN KEY (route_id) REFERENCES public.routes(id) ON DELETE RESTRICT;
@@ -43,36 +45,18 @@ EXECUTE FUNCTION public.touch_updated_at();
 -- sus tiendas; la policy de 0006 fue DROP + CREATE (reemplazada, ver abajo).
 ALTER TABLE public.routes ENABLE ROW LEVEL SECURITY;
 
--- Policy FINAL — 0009_negocio.sql:537-546 (VERBATIM; reemplaza a 0006:263-267)
-DROP POLICY IF EXISTS routes_select ON public.routes;
-CREATE POLICY routes_select ON public.routes
-  FOR SELECT TO authenticated
-  USING (public.my_role() = 'admin'
-         OR (public.my_role() = 'operador'
-             AND EXISTS (SELECT 1 FROM public.route_stops rs
-                         WHERE rs.route_id = routes.id
-                           AND rs.store_id = ANY (public.my_store_ids())))
-         OR (public.my_role() = 'distribuidor'
-             AND distributor_id = public.my_distributor_id()));
-
--- Policy BASE (REEMPLAZADA por 0009) — 0006_rls_grants.sql:263-267 (histórica):
--- CREATE POLICY routes_select ON public.routes
---   FOR SELECT TO authenticated
---   USING (public.my_role() IN ('admin', 'operador')
---          OR (public.my_role() = 'distribuidor'
---              AND distributor_id = public.my_distributor_id()));
+-- Policy routes_select (FINAL + histórica): CONSOLIDADA en 90_security.sql
+-- (§4ter) — DROP+CREATE VERBATIM 0009:537-546, que reemplaza a 0006:263-267.
+-- El cuerpo se analiza AL CREARLA y referencia public.route_stops (18),
+-- posterior a esta entidad: acá rompería el paste. Ver 90_security.sql.
 -- Sin policy INSERT/UPDATE/DELETE ⇒ escritura solo RPC.
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated (escritura solo RPC SECURITY DEFINER). SELECT NO se
 -- revoca (queda la policy routes_select); no hay GRANT SELECT explícito para routes.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- GRANT EXECUTE save_route(bigint, date, jsonb) TO authenticated, service_role — 0011:500.
 -- GRANT EXECUTE update_route_status(bigint, public.route_status) TO authenticated, service_role — 0011:502.
 -- (0011:465-467 revoca TODO EXECUTE del schema y luego re-grantea la whitelist de 0011:480-512.)
@@ -87,7 +71,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.save_route(
   p_distributor bigint, p_route_date date, p_stops jsonb DEFAULT '[]'::jsonb
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role  text := public.my_role();
   v_route bigint;
@@ -133,7 +117,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.update_route_status(
   p_route bigint, p_status public.route_status
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := public.my_role();
   r      public.routes%ROWTYPE;

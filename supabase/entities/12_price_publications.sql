@@ -31,6 +31,22 @@ CREATE UNIQUE INDEX uq_price_store_product_active
 CREATE INDEX idx_price_product_created
   ON public.price_publications (product_id, created_at DESC);
 
+-- TRIGGER-FUNCTION prevent_price_update (VERBATIM — 0004:296-306)
+-- Va ANTES del trigger trg_prevent_price_update: CREATE TRIGGER resuelve la
+-- función en el catálogo al crearla ("The trigger function must be defined
+-- before the trigger itself can be created" — docs PostgreSQL, 37.1 Overview).
+-- M2: el precio sólo cambia vía set_price(). Rechaza UPDATE de price sobre la
+-- fila activa (destruiría el histórico); apagar is_active está permitido.
+CREATE OR REPLACE FUNCTION public.prevent_price_update() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF OLD.is_active AND NEW.price IS DISTINCT FROM OLD.price THEN
+    RAISE EXCEPTION 'no se puede actualizar price sobre una fila activa; use set_price() (D27)';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
 -- Triggers — 0004_functions_triggers.sql:443-451, 519-522 (VERBATIM)
 -- (a) updated_at automático (touch_updated_at, definida 0004:253-259)
 DROP TRIGGER IF EXISTS trg_price_publications_updated_at ON public.price_publications;
@@ -68,13 +84,9 @@ CREATE POLICY price_publications_delete ON public.price_publications
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML mutables por RPC/trigger, VERBATIM
 -- parcial a price_publications): INSERT/UPDATE/DELETE revocados a authenticated.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- SELECT no se revoca (queda la policy price_publications_select). Sin GRANT por
 -- columna en esta tabla. 0011 (D-5/L545) revoca ALL a anon sobre todas las tablas.
 
@@ -86,7 +98,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.set_price(
   p_product bigint, p_store bigint, p_price numeric(12,2), p_currency char(3) DEFAULT 'COP'
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_prev bigint;
   v_id   bigint;

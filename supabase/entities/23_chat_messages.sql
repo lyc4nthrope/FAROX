@@ -44,13 +44,9 @@ CREATE POLICY chat_messages_select ON public.chat_messages
                    AND c.user_id = auth.uid()));
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial) + :380 (GRANT SELECT)
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- (1) chat legible por dueño — §8 manda sobre el revoke incompleto de §4.
 GRANT SELECT ON public.chat_conversations, public.chat_messages TO authenticated;
 -- GRANT EXECUTE send_message(bigint, text) TO authenticated, service_role — 0011:511.
@@ -65,7 +61,7 @@ GRANT SELECT ON public.chat_conversations, public.chat_messages TO authenticated
 CREATE OR REPLACE FUNCTION public.send_message(
   p_conversation bigint, p_content text
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_id bigint;
 BEGIN

@@ -60,13 +60,9 @@ CREATE POLICY route_stops_select ON public.route_stops
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated (escritura solo RPC SECURITY DEFINER). SELECT NO se
 -- revoca (queda la policy route_stops_select); no hay GRANT SELECT explícito.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- GRANT EXECUTE mark_stop(bigint, public.stop_status, timestamptz) TO authenticated, service_role — 0011:501.
 
 -- ============================================================================
@@ -78,7 +74,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.mark_stop(
   p_stop bigint, p_status public.stop_status, p_arrived timestamptz DEFAULT now()
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := public.my_role();
   s      public.route_stops%ROWTYPE;

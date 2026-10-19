@@ -35,7 +35,7 @@ EXECUTE FUNCTION public.touch_updated_at();
 -- §3.11: updated_at lo toca un trigger al insertar mensaje (ordenar listados).
 -- Sin trigger de auditoría en chat_* (A1).
 CREATE OR REPLACE FUNCTION public.touch_conversation_updated_at() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   UPDATE public.chat_conversations
   SET updated_at = now()
@@ -56,15 +56,13 @@ CREATE POLICY chat_conversations_select ON public.chat_conversations
   USING (user_id = auth.uid());
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial) + :380 (GRANT SELECT)
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- (1) chat legible por dueño — §8 manda sobre el revoke incompleto de §4.
-GRANT SELECT ON public.chat_conversations, public.chat_messages TO authenticated;
+-- GRANT SELECT de chat_conversations + chat_messages: vive en
+-- 23_chat_messages.sql (allí existen ambas tablas); acá referenciaría
+-- chat_messages, que aun no existe (forward ref).
 -- GRANT EXECUTE create_chat(text) TO authenticated, service_role — 0011:510.
 -- 0011:545-546 (contexto): REVOKE ALL ON ALL TABLES/SEQUENCES IN SCHEMA public FROM anon.
 
@@ -74,7 +72,7 @@ GRANT SELECT ON public.chat_conversations, public.chat_messages TO authenticated
 -- reescribe, solo la GRANTEA en 0011:510). Excepción del gate has_scope (D37):
 -- el canal de onboarding no se bloquea. Toca SOLO chat_conversations.
 CREATE OR REPLACE FUNCTION public.create_chat(p_title text DEFAULT NULL) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_id bigint;
 BEGIN

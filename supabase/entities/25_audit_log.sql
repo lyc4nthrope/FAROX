@@ -46,13 +46,9 @@ CREATE POLICY audit_read ON public.audit_log
   USING (public.my_role() = 'admin');
 
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial) + :375-377 (GRANT SELECT)
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- D38/D32: estas dos NO se revocan; se GRANTEAN SELECT con su policy
 -- (audit_log: admin la lee; dashboard_daily: realtime exige SELECT+RLS, D32).
 GRANT SELECT ON public.audit_log TO authenticated;

@@ -90,29 +90,16 @@ CREATE POLICY alerts_select ON public.alerts
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated (escritura solo RPC/jobs SECURITY DEFINER). SELECT NO
 -- se revoca (queda la policy alerts_select); no hay GRANT SELECT explícito.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 
--- Helpers internos SIN EXECUTE para clientes — 0006_rls_grants.sql:405-411 (VERBATIM)
-REVOKE EXECUTE ON FUNCTION
-  public.internal_alert_open(public.alert_type, bigint, bigint, bigint, bigint, text, jsonb),
-  public.internal_alert_resolve(public.alert_type, bigint, bigint, bigint),
-  public.internal_eval_stock_alert(bigint, bigint),
-  public.internal_dashboard_upsert(bigint, integer, integer, numeric, numeric),
-  public.internal_stock_entry(public.movement_type, bigint, bigint, numeric, bigint, bigint, bigint, numeric, date, uuid, bigint)
-FROM authenticated;
-
--- Jobs diarios SIN EXECUTE para clientes (D46) — 0006_rls_grants.sql:417-421 (VERBATIM)
-REVOKE EXECUTE ON FUNCTION
-  public.job_scan_expiry_soon(),
-  public.job_scan_order_late(),
-  public.job_scan_credit_overdue()
-FROM authenticated;
+-- Helpers internos y jobs SIN EXECUTE para clientes (0006:405-411 y 417-421):
+-- CONSOLIDADOS en 90_security.sql — su sweep "REVOKE EXECUTE ON ALL FUNCTIONS
+-- IN SCHEMA public FROM authenticated" (§2) más la whitelist de 31 firmas (§3)
+-- los cubren estrictamente mejor. No se repiten acá porque tocaban
+-- internal_dashboard_upsert (definida en 24) e internal_stock_entry (30) y los
+-- tres job_scan_* (definidos en 60): forward refs que rompían el paste.
 -- GRANT EXECUTE mark_alert_read(bigint) TO authenticated, service_role — 0011:507.
 
 -- ============================================================================
@@ -121,7 +108,7 @@ FROM authenticated;
 -- sobre la expresión COMPLETA, D-4; supera al guard compound NULL-able de
 -- 0004:1343-1358). Toca SOLO alerts.
 CREATE OR REPLACE FUNCTION public.mark_alert_read(p_alert bigint) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role text := COALESCE(public.my_role(), '');  -- D-4: NULL-safe
   a      public.alerts%ROWTYPE;
@@ -150,7 +137,7 @@ CREATE OR REPLACE FUNCTION public.internal_alert_open(
   p_message     text,
   p_context     jsonb DEFAULT NULL
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   INSERT INTO public.alerts (type, store_id, product_id, order_id, distributor_id, message, context)
   VALUES (p_type, p_store_id, p_product_id, p_order_id, p_distributor_id, p_message, p_context)
@@ -169,7 +156,7 @@ CREATE OR REPLACE FUNCTION public.internal_alert_resolve(
   p_product_id  bigint,
   p_order_id    bigint
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   UPDATE public.alerts
   SET resolved_at = now()
@@ -188,7 +175,7 @@ CREATE OR REPLACE FUNCTION public.internal_eval_stock_alert(
   p_store_id   bigint,
   p_product_id bigint
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_qty      numeric(12,3);
   v_thr      numeric(12,3);

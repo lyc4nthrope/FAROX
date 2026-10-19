@@ -70,13 +70,9 @@ CREATE POLICY credits_select ON public.credits
 -- GRANTs — 0006_rls_grants.sql:351-357 (REVOKE DML, VERBATIM parcial): INSERT/UPDATE/DELETE
 -- revocados a authenticated (escritura solo RPC SECURITY DEFINER). SELECT NO se
 -- revoca (queda la policy credits_select); no hay GRANT SELECT explícito para credits.
-REVOKE INSERT, UPDATE, DELETE ON
-  public.stock, public.movements, public.order_items, public.orders,
-  public.credits, public.credit_payments, public.price_publications,
-  public.alerts, public.routes, public.route_stops, public.user_stores,
-  public.dashboard_daily, public.audit_log,
-  public.chat_conversations, public.chat_messages
-FROM authenticated;
+-- REVOKE global de las 15 tablas RPC-only: CONSOLIDADO en 90_security.sql
+-- (0006:351-357, VERBATIM). Acá NO se repite: en orden de entidad el bloque
+-- referenciaría tablas que aun no existen (forward refs).
 -- GRANT EXECUTE create_credit(bigint, date)              TO authenticated, service_role — 0011:503.
 -- GRANT EXECUTE cancel_credit(bigint, text)              TO authenticated, service_role — 0011:504.
 -- GRANT EXECUTE register_payment(bigint, numeric(14,2), public.payment_method)
@@ -91,7 +87,7 @@ FROM authenticated;
 CREATE OR REPLACE FUNCTION public.create_credit(
   p_order bigint, p_due_date date DEFAULT NULL
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_total  numeric(14,2);
   v_store  bigint;
@@ -134,7 +130,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.cancel_credit(
   p_credit bigint, p_reason text
 ) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   c public.credits%ROWTYPE;
 BEGIN
@@ -164,7 +160,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.register_payment(
   p_credit bigint, p_amount numeric(14,2), p_method public.payment_method
 ) RETURNS bigint
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   v_role  text := COALESCE(public.my_role(), '');  -- NULL-safe (D-4 barato)
   c       public.credits%ROWTYPE;

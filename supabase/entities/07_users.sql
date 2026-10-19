@@ -1,4 +1,4 @@
--- Entity: users | Source: 20261015000002_tables_reused.sql:69-87 (CREATE TABLE + índice) · 20261015000003_tables_farox.sql:276-278 (FK diferida → distributors) · 20261015000004_functions_triggers.sql:397-416,499-502 (triggers) + 308-360 (trigger-fns) · 20261015000006_rls_grants.sql:32,191-212,362-369 (RLS + grants) · 20261016000011_seguridad.sql:85-139,486-488,545-546 (RPCs finales + lockdown anon) | Order: after auth.users + roles + distributors
+-- Entity: users | Source: 20261015000002_tables_reused.sql:69-87 (CREATE TABLE + índice) · 20261015000003_tables_farox.sql:276-278 (FK diferida → distributors: EJECUTADA en 08_distributors.sql §2bis) · 20261015000004_functions_triggers.sql:397-416,499-502 (triggers) + 308-360 (trigger-fns) · 20261015000006_rls_grants.sql:32,191-212,362-369 (RLS + grants) · 20261016000011_seguridad.sql:85-139,486-488,545-546 (RPCs finales + lockdown anon) | Order: after auth.users + roles (03) + contact_preference (enum, 0001); la FK a distributors corre en 08
 
 -- ============================================================================
 -- 1. CREATE TABLE (verbatim — 20261015000002_tables_reused.sql:69-87)
@@ -13,7 +13,7 @@ CREATE TABLE public.users (
   email               text UNIQUE,                          -- FAROX: copia de auth.users.email vía trigger sync_email()
   phone_number        text,
   contact_preference  public.contact_preference NOT NULL DEFAULT 'whatsapp',  -- FAROX
-  distributor_id      bigint NULL,                          -- FK → distributors agregada en 0003
+  distributor_id      bigint NULL,                          -- FK → distributors: se agrega en 08_distributors.sql §2bis (en 0003)
   premium             boolean NOT NULL DEFAULT false,       -- FAROX: fuente única de verdad (D7)
   is_active           boolean NOT NULL DEFAULT true,
   created_at          timestamptz NOT NULL DEFAULT now(),
@@ -21,54 +21,26 @@ CREATE TABLE public.users (
   -- Eliminadas de NØSEE: reputation_points, avatar_url, mp_customer_id, onboarding_completed, is_verified
 );
 
-CREATE INDEX idx_users_distributor_id ON public.users (btree (distributor_id));
+CREATE INDEX idx_users_distributor_id ON public.users (distributor_id);
+-- btree = access method por DEFECTO; el método NO se escribe dentro de la lista
+-- de columnas (ahí se parsea como columna y falla). Otros métodos van como
+-- "ON tabla USING brin (...)" — ver idx_movements_created_at_brin (16_movements).
 -- Diferidos (D22): btree (role_id), btree (lower(full_name)) — 27 usuarios ⇒ ruido puro.
 
--- FK diferida a distributors (verbatim — 20261015000003_tables_farox.sql:276-278):
-ALTER TABLE public.users
-  ADD CONSTRAINT users_distributor_id_fkey
-  FOREIGN KEY (distributor_id) REFERENCES public.distributors(id) ON DELETE SET NULL;  -- 1 usuario ↔ 1 distribuidor (D29)
+-- FK diferida a distributors: MOVIDA a 08_distributors.sql (§2bis) — VERBATIM
+-- 0003_tables_farox.sql:276-278. No puede vivir acá: su
+-- REFERENCES public.distributors(id) no resuelve antes de que exista
+-- distributors, que es el archivo 08. La columna distributor_id queda creada
+-- sin FK arriba (línea 16), igual que en la migración, y 08 la engancha.
 
 -- Índices: solo idx_users_distributor_id (grep verificado en 0002:86).
 -- NO existen (diferidos D22): btree(role_id), btree(lower(full_name)).
 
 -- ============================================================================
--- 2. TRIGGERS (verbatim — 20261015000004_functions_triggers.sql)
--- ============================================================================
-
-DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
-CREATE TRIGGER trg_users_updated_at
-BEFORE UPDATE ON public.users FOR EACH ROW
-EXECUTE FUNCTION public.touch_updated_at();
--- 0004:408-411 · fn touch_updated_at: 0004:253-259 (compartida, NO duplicada acá)
-
-DROP TRIGGER IF EXISTS trg_users_sanitize_scope ON public.users;
-CREATE TRIGGER trg_users_sanitize_scope
-BEFORE INSERT OR UPDATE ON public.users FOR EACH ROW
-EXECUTE FUNCTION public.sanitize_distributor_scope();
--- 0004:413-416
-
-DROP TRIGGER IF EXISTS trg_audit_users ON public.users;
-CREATE TRIGGER trg_audit_users
-AFTER INSERT OR UPDATE OR DELETE ON public.users FOR EACH ROW
-EXECUTE FUNCTION public.audit_diff();
--- 0004:499-502 · fn audit_diff: 0004:266-294, redefinida (R10, mismo semántica) en 20261016000010_perf.sql:283-315
-
--- Triggers SOBRE auth.users que escriben en public.users (verbatim — 0004:397-406):
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-AFTER INSERT ON auth.users FOR EACH ROW
-EXECUTE FUNCTION public.handle_new_user();
-
-DROP TRIGGER IF EXISTS on_auth_user_email_updated ON auth.users;
-CREATE TRIGGER on_auth_user_email_updated
-AFTER UPDATE OF email ON auth.users FOR EACH ROW
-WHEN (OLD.email IS DISTINCT FROM NEW.email)
-EXECUTE FUNCTION public.sync_email();
--- 0004:397-406 · 0008:362-376 verifica que sigan presentes (signup SIN fila users = sistema de permisos caído)
-
--- ============================================================================
--- 3. TRIGGER-FUNCTIONS propias de users (verbatim — 0004)
+-- 2. TRIGGER-FUNCTIONS propias de users (verbatim — 0004)
+--    VAN ANTES QUE LOS TRIGGERS: CREATE TRIGGER resuelve la función en el
+--    catálogo al crearla ("The trigger function must be defined before the
+--    trigger itself can be created" — docs PostgreSQL, 37.1 Overview).
 -- ============================================================================
 
 -- M11: red de seguridad además de update_user_role — rol distribuidor ⇒
@@ -132,6 +104,42 @@ $$;
 --   touch_updated_at → 20261015000004_functions_triggers.sql:253-259
 --   audit_diff       → 20261015000004_functions_triggers.sql:266-294
 --                      (redefinición R10: 20261016000010_perf.sql:283-315)
+
+-- ============================================================================
+-- 3. TRIGGERS (verbatim — 20261015000004_functions_triggers.sql)
+--    Van DESPUÉS de sus trigger-functions (ver nota en §2).
+-- ============================================================================
+
+DROP TRIGGER IF EXISTS trg_users_updated_at ON public.users;
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON public.users FOR EACH ROW
+EXECUTE FUNCTION public.touch_updated_at();
+-- 0004:408-411 · fn touch_updated_at: 0004:253-259 (compartida, NO duplicada acá)
+
+DROP TRIGGER IF EXISTS trg_users_sanitize_scope ON public.users;
+CREATE TRIGGER trg_users_sanitize_scope
+BEFORE INSERT OR UPDATE ON public.users FOR EACH ROW
+EXECUTE FUNCTION public.sanitize_distributor_scope();
+-- 0004:413-416
+
+DROP TRIGGER IF EXISTS trg_audit_users ON public.users;
+CREATE TRIGGER trg_audit_users
+AFTER INSERT OR UPDATE OR DELETE ON public.users FOR EACH ROW
+EXECUTE FUNCTION public.audit_diff();
+-- 0004:499-502 · fn audit_diff: 0004:266-294, redefinida (R10, mismo semántica) en 20261016000010_perf.sql:283-315
+
+-- Triggers SOBRE auth.users que escriben en public.users (verbatim — 0004:397-406):
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_user();
+
+DROP TRIGGER IF EXISTS on_auth_user_email_updated ON auth.users;
+CREATE TRIGGER on_auth_user_email_updated
+AFTER UPDATE OF email ON auth.users FOR EACH ROW
+WHEN (OLD.email IS DISTINCT FROM NEW.email)
+EXECUTE FUNCTION public.sync_email();
+-- 0004:397-406 · 0008:362-376 verifica que sigan presentes (signup SIN fila users = sistema de permisos caído)
 
 -- ============================================================================
 -- 4. RLS (verbatim — 20261015000006_rls_grants.sql)

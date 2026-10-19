@@ -25,6 +25,18 @@ CREATE TABLE public.distributors (
 -- las migraciones): solo la PK (id) y el UNIQUE inline de nit (línea 16 arriba).
 
 -- ============================================================================
+-- 2bis. FK entrante desde users (verbatim — 0003_tables_farox.sql:276-278)
+-- ============================================================================
+-- MOVIDA desde 07_users.sql: su REFERENCES public.distributors(id) no puede
+-- resolverse antes de que exista ESTA tabla — en la migración 0003 los crea
+-- en el mismo script ("distributors, antes que users/movements por FKs"),
+-- pero en la vista por entidad 07 corre antes que 08. La columna
+-- users.distributor_id se crea en 07 sin FK y este ALTER la engancha acá.
+ALTER TABLE public.users
+  ADD CONSTRAINT users_distributor_id_fkey
+  FOREIGN KEY (distributor_id) REFERENCES public.distributors(id) ON DELETE SET NULL;  -- 1 usuario ↔ 1 distribuidor (D29)
+
+-- ============================================================================
 -- 3. TRIGGERS (verbatim — 20261015000004_functions_triggers.sql)
 -- ============================================================================
 
