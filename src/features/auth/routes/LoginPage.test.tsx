@@ -1,0 +1,90 @@
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import * as authApi from "../api";
+import { AuthProvider } from "../../../app/providers/AuthProvider";
+import { LoginPage } from "./LoginPage";
+
+vi.mock("../api", () => ({
+  getSession: vi.fn(),
+  subscribeToAuthChanges: vi.fn(),
+  signInWithPassword: vi.fn(),
+  signOut: vi.fn(),
+  fetchPrivileges: vi.fn(),
+}));
+
+function renderLogin() {
+  return render(
+    <MemoryRouter initialEntries={["/login"]}>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<p>inicio</p>} />
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
+describe("LoginPage (§S2 fila /login)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: null, premium: false });
+    vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    vi.mocked(authApi.signInWithPassword).mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("formulario vacío: errores inline y CERO requests", async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.click(screen.getByRole("button", { name: "Ingresar" }));
+    expect(await screen.findByText("Ingresá tu email")).toBeInTheDocument();
+    expect(screen.getByText("Ingresá tu contraseña")).toBeInTheDocument();
+    expect(authApi.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("email inválido: error inline y tampoco llama a la API", async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText("Email"), "no-es-email");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+    await user.click(screen.getByRole("button", { name: "Ingresar" }));
+    expect(await screen.findByText("Ingresá un email válido")).toBeInTheDocument();
+    expect(authApi.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("credenciales inválidas: mensaje amigable, sin texto crudo del backend", async () => {
+    vi.mocked(authApi.signInWithPassword).mockResolvedValue({
+      error: { message: "Invalid login credentials" },
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText("Email"), "demo@farox.app");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+    await user.click(screen.getByRole("button", { name: "Ingresar" }));
+    expect(await screen.findByText("Email o contraseña incorrectos.")).toBeInTheDocument();
+    expect(screen.queryByText(/Invalid login credentials/)).not.toBeInTheDocument();
+  });
+
+  it("datos válidos: llama a signInWithPassword con el formulario", async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText("Email"), "demo@farox.app");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+    await user.click(screen.getByRole("button", { name: "Ingresar" }));
+    await waitFor(() =>
+      expect(authApi.signInWithPassword).toHaveBeenCalledWith({
+        email: "demo@farox.app",
+        password: "secreto123",
+      }),
+    );
+  });
+});

@@ -4,3 +4,11 @@ opencode.json
 .agents/skills/
 skills-lock.json
 
+# Frontend (scaffold front-sprint1 B1)
+node_modules/
+dist/
+*.local
+.env
+.env.*
+!.env.example
+
