@@ -1,6 +1,7 @@
 import { Route, Routes } from "react-router-dom";
 
 import { LoginPage } from "../features/auth";
+import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { ProfilePage } from "../features/profile";
 import type { RoleName } from "../features/auth/types";
 import { RequireAuth } from "./guards/RequireAuth";
@@ -15,7 +16,7 @@ import { HomePage } from "./shell/HomePage";
 //   RequireRole): la DB no gatea su lectura y el rol null ya no renderiza
 //   controles privilegiados (V0-3).
 // · /distributors/:id entra para operador (lectura, SEC-01 "read-only"); los
-//   controles de escritura los oculta el feature en B5.
+//   controles de escritura los oculta el feature distributors (B5, idea:119).
 const ADMIN_ONLY: readonly RoleName[] = ["admin"];
 const ADMIN_OR_OPERATOR: readonly RoleName[] = ["admin", "operador"];
 
@@ -30,7 +31,7 @@ export function AppRoutes() {
             path="/distributors"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Distribuidores" batch="B5" />
+                <DistributorsPage />
               </RequireRole>
             }
           />
@@ -38,7 +39,7 @@ export function AppRoutes() {
             path="/distributors/new"
             element={
               <RequireRole roles={ADMIN_ONLY}>
-                <RoutePlaceholder title="Nuevo distribuidor" batch="B5" />
+                <DistributorFormPage />
               </RequireRole>
             }
           />
@@ -46,7 +47,7 @@ export function AppRoutes() {
             path="/distributors/:id"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Distribuidor" batch="B5" />
+                <DistributorFormPage />
               </RequireRole>
             }
           />

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../features/auth/types";
 import * as authApi from "../features/auth/api";
+import * as distributorsApi from "../features/distributors/api";
 import * as profileApi from "../features/profile/api";
 import { AuthProvider } from "./providers/AuthProvider";
 import { AppRoutes } from "./router";
@@ -14,6 +15,17 @@ vi.mock("../features/auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+}));
+// B5 (T5.2): /distributors ya no es placeholder — el api de la feature se
+// mockea COMPLETO como en el resto de los tests: sin esto, el módulo real
+// importa el cliente supabase, que valida el env en el arranque (V0-1).
+vi.mock("../features/distributors/api", () => ({
+  fetchDistributors: vi.fn(),
+  fetchDistributor: vi.fn(),
+  createDistributor: vi.fn(),
+  updateDistributor: vi.fn(),
+  deactivateDistributor: vi.fn(),
+  deleteDistributor: vi.fn(),
 }));
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
@@ -51,6 +63,12 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
       error: null,
     });
     vi.mocked(profileApi.updateMyProfile).mockResolvedValue({ error: null });
+    vi.mocked(distributorsApi.fetchDistributors).mockResolvedValue({
+      rows: [],
+      count: 0,
+      error: null,
+    });
+    vi.mocked(distributorsApi.fetchDistributor).mockResolvedValue({ row: null, error: null });
     conSesion("admin");
   });
 
