@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 
 import { LoginPage } from "../features/auth";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
+import { ProductFormPage, ProductsPage } from "../features/products";
 import { ProfilePage } from "../features/profile";
 import type { RoleName } from "../features/auth/types";
 import { RequireAuth } from "./guards/RequireAuth";
@@ -15,6 +16,11 @@ import { HomePage } from "./shell/HomePage";
 // · /products y /profile son legibles por cualquier sesión autenticada (sin
 //   RequireRole): la DB no gatea su lectura y el rol null ya no renderiza
 //   controles privilegiados (V0-3).
+// · /products/:id entra también para distribuidor (§S2 "distribuidor
+//   read-only"; products_select USING true, 0006:144-145): el formulario se
+//   pinta en modo solo lectura y los controles los oculta el feature products
+//   (B6, SEC-01 idea:113); /products/new SÍ lo deniega (PROD-2 escenario
+//   "distribuidor read-only" ⇒ denied en la ruta de alta).
 // · /distributors/:id entra para operador (lectura, SEC-01 "read-only"); los
 //   controles de escritura los oculta el feature distributors (B5, idea:119).
 const ADMIN_ONLY: readonly RoleName[] = ["admin"];
@@ -51,23 +57,16 @@ export function AppRoutes() {
               </RequireRole>
             }
           />
-          <Route path="/products" element={<RoutePlaceholder title="Productos" batch="B6" />} />
+          <Route path="/products" element={<ProductsPage />} />
           <Route
             path="/products/new"
             element={
               <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Nuevo producto" batch="B6" />
+                <ProductFormPage />
               </RequireRole>
             }
           />
-          <Route
-            path="/products/:id"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <RoutePlaceholder title="Producto" batch="B6" />
-              </RequireRole>
-            }
-          />
+          <Route path="/products/:id" element={<ProductFormPage />} />
           <Route
             path="/stores"
             element={

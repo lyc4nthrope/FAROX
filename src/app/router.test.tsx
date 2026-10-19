@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoleName } from "../features/auth/types";
 import * as authApi from "../features/auth/api";
 import * as distributorsApi from "../features/distributors/api";
+import * as productsApi from "../features/products/api";
 import * as profileApi from "../features/profile/api";
 import { AuthProvider } from "./providers/AuthProvider";
 import { AppRoutes } from "./router";
@@ -26,6 +27,19 @@ vi.mock("../features/distributors/api", () => ({
   updateDistributor: vi.fn(),
   deactivateDistributor: vi.fn(),
   deleteDistributor: vi.fn(),
+}));
+// B6 (T6.2): mismo motivo para /products — páginas reales en vez de
+// placeholder, así que el api de la feature debe estar mockeado completo.
+vi.mock("../features/products/api", () => ({
+  fetchProducts: vi.fn(),
+  fetchProduct: vi.fn(),
+  fetchBrands: vi.fn(),
+  fetchUnitTypes: vi.fn(),
+  fetchProductCategories: vi.fn(),
+  createProduct: vi.fn(),
+  updateProduct: vi.fn(),
+  deactivateProduct: vi.fn(),
+  deleteProduct: vi.fn(),
 }));
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
@@ -69,6 +83,18 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
       error: null,
     });
     vi.mocked(distributorsApi.fetchDistributor).mockResolvedValue({ row: null, error: null });
+    vi.mocked(productsApi.fetchProducts).mockResolvedValue({
+      rows: [],
+      count: 0,
+      error: null,
+    });
+    vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: null, error: null });
+    vi.mocked(productsApi.fetchBrands).mockResolvedValue({ rows: [], error: null });
+    vi.mocked(productsApi.fetchUnitTypes).mockResolvedValue({ rows: [], error: null });
+    vi.mocked(productsApi.fetchProductCategories).mockResolvedValue({
+      rows: [],
+      error: null,
+    });
     conSesion("admin");
   });
 
