@@ -1,0 +1,308 @@
+# SPIKE U3 · DEV-04 — semántica de `supabase migration repair --local` para el baseline de las 12
+# migraciones hand-applied (design #507 §2.4 probes P1-P6 · spec #503 risks (a)/(d) · tasks #510 T3.1).
+# Batch B3 del cambio devops-ci-cd (sdd-apply). NOTA: #510 T2.5 preveía el job `baseline-spike` dentro
+# de schema-deploy.yml, pero B2 difer T2.5 (gated on spike) ⇒ el harness vive en este workflow dedicado
+# (workflow_dispatch). Mismo alcance P1-P6; discrepancia registrada en apply-progress.
+#
+# QUÉ RESPONDE:
+#   P1 — ¿existe supabase_migrations.schema_migrations en un stack fresco? Capturar su DDL.
+#   P2 — ¿`repair --status applied --local` contra la tabla INEXISTENTE la crea (rama A) o falla (rama B)?
+#   P3 — ¿contra tabla EXISTENTE muta SOLO filas (count +1, esquema intacto, sin ejecutar SQL)?
+#   P4 — ¿`repair --status reverted --local` revierte (borra la fila)? Reversibilidad.
+#   P5 — DDL definitiva de la tabla de history + observación de `migration list --local` sin link.
+#   P6 — supabase/config.toml generada por init, archivada para que T4.2 la commitee byte-idéntica.
+#
+# SEGURIDAD POR CONSTRUCCIÓN: workflow_dispatch ONLY · SIN ningún environment de GitHub ·
+#   SIN secretos de GitHub ⇒ inalcanzable para producción por diseño. Stack local desechable en CI
+#   (Docker solo existe en runners, #495). El único DROP SCHEMA apunta al stack local (127.0.0.1:54322). Jamás empuja
+#   esquema al proyecto remoto (INV-6/DEV-05: sin spike PASS + T5.1 verde, cero push remoto).
+#
+# RÚBRICA (design #507 §2.4 SUCCESS — TODOS required): DDL en artefacto · rama A/B documentada ·
+#   P3 row-only probado · P4 reversible probado · log archivado. PASS ⇒ desbloquea T4.2 (config.toml
+#   byte-idéntica al artefacto P6) y T5.1 (baseline-repair: rama A = repair ×12 directo · rama B =
+#   aplicar el DDL del artefacto primero, luego repair ×12). FAIL/INCOMPLETO ⇒ T5.1 BLOQUEADO;
+#   escalar: derivar DDL desde el código fuente del CLI (github.com/supabase/cli) — NUNCA adivinar.
+# RUNBOOK humano: docs/spikes/u3-migration-repair-baseline.md
+#
+# GROUNDING idea…md:198 ("backups PITR … audit_log activo desde Sprint 1"): un baseline mal manejado
+# (push ciego que re-aplica las 12 sobre un esquema ya aplicado a mano) corrompería el hardening de
+# 0012 y el audit_log — este spike es la prevención documentada de ese escenario (spec risk (a)+(d)).
+
+name: Spike U3 Repair Baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike-repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        # U5 (design #507 §1): sin input de versión — nombre del input de versión UNVERIFIED
+        # ("default latest first"). Confirmar antes de fijar versión del CLI.
+
+      - name: "P6: supabase init — generar supabase/config.toml (repo no la tiene, #506) y archivarla"
+        run: |
+          set -euo pipefail
+          mkdir -p spike-artifacts
+          if [ ! -f supabase/config.toml ]; then
+            supabase init
+          fi
+          test -f supabase/config.toml || { echo "::error::supabase/config.toml ausente tras init — el spike no puede arrancar (design §2.4 P6)"; exit 1; }
+          cp supabase/config.toml spike-artifacts/config.toml
+          echo "--- config.toml generada (artefacto P6: T4.2 la commitea byte-idéntica, hand-edit prohibido) ---"
+          cat supabase/config.toml
+
+      - name: "Precondiciones: psql y pg_dump en el runner (presence-assert, patrón backup-weekly.yml)"
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null 2>&1 || { echo "::error::psql no disponible en el runner — instalar postgresql-client (el spike inspecciona la tabla de history vía SQL)"; exit 1; }
+          command -v pg_dump >/dev/null 2>&1 || { echo "::error::pg_dump no disponible en el runner — instalar postgresql-client (P1/P3/P5 capturan la DDL con pg_dump)"; exit 1; }
+          # URL default documentada por el CLI: docs supabase status → "DB URL" (fetch 2026-10-19).
+          echo "LOCAL_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> "$GITHUB_ENV"
+          echo "psql y pg_dump presentes; LOCAL_DB_URL = URL local default documentada (127.0.0.1:54322)"
+
+      - name: "Stack local solo-postgres: supabase start -x (design §2.4 prefiere start -x; Docker solo en CI, #495)"
+        run: |
+          set -euo pipefail
+          # Lista -x tomada VERBATIM de los docs de supabase start (fetch 2026-10-19): containers
+          # excluibles [gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,
+          # studio,edge-runtime,logflare,vector,supavisor] — excluyendo todos, queda solo postgres.
+          # Si start falla por salud/recursos, el run queda ROJO acá — señal diseñada, no silencio.
+          # (Forma alternativa DEV-08: `supabase db start` — su aplicación de migraciones es
+          #  UNVERIFIED, #510; el doc de `supabase start` SÍ muestra "Applying migration …" en su
+          #  response de ejemplo. Lo que este stack fresco produzca LO OBSERVA P1 vía SQL, no se asume.)
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor 2>&1 | tee spike-artifacts/start.log
+          echo "--- ¿start aplicó migraciones? (evidencia observada, no asumida) ---"
+          grep -c "Applying migration" spike-artifacts/start.log || echo "sin líneas 'Applying migration' en la salida — P1 decide vía SQL (presence-then-count, D7)"
+
+      - name: "P1: stack fresco — ¿existe supabase_migrations.schema_migrations? Capturar DDL + filas"
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          P1_EXISTS=$(psql "$URL" -tAc "SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL;")
+          echo "P1_TABLE_EXISTS=$P1_EXISTS" >> "$GITHUB_ENV"
+          {
+            echo "### P1 — inspección del stack fresco (post supabase start -x)"
+            echo "to_regclass('supabase_migrations.schema_migrations') IS NOT NULL = $P1_EXISTS"
+          } | tee spike-artifacts/p1-fresh.log
+          if [ "$P1_EXISTS" = "t" ]; then
+            psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;" | tee -a spike-artifacts/p1-fresh.log
+            psql "$URL" -c "TABLE supabase_migrations.schema_migrations;" | tee -a spike-artifacts/p1-fresh.log
+            pg_dump --schema-only --no-owner --no-privileges --table=supabase_migrations.schema_migrations "$URL" -f spike-artifacts/p1-schema-migrations.sql
+            echo "DDL capturada en spike-artifacts/p1-schema-migrations.sql (criterio 1 de la rúbrica)"
+            psql "$URL" <<'SQL' | tee spike-artifacts/p1-table-def.txt
+          \d+ supabase_migrations.schema_migrations
+          SQL
+          else
+            echo "tabla INEXISTENTE en el stack fresco — no hay DDL que capturar en P1 (start -x no aplicó migraciones)" | tee -a spike-artifacts/p1-fresh.log
+            echo "::warning::P1: stack fresco sin la tabla de history — P2 decidirá rama A/B; si B y sin DDL capturable, el spike escala a derivación desde CLI source (github.com/supabase/cli, risk (a))"
+          fi
+
+      - name: "Normalizar estado: DROP SCHEMA supabase_migrations en el stack LOCAL desechable (jamás remoto)"
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          # Propósito: forzar deterministicamente el estado "tabla INEXISTENTE" que P2 debe probar.
+          # El stack es un contenedor desechable del runner (el volumen muere con el job) — cero riesgo.
+          psql "$URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS supabase_migrations CASCADE;"
+          EXISTS_AFTER_DROP=$(psql "$URL" -tAc "SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL;")
+          [ "$EXISTS_AFTER_DROP" = "f" ] || { echo "::error::la normalización a estado 'tabla inexistente' falló — el spike no puede continuar"; exit 1; }
+          echo "estado normalizado: tabla de history inexistente en el stack local (listo para P2)"
+
+      - name: "P2: repair --status applied --local contra tabla INEXISTENTE — ¿la crea (rama A) o falla (rama B)?"
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          # Forma de invocación doc-verified (docs migration-repair, fetch 2026-10-19):
+          #   supabase migration repair [version] ... --status <applied|reverted> (--status REQUIRED)
+          #   --local = "Repairs the migration history of the local database"
+          #   "marking as applied will insert a new record" (semántica row-only).
+          # El exit code y el stdout se capturan VERBATIM: el resultado del probe es dato, no gate.
+          set +e
+          supabase migration repair 20261015000001 --status applied --local 2>&1 | tee spike-artifacts/p2-repair.log
+          P2_RC=${PIPESTATUS[0]}
+          set -e
+          echo "P2 exit code: $P2_RC" | tee -a spike-artifacts/p2-repair.log
+          P2_EXISTS=$(psql "$URL" -tAc "SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL;")
+          P2_ROWS=$(psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;" 2>/dev/null || echo "n/a")
+          {
+            echo "### P2 — tras repair sobre tabla previamente inexistente"
+            echo "tabla existe: $P2_EXISTS · filas: $P2_ROWS · exit: $P2_RC"
+          } | tee -a spike-artifacts/p2-repair.log
+          if [ "$P2_EXISTS" = "t" ] && [ "$P2_ROWS" != "n/a" ] && [ "$P2_ROWS" -ge 1 ]; then
+            BRANCH="A"
+            psql "$URL" -c "TABLE supabase_migrations.schema_migrations;" | tee -a spike-artifacts/p2-repair.log
+            echo "::notice::rama A — repair --status applied --local CREÓ la tabla de history e insertó la fila (T5.1 podrá repair ×12 directo)"
+          else
+            BRANCH="B"
+            echo "::warning::rama B — repair --status applied --local NO creó la tabla (exit=$P2_RC). T5.1 deberá crearla primero con el DDL capturada en P1/P5 y luego repair ×12."
+          fi
+          {
+            echo "BRANCH=$BRANCH"
+            echo "P2_RC=$P2_RC"
+          } >> "$GITHUB_ENV"
+          echo "P2 verdict: BRANCH=$BRANCH (exit=$P2_RC, existe=$P2_EXISTS, filas=$P2_ROWS)"
+
+      - name: "Rama B: recrear la tabla de history desde el DDL capturada en P1 (requisito de T5.1 si B)"
+        if: env.BRANCH == 'B'
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          if [ ! -s spike-artifacts/p1-schema-migrations.sql ]; then
+            echo "::warning::sin DDL capturada en P1 (el stack fresco tampoco creó la tabla) — P3/P4 requieren la tabla: se marca INCOMPLETO y el humano escala a derivación desde CLI source (github.com/supabase/cli, risk (a)) — NUNCA adivinar"
+            echo "SPIKE_INCOMPLETE=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          psql "$URL" -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS supabase_migrations CASCADE;"
+          psql "$URL" -v ON_ERROR_STOP=1 -f spike-artifacts/p1-schema-migrations.sql
+          EXISTS=$(psql "$URL" -tAc "SELECT to_regclass('supabase_migrations.schema_migrations') IS NOT NULL;")
+          if [ "$EXISTS" != "t" ]; then
+            echo "::error::la recreación de la tabla desde el DDL capturado no produjo la tabla — INCOMPLETO (leer artefacto p1-schema-migrations.sql)"
+            echo "SPIKE_INCOMPLETE=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "rama B confirmada: tabla recreada desde el DDL capturado — T5.1 deberá aplicar este MISMO DDL antes del repair ×12"
+
+      - name: "P3: repair contra tabla EXISTENTE — solo-filas probado (count +1, esquema intacto, sin SQL ejecutado)"
+        if: env.SPIKE_INCOMPLETE != '1'
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          ROWS_BEFORE=$(psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;")
+          # Prueba genérica "no se ejecutó SQL de negocio": el conteo de relaciones en public es
+          # inmune a los contenidos específicos de las migraciones (sin acoplamiento a tablas).
+          PUB_BEFORE=$(psql "$URL" -tAc "SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','v','m','p','f');")
+          pg_dump --schema-only --no-owner --no-privileges --table=supabase_migrations.schema_migrations "$URL" -f spike-artifacts/p3-ddl-before.sql
+          set +e
+          supabase migration repair 20261015000002 --status applied --local 2>&1 | tee spike-artifacts/p3-repair.log
+          P3_RC=${PIPESTATUS[0]}
+          set -e
+          ROWS_AFTER=$(psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;")
+          PUB_AFTER=$(psql "$URL" -tAc "SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','v','m','p','f');")
+          pg_dump --schema-only --no-owner --no-privileges --table=supabase_migrations.schema_migrations "$URL" -f spike-artifacts/p3-ddl-after.sql
+          set +e
+          diff -u spike-artifacts/p3-ddl-before.sql spike-artifacts/p3-ddl-after.sql > spike-artifacts/p3-ddl.diff 2>&1
+          DIFF_RC=$?
+          set -e
+          P3_OK=1
+          {
+            echo "### P3 — repair 20261015000002 --status applied --local sobre tabla existente"
+            echo "exit: $P3_RC · filas: $ROWS_BEFORE -> $ROWS_AFTER · relaciones en public: $PUB_BEFORE -> $PUB_AFTER · diff DDL rc: $DIFF_RC (0 = sin cambios)"
+          } | tee -a spike-artifacts/p3-repair.log
+          [ "$P3_RC" -eq 0 ] || { echo "::error::P3: repair terminó con exit $P3_RC (ver artefacto p3-repair.log)"; P3_OK=0; }
+          [ "$ROWS_AFTER" -eq "$((ROWS_BEFORE + 1))" ] || { echo "::error::P3: se esperaba filas_before+1 (docs: 'marking as applied will insert a new record') — obtuviste $ROWS_BEFORE -> $ROWS_AFTER"; P3_OK=0; }
+          [ "$PUB_BEFORE" -eq "$PUB_AFTER" ] || { echo "::error::P3: cambió el conteo de objetos en public ($PUB_BEFORE -> $PUB_AFTER) — repair EJECUTÓ SQL de negocio en vez de mutar solo history (hallazgo crítico, escalar a diseño)"; P3_OK=0; }
+          [ "$DIFF_RC" -eq 0 ] || { echo "::error::P3: el DDL de la tabla de history cambió tras repair — no es row-only (ver spike-artifacts/p3-ddl.diff)"; P3_OK=0; }
+          echo "P3_OK=$P3_OK" >> "$GITHUB_ENV"
+          echo "P3 result: filas $ROWS_BEFORE->$ROWS_AFTER · public $PUB_BEFORE->$PUB_AFTER · diff_rc=$DIFF_RC · P3_OK=$P3_OK"
+
+      - name: "P4: repair --status reverted --local — reversibilidad (borra la fila)"
+        if: env.SPIKE_INCOMPLETE != '1'
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          # Docs migration-repair (fetch 2026-10-19): "Marking as reverted will delete an existing
+          # record from the migration history table" — row-only, reversible por diseño.
+          ROWS_BEFORE=$(psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;")
+          set +e
+          supabase migration repair 20261015000001 --status reverted --local 2>&1 | tee spike-artifacts/p4-revert.log
+          P4_RC=${PIPESTATUS[0]}
+          set -e
+          ROWS_AFTER=$(psql "$URL" -tAc "SELECT count(*) FROM supabase_migrations.schema_migrations;")
+          psql "$URL" -c "TABLE supabase_migrations.schema_migrations;" | tee -a spike-artifacts/p4-revert.log
+          P4_OK=1
+          {
+            echo "### P4 — repair 20261015000001 --status reverted --local"
+            echo "exit: $P4_RC · filas: $ROWS_BEFORE -> $ROWS_AFTER"
+          } | tee -a spike-artifacts/p4-revert.log
+          [ "$P4_RC" -eq 0 ] || { echo "::error::P4: revert terminó con exit $P4_RC (ver artefacto p4-revert.log)"; P4_OK=0; }
+          [ "$ROWS_AFTER" -eq "$((ROWS_BEFORE - 1))" ] || { echo "::error::P4: se esperaba filas_before-1 (docs: 'reverted will delete an existing record') — obtuviste $ROWS_BEFORE -> $ROWS_AFTER"; P4_OK=0; }
+          echo "P4_OK=$P4_OK" >> "$GITHUB_ENV"
+          echo "P4 result: filas $ROWS_BEFORE->$ROWS_AFTER · P4_OK=$P4_OK"
+
+      - name: "P5: DDL definitiva + contents + migration list --local (observación: ¿requiere link?)"
+        if: env.SPIKE_INCOMPLETE != '1'
+        run: |
+          set -euo pipefail
+          URL="$LOCAL_DB_URL"
+          set +e
+          pg_dump --schema-only --no-owner --no-privileges --table=supabase_migrations.schema_migrations "$URL" -f spike-artifacts/p5-final-ddl.sql 2> spike-artifacts/p5-pgdump-err.log
+          P5_PG_RC=$?
+          set -e
+          echo "pg_dump final exit: $P5_PG_RC (stderr en spike-artifacts/p5-pgdump-err.log)"
+          psql "$URL" <<'SQL' | tee spike-artifacts/p5-table-def.txt
+          \d+ supabase_migrations.schema_migrations
+          SQL
+          psql "$URL" -c "TABLE supabase_migrations.schema_migrations;" | tee spike-artifacts/p5-contents.txt
+          if [ -s spike-artifacts/p5-final-ddl.sql ] || [ -s spike-artifacts/p1-schema-migrations.sql ]; then
+            DDL_CAPTURED=1
+            echo "P5: DDL de la tabla de history capturada (artefactos p1-schema-migrations.sql / p5-final-ddl.sql)"
+          else
+            DDL_CAPTURED=0
+            echo "::warning::P5: sin DDL capturada — escalar a derivación desde el código fuente del CLI (github.com/supabase/cli), design §2.4 P5 — NUNCA adivinar (risk (a))"
+          fi
+          echo "DDL_CAPTURED=$DDL_CAPTURED" >> "$GITHUB_ENV"
+          set +e
+          supabase migration list --local 2>&1 | tee spike-artifacts/p5-migration-list-local.log
+          MIGLIST_RC=${PIPESTATUS[0]}
+          set -e
+          # OBSERVACIÓN (no aserción): los docs de migration list dicen "Requires your local project to
+          # be linked" aunque existe el flag --local. Este spike no puede linkear (cero credenciales por
+          # construcción); si el comando falla sin link, queda capturado acá y alimenta el diseño de
+          # T5.1 — nunca se agrega token a este workflow por este motivo.
+          echo "migration list --local exit: $MIGLIST_RC (sin link — observación, U-nota design §2.5)"
+
+      - name: "VEREDICTO — rúbrica design #507 §2.4 (PASS ⇒ desbloquea T4.2 + T5.1 · FAIL ⇒ T5.1 bloqueado)"
+        if: always()
+        run: |
+          set -uo pipefail
+          mkdir -p spike-artifacts
+          : > spike-artifacts/verdict.txt
+          emit() { echo "$1" | tee -a spike-artifacts/verdict.txt; }
+          emit "## SPIKE U3 — veredicto (design #507 §2.4 · spec DEV-04 · tasks #510 T3.1)"
+          emit ""
+          emit "| # | Criterio SUCCESS §2.4 | Observado |"
+          emit "|---|---|---|"
+          emit "| 1 | DDL de la tabla de history capturada | DDL_CAPTURED=${DDL_CAPTURED:-0} |"
+          emit "| 2 | Rama documentada (A: repair crea tabla · B: requiere DDL previa) | BRANCH=${BRANCH:-no-observada} · P2_RC=${P2_RC:-n/a} · P1_TABLE_EXISTS=${P1_TABLE_EXISTS:-n/a} |"
+          emit "| 3 | P3 row-only probado (count +1 · public sin cambios · diff DDL vacío) | P3_OK=${P3_OK:-no-corrio} |"
+          emit "| 4 | P4 reversible probado (revert borra la fila) | P4_OK=${P4_OK:-no-corrio} |"
+          emit "| 5 | Log + artefactos archivados (upload-artifact, if: always()) | artefacto spike-u3-repair-baseline |"
+          emit "| 6 | P6 config.toml archivada (T4.2 la commitea byte-idéntica) | ver spike-artifacts/config.toml |"
+          emit ""
+          EXIT=0
+          if [ "${SPIKE_INCOMPLETE:-0}" = "1" ]; then
+            emit "VEREDICTO: **INCOMPLETO** — P2 no produjo la tabla y no hubo DDL capturable para recrearla. T5.1 queda BLOQUEADO."
+            emit "ESCALAR (risk (a)): derivar la DDL desde el código fuente del CLI (github.com/supabase/cli) — NUNCA adivinar."
+            EXIT=1
+          elif [ "${P3_OK:-0}" != "1" ] || [ "${P4_OK:-0}" != "1" ] || [ "${DDL_CAPTURED:-0}" != "1" ] || { [ "${BRANCH:-}" != "A" ] && [ "${BRANCH:-}" != "B" ]; }; then
+            emit "VEREDICTO: **FAIL** — algún criterio no se probó o falló. T5.1 queda BLOQUEADO; leer los logs P2-P5 en el artefacto."
+            EXIT=1
+          else
+            emit "VEREDICTO: **PASS** (rama $BRANCH). Desbloquea:"
+            emit "- T4.2: commitear supabase/config.toml byte-idéntica al artefacto P6 (determinismo; hand-edit prohibido)."
+            emit "- T5.1: baseline-repair con la rama que el spike eligió — A = repair --status applied ×12 directo · B = aplicar el DDL del artefacto ANTES del repair ×12; en ambos, re-verificar 12 applied / 0 pending."
+            emit "RESIDUAL (no cubierto por el spike): comportamiento de repair contra el proyecto REMOTO (--linked) — el spike es local-only por construcción; la semántica row-only está doc-verified para ambos targets (docs migration-repair, fetch 2026-10-19)."
+            emit "SIGUIENTE PASO HUMANO: registrar PASS/rama en engram (accept de T3.1) antes de T4.2/T5.1."
+          fi
+          {
+            cat spike-artifacts/verdict.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$EXIT"
+
+      - name: "Artefacto: logs + DDL + config.toml + veredicto (retención 30d, subido SIEMPRE)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spike-u3-repair-baseline
+          path: spike-artifacts/
+          retention-days: 30
+          # warn (no error): un fallo temprano debe conservar la evidencia parcial — el VEREDICTO
+          # ya puso el run en rojo; destruir el rastro por un artefacto vacío sería anti-diseño.
+          if-no-files-found: warn
