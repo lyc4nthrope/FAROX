@@ -21,6 +21,8 @@ vi.mock("../features/auth/api", () => ({
   // del router ya las importa, así que el mock debe exportarlas COMPLETO.
   signUp: vi.fn(),
   resendConfirmationEmail: vi.fn(),
+  // D2: /auth/callback canjea el código PKCE — mismo motivo que arriba.
+  confirmEmailConfirmationCode: vi.fn(),
 }));
 // B5 (T5.2): /distributors ya no es placeholder — el api de la feature se
 // mockea COMPLETO como en el resto de los tests: sin esto, el módulo real
@@ -86,6 +88,11 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     vi.clearAllMocks();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    // D2: el canje PKCE del callback se resuelve "sin código" para que la
+    // ruta monte su rama de error y el test verifique solo el GUARD PÚBLICO.
+    vi.mocked(authApi.confirmEmailConfirmationCode).mockResolvedValue({
+      status: "missing-code",
+    });
     vi.mocked(profileApi.fetchMyProfile).mockResolvedValue({
       row: {
         full_name: "Ada Lovelace",
@@ -143,6 +150,20 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
       await screen.findByRole("heading", { name: "Crear tu cuenta" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
+    expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
+  });
+
+  it("anónimo en /auth/callback: pantalla del callback — ruta PÚBLICA sin RequireAuth (D2)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    renderRuta("/auth/callback?code=abc123");
+    // El callback monta sin sesión y sin privilegios: nunca cae al guard de /login.
+    expect(
+      await screen.findByRole("heading", { name: "No pudimos confirmar tu cuenta" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Iniciá sesión" }),
+    ).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
     expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
   });

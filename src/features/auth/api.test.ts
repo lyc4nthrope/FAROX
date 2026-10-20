@@ -1,27 +1,36 @@
-import type { AuthError, Session } from "@supabase/supabase-js";
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import { resendConfirmationEmail, signUp } from "./api";
+import { confirmEmailConfirmationCode, resendConfirmationEmail, signUp } from "./api";
 
 // Capa api contra el cliente supabase MOCKEADO (mismo aislamiento que el
 // resto de la suite: el cliente real valida el env al importar, V0-1). Acá se
 // prueba el CONTRATO exacto que viaja a Auth: metadata full_name (lee el
-// trigger handle_new_user, 0004:336) y type "signup" del reenvío.
+// trigger handle_new_user, 0004:336), type "signup" del reenvío y el canje
+// PKCE del código de confirmación (D2).
 vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: {
     auth: {
       signUp: vi.fn(),
       resend: vi.fn(),
+      exchangeCodeForSession: vi.fn(),
+      getSession: vi.fn(),
     },
   },
 }));
 
 const signUpMock = vi.mocked(supabase.auth.signUp);
 const resendMock = vi.mocked(supabase.auth.resend);
+const exchangeMock = vi.mocked(supabase.auth.exchangeCodeForSession);
+const authGetSessionMock = vi.mocked(supabase.auth.getSession);
 
+// User mínimo para AuthTokenResponse (data exige user y session juntos, no
+// mixtos — unión de auth-js) y para el getSession de dominio, que lee
+// session.user.id (api.ts:34).
+const FAKE_USER = { id: "u1" } as User;
 // Session mínima: solo importa que NO es null para la rama "sin confirmación".
-const FAKE_SESSION = { access_token: "token" } as Session;
+const FAKE_SESSION = { access_token: "token", user: FAKE_USER } as Session;
 // AuthError mínimo: la capa api solo lee .message (AuthOperationError, api.ts).
 const AUTH_ERROR = { message: "User already registered" } as AuthError;
 
@@ -89,5 +98,58 @@ describe("auth api · resendConfirmationEmail (D1)", () => {
     const result = await resendConfirmationEmail("demo@farox.app");
 
     expect(result.error).toBe(error);
+  });
+});
+
+describe("auth api · confirmEmailConfirmationCode (D2 · canje PKCE)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // jsdom: history.replaceState fija window.location.search que lee el helper.
+    window.history.replaceState({}, "", "/auth/callback");
+  });
+
+  it("leyó el code de la URL y lo canjeó con exchangeCodeForSession", async () => {
+    window.history.replaceState({}, "", "/auth/callback?code=abc123");
+    exchangeMock.mockResolvedValue({
+      data: { user: FAKE_USER, session: FAKE_SESSION },
+      error: null,
+    });
+
+    const outcome = await confirmEmailConfirmationCode();
+
+    expect(exchangeMock).toHaveBeenCalledWith("abc123");
+    expect(outcome).toEqual({ status: "ok" });
+  });
+
+  it("sin code en la URL: missing-code con CERO llamadas a la api (sin hang)", async () => {
+    const outcome = await confirmEmailConfirmationCode();
+
+    expect(outcome).toEqual({ status: "missing-code" });
+    expect(exchangeMock).not.toHaveBeenCalled();
+    expect(authGetSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("código expirado/inválido y sin sesión: status error con el error de Auth", async () => {
+    window.history.replaceState({}, "", "/auth/callback?code=viejo");
+    const authError = { message: "oauth code has expired" } as AuthError;
+    exchangeMock.mockResolvedValue({ data: { user: null, session: null }, error: authError });
+    authGetSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+
+    const outcome = await confirmEmailConfirmationCode();
+
+    expect(outcome).toEqual({ status: "error", error: authError });
+  });
+
+  it("el canje explícito falla pero YA hay sesión (auto-canje del cliente o doble montaje): status ok", async () => {
+    window.history.replaceState({}, "", "/auth/callback?code=abc123");
+    exchangeMock.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "code already redeemed" } as AuthError,
+    });
+    authGetSessionMock.mockResolvedValue({ data: { session: FAKE_SESSION }, error: null });
+
+    const outcome = await confirmEmailConfirmationCode();
+
+    expect(outcome).toEqual({ status: "ok" });
   });
 });

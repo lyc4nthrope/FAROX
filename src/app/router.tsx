@@ -1,6 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 
-import { LoginPage, RegisterPage } from "../features/auth";
+import { CallbackPage, LoginPage, RegisterPage } from "../features/auth";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { ProfilePage } from "../features/profile";
@@ -40,6 +40,10 @@ export function AppRoutes() {
       {/* /register: ruta PÚBLICA (D1) — el registro no exige sesión; queda
           FUERA del layout RequireAuth/AppShell como /login. */}
       <Route path="/register" element={<RegisterPage />} />
+      {/* /auth/callback: ruta PÚBLICA (D2) — el usuario llega del link de
+          confirmación de email SIN sesión todavía; queda FUERA de
+          RequireAuth/AppShell como /login y /register. */}
+      <Route path="/auth/callback" element={<CallbackPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />

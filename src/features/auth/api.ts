@@ -97,6 +97,46 @@ export async function resendConfirmationEmail(
   return { error };
 }
 
+// ── D2 · canje del código de confirmación de email (PKCE) ─────────────────────
+// Tras confirmar el email, Supabase redirige a /auth/callback?code=... El
+// código es de UN solo uso: sin canjearlo, confirmar NO otorga sesión.
+
+export type ConfirmEmailOutcome =
+  | { status: "ok" }
+  | { status: "missing-code" }
+  | { status: "error"; error: AuthOperationError };
+
+// Método VERIFICADO contra las types instaladas (@supabase/supabase-js
+// 2.118.0 → auth-js GoTrueClient.d.ts:856-858):
+//   exchangeCodeForSession(authCode: string, options?: { flowId?: string })
+// El flowId es optativo y solo importa con varios flujos PKCE en vuelo
+// (GoTrueClient.d.ts:676-681); el flujo de email de confirmación trae uno
+// solo, así que va sin opciones.
+export async function confirmEmailConfirmationCode(): Promise<ConfirmEmailOutcome> {
+  const code = new URLSearchParams(window.location.search).get("code");
+  if (code === null || code === "") {
+    return { status: "missing-code" };
+  }
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error === null) {
+    return { status: "ok" };
+  }
+  // Realidad del cliente instalado: el SDK auto-canjea el código en
+  // _initialize() cuando detecta un callback PKCE con verifier en storage
+  // (auth-js GoTrueClient.js:393 y 403-404 → 3285). Nuestro canje explícito
+  // corre DESPUÉS (el wrapper público espera initializePromise,
+  // GoTrueClient.js:1257); si el auto-canje ya consumió el código, el
+  // explícito falla pero la sesión EXISTE — no es error para el usuario.
+  // (Hoy, con el cliente en flowType implícito, el auto-canje no ocurre:
+  // signUp nunca guarda verifier — GoTrueClient.js:738-741. Este fallback
+  // además cubre el doble montaje en StrictMode.)
+  const existing = await getSession();
+  if (existing !== null) {
+    return { status: "ok" };
+  }
+  return { status: "error", error };
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error !== null) {
