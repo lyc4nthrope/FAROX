@@ -246,6 +246,8 @@ Estos requisitos no son estrictamente necesarios para un MVP funcional, pero son
 
 # **Planificación del Proyecto: 2 Meses (8 Semanas / 4 Sprints)**
 
+> **Reemplazado (2026-10-19):** el cronograma de esta sección quedó como referencia histórica. El plan de ejecución vigente (14 días hábiles, entrega el 6 de noviembre de 2026, tareas, responsables y criterios de terminado) es [`docs/mvp/PLAN.md`](docs/mvp/PLAN.md). Requisitos, roles, seguridad y modelo de datos de este documento siguen vigentes.
+
 ## ***Mapeo General de Requisitos***
 
 | Área Principal | ID Requisito | Descripción Detallada | Prioridad MVP |
