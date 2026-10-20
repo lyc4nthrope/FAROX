@@ -54,11 +54,17 @@ export function AppRoutes() {
             (S-D3.0). D2 llega de /auth/callback a "/" y el guard intercepta
             acá (design #538 §8). */}
         <Route element={<OnboardingGate />}>
+          {/* /onboarding: pantalla full-screen SIN chrome de app — hermana
+              del bloque AppShell DENTRO del gate (v2). Mientras la sesión
+              necesite onboarding el guard solo deja pasar esta ruta (cualquier
+              otra redirige acá), así que header (Perfil/Salir) y nav de
+              entidades NUNCA montan; con señal, el propio gate rebota
+              /onboarding a "/" (S-D3.0). React Router la resuelve limpia:
+              el segmento estático "/onboarding" rankea por encima del
+              splat "*" que vive dentro del AppShell. */}
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route element={<AppShell />}>
             <Route path="/" element={<HomePage />} />
-            {/* /onboarding: pantalla propia de la pregunta de 2 niveles
-                (hermana de "/" dentro del árbol autenticado, T2.7). */}
-            <Route path="/onboarding" element={<OnboardingPage />} />
             <Route
               path="/distributors"
               element={
