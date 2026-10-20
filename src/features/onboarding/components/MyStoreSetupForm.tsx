@@ -1,4 +1,5 @@
 import { ErrorBanner } from "../../../shared/ui";
+import { MapLocationField } from "../../../shared/ui/LocationPicker/MapLocationField";
 import type { MyStoreValues } from "../schemas";
 import type { StoreTypeOption } from "../types";
 
@@ -17,17 +18,21 @@ export interface MyStoreSetupFormProps {
   saving: boolean;
   storeTypes: StoreTypeOption[];
   onChange: (next: MyStoreValues) => void;
+  // El MAPA es el input de coordenadas (supersede del D3 de #486): el
+  // contenedor recibe la mutación del pin y agenda el reverse geocode
+  // (best-effort → values.address → p_address).
+  onLocationChange: (next: { latitude: number; longitude: number }) => void;
   onSubmit: () => void;
   onBack: () => void;
 }
 
 // Presentacional pura: form MÍNIMO de la terminal [Mi tienda] — nombre, tipo
-// (catálogo) y coordenadas OBLIGATORIAS (stores.location NOT NULL, 0002:131).
-// Sin address/city/phone (alta mínima del onboarding; la capa api los envía
-// NULL) y SIN duplicar la página CRUD de B7 (/stores/new). Coordenadas
-// numéricas manuales con el mismo par de labels con rango que StoreForm de B7
-// (el orden lat/lng confunde a simple vista — trap #2 de B7). La validación
-// Zod corre en el contenedor ANTES de cualquier request (idea:198).
+// (catálogo) y ubicación OBLIGATORIAS (stores.location NOT NULL, 0002:131).
+// Sin city/phone (alta mínima del onboarding; la capa api los envía NULL) y
+// SIN duplicar la página CRUD de B7 (/stores/new). La ubicación se elige en
+// un mapa (MapLocationField, lazy + escape hatch numérico si el chunk no
+// carga); la validación Zod corre en el contenedor ANTES de cualquier request
+// (idea:198) — sin pin, lat/lng quedan "" y el submit se bloquea.
 export function MyStoreSetupForm({
   values,
   errors,
@@ -35,6 +40,7 @@ export function MyStoreSetupForm({
   saving,
   storeTypes,
   onChange,
+  onLocationChange,
   onSubmit,
   onBack,
 }: MyStoreSetupFormProps) {
@@ -98,44 +104,17 @@ export function MyStoreSetupForm({
         )}
       </div>
       <div>
-        <label htmlFor="onboarding-store-lat" className="block text-sm font-medium text-gray-700">
-          Latitud (-90 a 90)
-        </label>
-        <input
-          id="onboarding-store-lat"
-          type="text"
-          inputMode="decimal"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          value={values.lat}
-          aria-invalid={errors.lat !== undefined}
-          aria-describedby={errors.lat === undefined ? undefined : "onboarding-store-lat-error"}
-          onChange={(event) => onChange({ ...values, lat: event.target.value })}
+        <MapLocationField
+          latitude={values.lat}
+          longitude={values.lng}
+          address={values.address}
+          latitudeError={errors.lat}
+          longitudeError={errors.lng}
+          onLocationChange={onLocationChange}
+          onCoordinateTextChange={(next) => onChange({ ...values, lat: next.latitude, lng: next.longitude })}
+          label="Ubicación de la tienda"
+          idPrefix="onboarding-store"
         />
-        {errors.lat !== undefined && (
-          <p id="onboarding-store-lat-error" className="mt-1 text-xs text-red-600">
-            {errors.lat}
-          </p>
-        )}
-      </div>
-      <div>
-        <label htmlFor="onboarding-store-lng" className="block text-sm font-medium text-gray-700">
-          Longitud (-180 a 180)
-        </label>
-        <input
-          id="onboarding-store-lng"
-          type="text"
-          inputMode="decimal"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          value={values.lng}
-          aria-invalid={errors.lng !== undefined}
-          aria-describedby={errors.lng === undefined ? undefined : "onboarding-store-lng-error"}
-          onChange={(event) => onChange({ ...values, lng: event.target.value })}
-        />
-        {errors.lng !== undefined && (
-          <p id="onboarding-store-lng-error" className="mt-1 text-xs text-red-600">
-            {errors.lng}
-          </p>
-        )}
       </div>
       <div className="flex items-center gap-3">
         <button

@@ -81,17 +81,19 @@ export async function registerDistributor(
 // features/stores/api.ts: la creación en stores pasa exclusivamente por esa
 // RPC, STORE-1). El EWKT de p_location se arma con stores/geo.buildLocationEWKT
 // (lng-first SIEMPRE — T2.5 "reusar geo.ts como building block"; un swap
-// lat/lng es silencioso y dejaría la tienda en el océano). address/city/phone
-// no viajan: son DEFAULT NULL (0004:641-643). La auto-asociación del dueño en
-// user_stores la hace el server (D35, 0004:661-663) ⇒ tras el éxito la señal
-// my_store_ids() aparece derivada, sin llamadas extra.
+// lat/lng es silencioso y dejaría la tienda en el océano). p_address lleva la
+// dirección resuelta del reverse geocode del pin (best-effort desde el mapa;
+// vacío ⇒ NULL, DEFAULT NULL en la firma). city/phone no viajan: son DEFAULT
+// NULL (0004:642-643). La auto-asociación del dueño en user_stores la hace el
+// server (D35, 0004:661-663) ⇒ tras el éxito la señal my_store_ids() aparece
+// derivada, sin llamadas extra.
 export async function createStore(
   values: MyStoreValues,
 ): Promise<{ error: { message: string } | null }> {
   const { error } = await supabase.rpc("create_store", {
     p_name: values.name,
     p_store_type_id: Number(values.store_type_id),
-    p_address: null,
+    p_address: values.address === "" ? null : values.address,
     p_city: null,
     p_phone: null,
     p_location: buildLocationEWKT(Number(values.lat), Number(values.lng)),

@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { mapError } from "../../../shared/lib/errors/mapError";
+import { useReverseGeocode } from "../../../shared/lib/geo/useReverseGeocode";
+import type { GeoCoords } from "../../../shared/lib/geo/useGeolocation";
 import {
   createStore,
   deactivateStore,
@@ -64,6 +66,27 @@ export function StoreFormPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storeTypes, setStoreTypes] = useState<StoreTypeRef[]>([]);
+
+  // Pipeline único de reverse geocode del pin (~800ms, cancellable): completa
+  // Dirección SOLO si estaba vacía — jamás pisa lo que el usuario escribió.
+  // Best-effort: si Nominatim falla, p_address en create_store queda NULL.
+  const { schedule: scheduleAddressResolution } = useReverseGeocode((address) => {
+    setValues((previous) =>
+      previous.address.trim() === "" ? { ...previous, address } : previous,
+    );
+  });
+
+  // ÚNICA vía de mutación de coordenadas desde el mapa (supersede del D3 de
+  // #486): strings en el form (mismo shape que el escape hatch numérico) y
+  // reverse geocode en paralelo.
+  function handleLocationChange(next: GeoCoords): void {
+    setValues((previous) => ({
+      ...previous,
+      lat: String(next.latitude),
+      lng: String(next.longitude),
+    }));
+    scheduleAddressResolution(next);
+  }
 
   useEffect(() => {
     if (storeId !== null && (!Number.isInteger(storeId) || storeId < 1)) {
@@ -215,6 +238,7 @@ export function StoreFormPage() {
             submitLabel={isEdit ? "Guardar cambios" : "Crear tienda"}
             storeTypes={storeTypes}
             onChange={setValues}
+            onLocationChange={handleLocationChange}
             onSubmit={handleSubmit}
             onDelete={handleDelete}
           />

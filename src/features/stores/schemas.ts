@@ -25,11 +25,13 @@ export const storeSchema = z.object({
   address: z.string().trim(),
   city: z.string().trim(),
   phone: z.string().trim(),
-  // D3 (#486): campos numéricos manuales, SIN mapa. Coordenadas
+  // D3 (#486) SUPERSEDE: la ubicación ya no son campos numéricos manuales —
+  // se elige en el MAPA (shared/ui/LocationPicker). Coordenadas
   // OBLIGATORIAS: stores.location NOT NULL (0002:131) mientras p_location es
   // DEFAULT NULL (0004:641) y create_store solo valida nombre/store_type
   // (0004:652-657) — omitirlas produciría un not_null_violation crudo
-  // (STORE-1 escenario "coordinates omitted blocked client-side").
+  // (STORE-1 escenario "coordinates omitted blocked client-side"). Los inputs
+  // numéricos quedan SOLO en el escape hatch si el mapa no carga.
   lat: z.string().trim().refine(
     (value) => esRango(value, -90, 90),
     "Ingresá una latitud válida entre -90 y 90",

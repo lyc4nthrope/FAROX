@@ -27,17 +27,20 @@ export type DistributorRegistrationValues = z.infer<typeof distributorSchema>;
 
 // [Mi tienda] = alta MÍNIMA: reusa el storeSchema de B7 vía pick (mismos
 // refinamientos de nombre/tipo/coordenadas, sin duplicarlos — T2.5 "reusar
-// stores/schemas.ts como building block"). address/city/phone NO se piden en
-// este alta mínima: la capa api los envía NULL (p_address/p_city/p_phone son
-// DEFAULT NULL, 0004:641-643). Coordenadas OBLIGATORIAS: stores.location
-// NOT NULL (0002:131) — Zod bloquea el request en el cliente (STORE-1
-// "coordinates omitted blocked client-side", defense-in-depth con el guard
-// server de 0013(a)).
+// stores/schemas.ts como building block"). city/phone NO se piden en este
+// alta mínima: la capa api los envía NULL (p_city/p_phone DEFAULT NULL,
+// 0004:641-643). Coordenadas OBLIGATORIAS: stores.location NOT NULL (0002:131)
+// — Zod bloquea el request en el cliente (STORE-1 "coordinates omitted blocked
+// client-side", defense-in-depth con el guard server de 0013(a)). La
+// ubicación se elige en el MAPA (LocationPicker, supersede del D3 de #486 que
+// había elegido campos numéricos manuales) y address llega del reverse
+// geocode del pin (best-effort: "" ⇒ p_address NULL).
 export const myStoreSchema = storeSchema.pick({
   name: true,
   store_type_id: true,
   lat: true,
   lng: true,
+  address: true,
 });
 
 export type MyStoreValues = z.infer<typeof myStoreSchema>;

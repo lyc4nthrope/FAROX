@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../auth/types";
 import * as authApi from "../../auth/api";
+import * as nominatim from "../../../shared/lib/geo/nominatim";
 import * as storesApi from "../api";
 import type { StoreGeo, StoreListRow, StoreRow } from "../types";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
@@ -15,6 +16,10 @@ import { StoresPage } from "./StoresPage";
 // D7 (componente, api de la feature mockeada COMPLETA): los escenarios de
 // STORE-1 y STORE-3 (spec #483 S6). /stores usa la página REAL para probar
 // "la fila aparece en la lista tras el refetch" (HARD-3, D4).
+// El picker del mapa se mockea a nivel de MapLocationField (Sin tiles ni
+// Leaflet real en jsdom): el mock expone un botón "Poner pin" que emite la
+// ubicación como lo haría el mapa. El reverse geocode (nominatim) también se
+// mockea: ningún test toca la red.
 vi.mock("../api", () => ({
   fetchStores: vi.fn(),
   fetchStore: vi.fn(),
@@ -31,6 +36,36 @@ vi.mock("../../auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+}));
+vi.mock("../../../shared/lib/geo/nominatim", () => ({
+  reverseGeocode: vi.fn(),
+}));
+vi.mock("../../../shared/ui/LocationPicker/MapLocationField", () => ({
+  MapLocationField: ({
+    latitude,
+    longitude,
+    latitudeError,
+    longitudeError,
+    onLocationChange,
+  }: {
+    latitude: string;
+    longitude: string;
+    latitudeError?: string;
+    longitudeError?: string;
+    onLocationChange: (next: { latitude: number; longitude: number }) => void;
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onLocationChange({ latitude: 4.6097, longitude: -74.0631 })}
+      >
+        Poner pin
+      </button>
+      <output>{`${latitude},${longitude}`}</output>
+      {latitudeError !== undefined && <p>{latitudeError}</p>}
+      {longitudeError !== undefined && <p>{longitudeError}</p>}
+    </div>
+  ),
 }));
 
 const T1: StoreRow = {
@@ -116,10 +151,10 @@ async function completarAlta(user: ReturnType<typeof userEvent.setup>): Promise<
   await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
   await user.type(screen.getByLabelText("Dirección"), "Calle 1 #2-3");
   await user.type(screen.getByLabelText("Ciudad"), "Bogotá");
-  // Campos numéricos MANUALES sin mapa (D3): los labels llevan el rango para
-  // que el orden lat/lng no se confunda en pantalla (trap #2 de B7).
-  await user.type(screen.getByLabelText("Latitud (-90 a 90)"), "4.6097");
-  await user.type(screen.getByLabelText("Longitud (-180 a 180)"), "-74.0631");
+  // El MAPA es el input de coordenadas (MapLocationField mockeado): colocar
+  // el pin emite { latitude, longitude } — el contenedor los serializa a
+  // string y el EWKT lng-first se arma en la capa api (geo.test.ts).
+  await user.click(screen.getByRole("button", { name: "Poner pin" }));
 }
 
 describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
@@ -143,6 +178,9 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     vi.mocked(storesApi.updateStore).mockResolvedValue({ error: null });
     vi.mocked(storesApi.deactivateStore).mockResolvedValue({ error: null });
     vi.mocked(storesApi.deleteStore).mockResolvedValue({ error: null });
+    // Sin resolver de direcciones por defecto: el reverse geocode es
+    // best-effort y no debe pisar lo que el usuario tipeó.
+    vi.mocked(nominatim.reverseGeocode).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -190,6 +228,36 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     expect(storesApi.fetchStores).toHaveBeenCalledTimes(2);
   });
 
+  it("pin → reverse geocode diferido completa Dirección y viaja al create (best-effort)", async () => {
+    // El mapa emite la ubicación, el contenedor agenda el reverse geocode
+    // (~800ms) y el resultado completa el ÚNICO campo Dirección vacío — p_address
+    // del RPC create_store deja de ser el null hardcodeado.
+    vi.mocked(nominatim.reverseGeocode).mockResolvedValue({
+      latitude: 4.6097,
+      longitude: -74.0631,
+      address: "Carrera 7 #1-1, Bogotá",
+    });
+    const user = userEvent.setup();
+    renderRutas("/stores/new", "admin");
+
+    await screen.findByRole("button", { name: "Crear tienda" });
+    await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
+    await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
+    await user.click(screen.getByRole("button", { name: "Poner pin" }));
+
+    expect(await screen.findByDisplayValue("Carrera 7 #1-1, Bogotá", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(nominatim.reverseGeocode).toHaveBeenCalledWith(4.6097, -74.0631);
+    await user.click(screen.getByRole("button", { name: "Crear tienda" }));
+
+    expect(storesApi.createStore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lat: "4.6097",
+        lng: "-74.0631",
+        address: "Carrera 7 #1-1, Bogotá",
+      }),
+    );
+  });
+
   it("operador: SÍ ve y completa el alta — su ruta de bootstrap de alcance (idea:114, D35)", async () => {
     // README:38-39 afirma que create_store exige admin y está MAL: la RPC solo
     // valida sesión/nombre/store_type (0004:649-657). El operador dentro del
@@ -204,9 +272,10 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     expect(storesApi.createStore).toHaveBeenCalledTimes(1);
   });
 
-  it("coordenadas vacías: errores inline y CERO requests (STORE-1, idea:198)", async () => {
+  it("sin pin en el mapa: errores inline de Zod y CERO requests (STORE-1, idea:198)", async () => {
     // stores.location NOT NULL (0002:131) vs p_location DEFAULT NULL (0004:641):
     // sin esta validación el backend devolvería un not_null_violation crudo.
+    // El mapa no sembró coordenadas ⇒ lat/lng quedan "" y Zod bloquea.
     const user = userEvent.setup();
     renderRutas("/stores/new", "admin");
 
@@ -221,21 +290,6 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     ).toBeInTheDocument();
     expect(storesApi.createStore).not.toHaveBeenCalled();
     expect(storesApi.updateStore).not.toHaveBeenCalled();
-  });
-
-  it("latitud fuera de rango (120): error inline y CERO requests (Zod −90..90)", async () => {
-    const user = userEvent.setup();
-    renderRutas("/stores/new", "admin");
-
-    await screen.findByRole("button", { name: "Crear tienda" });
-    await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
-    await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
-    await user.type(screen.getByLabelText("Latitud (-90 a 90)"), "120");
-    await user.type(screen.getByLabelText("Longitud (-180 a 180)"), "-74.0631");
-    await user.click(screen.getByRole("button", { name: "Crear tienda" }));
-
-    expect(await screen.findByText("Ingresá una latitud válida entre -90 y 90")).toBeInTheDocument();
-    expect(storesApi.createStore).not.toHaveBeenCalled();
   });
 
   it("tope D34 (trigger 0004:376): mensaje amigable, jamás el crudo (HARD-1)", async () => {
@@ -304,11 +358,12 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     renderRutas("/stores/1", "operador");
 
     const botonGuardar = await screen.findByRole("button", { name: "Guardar cambios" });
-    // Las coordenadas se re-binddean desde stores_geo (String(4.6097)). Con
-    // findBy (no getBy): el geo llega por un useEffect asíncrono — si el botón
-    // se resuelve antes que el geo, getBy fallaría por timing, no por bug.
-    expect(await screen.findByDisplayValue("4.6097")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("-74.0631")).toBeInTheDocument();
+    // Las coordenadas se re-binddean desde stores_geo (String(4.6097)) y el
+    // mapa las recibe como props — el <output> del mock las refleja. Con
+    // findBy (no getBy): el geo llega por un useEffect asíncrono — si el
+    // botón se resuelve antes que el geo, getBy fallaría por timing, no por
+    // bug.
+    expect(await screen.findByText("4.6097,-74.0631")).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Nombre"));
     await user.type(screen.getByLabelText("Nombre"), "Tienda Centro renovada");
     await user.click(botonGuardar);

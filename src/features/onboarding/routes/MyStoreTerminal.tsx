@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { mapError } from "../../../shared/lib/errors/mapError";
+import { useReverseGeocode } from "../../../shared/lib/geo/useReverseGeocode";
+import type { GeoCoords } from "../../../shared/lib/geo/useGeolocation";
 import { createStore, fetchStoreTypes } from "../api";
 import { useOnboarding } from "../context";
 import { MyStoreSetupForm, type MyStoreFormErrors } from "../components/MyStoreSetupForm";
@@ -13,12 +15,16 @@ const EMPTY_VALUES: MyStoreValues = {
   store_type_id: "",
   lat: "",
   lng: "",
+  address: "",
 };
 
 // Contenedor de la terminal [Mi tienda] (S-D3.B · T2.5): alta MÍNIMA por la
 // RPC create_store (mismo camino RPC-only que B7 — STORE-1). Ubicación
 // OBLIGATORIA validada por Zod en el cliente (idea:198; stores.location NOT
-// NULL 0002:131) + defense-in-depth del guard server de 0013(a) post-H1.
+// NULL 0002:131) + defense-in-depth del guard server de 0013(a) post-H1. La
+// ubicación se elige en el MAPA (supersede del D3 de #486): cada pin dispara
+// el reverse geocode diferido (~800ms) cuyo resultado viaja a p_address
+// (best-effort — si Nominatim falla, NULL y el alta NO se bloquea).
 // Éxito ⇒ create_store auto-asocia al dueño en user_stores (D35,
 // 0004:661-663) ⇒ refresh() re-deriva la señal my_store_ids() y el guard
 // deja de preguntar antes de navegar a "/" (S-D3.B AC).
@@ -32,6 +38,11 @@ export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storeTypes, setStoreTypes] = useState<StoreTypeOption[]>([]);
+
+  // Pipeline único de reverse geocode del pin (cancellable, montaje-safe).
+  const { schedule: scheduleAddressResolution } = useReverseGeocode((address) => {
+    setValues((previous) => ({ ...previous, address }));
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +67,18 @@ export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
       cancelled = true;
     };
   }, []);
+
+  // ÚNICA vía de mutación de coordenadas: el mapa emita y el form queda con
+  // strings (mismo shape que los inputs legacy del escape hatch). El reverse
+  // geocode corre en paralelo, diferido y best-effort.
+  function handleLocationChange(next: GeoCoords): void {
+    setValues((previous) => ({
+      ...previous,
+      lat: String(next.latitude),
+      lng: String(next.longitude),
+    }));
+    scheduleAddressResolution(next);
+  }
 
   function handleSubmit(): void {
     const parsed = myStoreSchema.safeParse(values);
@@ -110,6 +133,7 @@ export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
             saving={saving}
             storeTypes={storeTypes}
             onChange={setValues}
+            onLocationChange={handleLocationChange}
             onSubmit={handleSubmit}
             onBack={onBack}
           />

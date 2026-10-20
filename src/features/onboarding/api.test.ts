@@ -190,6 +190,7 @@ describe("onboarding api · createStore (terminal [Mi tienda], RPC-only STORE-1)
     const result = await createStore({
       name: "Tienda Centro",
       store_type_id: "1",
+      address: "",
       lat: "4.6097",
       lng: "-74.0631",
     });
@@ -213,6 +214,7 @@ describe("onboarding api · createStore (terminal [Mi tienda], RPC-only STORE-1)
     const result = await createStore({
       name: "Tienda Centro",
       store_type_id: "1",
+      address: "",
       lat: "4.6097",
       lng: "-74.0631",
     });

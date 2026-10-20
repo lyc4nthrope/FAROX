@@ -1,3 +1,4 @@
+import { MapLocationField } from "../../../shared/ui/LocationPicker/MapLocationField";
 import type { StoreFormValues } from "../schemas";
 import type { StoreTypeRef } from "../types";
 
@@ -25,6 +26,10 @@ export interface StoreFormProps {
   submitLabel: string;
   storeTypes: StoreTypeRef[];
   onChange: (next: StoreFormValues) => void;
+  // El MAPA es el input de coordenadas (supersede del D3 de #486): el
+  // contenedor recibe la mutación del pin, setea lat/lng y agenda el reverse
+  // geocode que puede completar Dirección (best-effort).
+  onLocationChange: (next: { latitude: number; longitude: number }) => void;
   onSubmit: () => void;
   onDelete: () => void;
 }
@@ -35,14 +40,13 @@ export interface StoreFormProps {
 // contenedor ANTES de cualquier request (idea:198 / STORE-1) — acá solo se
 // pintan los errores por campo.
 //
-// COORDENADAS (trap #2 de B7 · D3): campos numéricos MANUALES, sin mapa, con
-// el rango escrito en el propio label — latitud (-90 a 90) y longitud
-// (-180 a 180) no se pueden confundir leyendo la pantalla. El orden EWKT
-// (lng-first) lo garantiza geo.ts en el armado del request; acá solo se
-// separan los campos para que el usuario meta el valor correcto en el correcto.
-// Los placeholders son DISTINTOS de los mensajes de error: un placeholder
-// idéntico duplicaría texto en el DOM y rompería los tests estructurales
-// (lección #519).
+// COORDENADAS (supersede del trap #2 de B7 · D3 de #486): el input principal
+// es un MAPA (MapLocationField, lazy sobre Leaflet con escape hatch numérico
+// si el chunk no carga). El orden EWKT (lng-first) lo garantiza geo.ts en el
+// armado del request — acá solo se emiten coordenadas con campos NOMINADOS y
+// el contenedor nunca las reordena. El campo Dirección sigue siendo editable
+// a mano y puede ser completado por el reverse geocode del pin (solo si
+// estaba vacío: jamás pisa lo que el usuario escribió).
 export function StoreForm({
   values,
   errors,
@@ -53,6 +57,7 @@ export function StoreForm({
   submitLabel,
   storeTypes,
   onChange,
+  onLocationChange,
   onSubmit,
   onDelete,
 }: StoreFormProps) {
@@ -167,52 +172,20 @@ export function StoreForm({
         />
       </div>
       <div>
-        <label htmlFor="store-lat" className="block text-sm font-medium text-gray-700">
-          Latitud (-90 a 90)
-        </label>
-        <input
-          id="store-lat"
-          type="number"
-          step="any"
-          min={-90}
-          max={90}
+        <MapLocationField
+          latitude={values.lat}
+          longitude={values.lng}
+          address={values.address}
+          latitudeError={errors.lat}
+          longitudeError={errors.lng}
+          onLocationChange={onLocationChange}
+          onCoordinateTextChange={(next) =>
+            onChange({ ...values, lat: next.latitude, lng: next.longitude })
+          }
           disabled={readOnly}
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-          value={values.lat}
-          placeholder="ej. 4.6097"
-          aria-invalid={errors.lat !== undefined}
-          aria-describedby={errors.lat === undefined ? undefined : "store-lat-error"}
-          onChange={(event) => onChange({ ...values, lat: event.target.value })}
+          label="Ubicación de la tienda"
+          idPrefix="store"
         />
-        {errors.lat !== undefined && (
-          <p id="store-lat-error" className="mt-1 text-xs text-red-600">
-            {errors.lat}
-          </p>
-        )}
-      </div>
-      <div>
-        <label htmlFor="store-lng" className="block text-sm font-medium text-gray-700">
-          Longitud (-180 a 180)
-        </label>
-        <input
-          id="store-lng"
-          type="number"
-          step="any"
-          min={-180}
-          max={180}
-          disabled={readOnly}
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-          value={values.lng}
-          placeholder="ej. -74.0631"
-          aria-invalid={errors.lng !== undefined}
-          aria-describedby={errors.lng === undefined ? undefined : "store-lng-error"}
-          onChange={(event) => onChange({ ...values, lng: event.target.value })}
-        />
-        {errors.lng !== undefined && (
-          <p id="store-lng-error" className="mt-1 text-xs text-red-600">
-            {errors.lng}
-          </p>
-        )}
       </div>
       {!readOnly && (
         <div className="flex items-center gap-3">
