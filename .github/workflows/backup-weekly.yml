@@ -65,7 +65,7 @@ jobs:
           echo "dumps OK — schema: $(wc -c < "backups/schema-$TS.sql") B · data: $(wc -c < "backups/data-$TS.sql") B"
 
       - name: "Artifact off-DB, retention 30d (DEV-11) — ANTES del drill (design §4 fila 6)"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backup-${{ env.TS }}
           path: |
