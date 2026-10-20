@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as onboardingApi from "../api";
+import { clearOnboardingSignalsCache } from "../signalsCache";
+import * as nominatim from "../../../shared/lib/geo/nominatim";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { RequireAuth } from "../../../app/guards/RequireAuth";
 import { OnboardingGate } from "./OnboardingGate";
@@ -15,6 +17,12 @@ import { OnboardingPage } from "./OnboardingPage";
 // OnboardingGate → página); "/onboarding" arranca SIEMPRE sin señales y los
 // tests inyectan la señal resultante vía el mock de fetch (la terminal la
 // relee con refresh() antes de navegar — S-D3.A/S-D3.B AC).
+// Flujo v2 (full-screen): elegir una opción solo la SELECCIONA (bloque
+// superior dinámico + habilitar [Seleccionar]); [Seleccionar] es el único
+// que avanza de paso.
+// El picker del mapa se mockea a nivel de MapLocationField (sin Leaflet ni
+// tiles reales en jsdom): el mock expone "Poner pin" que emite la ubicación
+// como lo haría el mapa. El reverse geocode (nominatim) también se mockea.
 vi.mock("../api", () => ({
   fetchOnboardingSignals: vi.fn(),
   registerDistributor: vi.fn(),
@@ -27,6 +35,39 @@ vi.mock("../../auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+}));
+vi.mock("../../../shared/lib/geo/nominatim", () => ({
+  reverseGeocode: vi.fn(),
+}));
+vi.mock("../../../shared/ui/LocationPicker/MapLocationField", () => ({
+  MapLocationField: ({
+    latitude,
+    longitude,
+    address,
+    latitudeError,
+    longitudeError,
+    onLocationChange,
+  }: {
+    latitude: string;
+    longitude: string;
+    address?: string;
+    latitudeError?: string;
+    longitudeError?: string;
+    onLocationChange: (next: { latitude: number; longitude: number }) => void;
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onLocationChange({ latitude: 4.6097, longitude: -74.0631 })}
+      >
+        Poner pin
+      </button>
+      <output>{`${latitude},${longitude}`}</output>
+      {address !== undefined && address !== "" && <p>Dirección resuelta: {address}</p>}
+      {latitudeError !== undefined && <p>{latitudeError}</p>}
+      {longitudeError !== undefined && <p>{longitudeError}</p>}
+    </div>
+  ),
 }));
 
 const SIN_SENAL = { hasDistributor: false, hasStore: false };
@@ -70,9 +111,18 @@ function programarRefresh(conSenal: { hasDistributor: boolean; hasStore: boolean
     .mockResolvedValueOnce({ signals: conSenal, error: null });
 }
 
+// Flujo v2: clic en la opción = SELECCIÓN (no navega); [Seleccionar] avanza.
+async function elegir(user: ReturnType<typeof userEvent.setup>, opcion: string) {
+  await user.click(await screen.findByRole("radio", { name: opcion }));
+  await user.click(screen.getByRole("button", { name: "Seleccionar" }));
+}
+
 describe("OnboardingPage · pregunta de 2 niveles (T2.3, S-D3.0)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // El gate hidrata señales desde su caché en memoria por userId: cada
+    // test arranca sin ella para que el mock de fetch mande solo.
+    clearOnboardingSignalsCache();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
@@ -93,34 +143,139 @@ describe("OnboardingPage · pregunta de 2 niveles (T2.3, S-D3.0)", () => {
     cleanup();
   });
 
-  it("nivel 1 visible sin señales: ¿Qué sos? con [Distribuidor] | [Tienda] (S-D3.0)", async () => {
+  it("nivel 1 sin selección: título + copy base + radiogroup; [Seleccionar] deshabilitado (S-D3.0)", async () => {
     renderOnboarding();
 
-    expect(await screen.findByRole("heading", { name: "¿Qué sos?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Distribuidor" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Tienda" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/FAROX conecta a los distribuidores con las tiendas/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "¿Qué sos?" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Distribuidor" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Tienda" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeDisabled();
   });
 
-  it("Tienda abre el nivel 2 [Mi tienda] | [Trabajo en tienda]; Volver regresa al nivel 1", async () => {
+  it("[Seleccionar] sin selección NO hace nada: deshabilitado y sin navegación (requisito v2)", async () => {
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Tienda" }));
+    const seleccionar = await screen.findByRole("button", { name: "Seleccionar" });
+    expect(seleccionar).toBeDisabled();
+    await user.click(seleccionar);
 
-    expect(await screen.findByRole("heading", { name: "¿Ya tenés tu tienda?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Mi tienda" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Trabajo en tienda" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Contanos sobre tu relación con la tienda" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("elegir una opción actualiza el bloque superior y habilita [Seleccionar] SIN navegar", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+    expect(
+      await screen.findByText(/FAROX conecta a los distribuidores con las tiendas/),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "Distribuidor" }));
+
+    expect(
+      await screen.findByText(/Trabajás con productos y las tiendas te piden catálogo/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeEnabled();
+    // Elegir NO dispara la terminal: seguimos en el nivel 1.
+    expect(screen.getByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Registro de distribuidor" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("nivel 2: el bloque superior también cambia con la selección (Mi tienda) sin navegar", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+
+    await elegir(user, "Tienda");
+
+    expect(
+      await screen.findByRole("heading", { name: "Contanos sobre tu relación con la tienda" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Esto define qué podés hacer desde hoy/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeDisabled();
+
+    await user.click(screen.getByRole("radio", { name: "Mi tienda" }));
+
+    expect(await screen.findByText(/Sos responsable del negocio/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeEnabled();
+    // Seguimos en el nivel 2: la terminal [Mi tienda] todavía no abrió.
+    expect(screen.queryByRole("heading", { name: "Creá tu tienda" })).not.toBeInTheDocument();
+  });
+
+  it("Tienda + [Seleccionar] abre el nivel 2 [Mi tienda] | [Trabajo en tienda]; Volver regresa al nivel 1", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+
+    await user.click(await screen.findByRole("radio", { name: "Tienda" }));
+    await user.click(screen.getByRole("button", { name: "Seleccionar" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Contanos sobre tu relación con la tienda" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "¿Ya tenés tu tienda?" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Mi tienda" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Trabajo en tienda" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Volver" }));
 
-    expect(await screen.findByRole("heading", { name: "¿Qué sos?" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "¿Ya tenés tu tienda?" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Contanos sobre tu relación con la tienda" }),
+    ).not.toBeInTheDocument();
+    // La remonta por key={step} limpia la selección: hay que volver a elegir.
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeDisabled();
+  });
+
+  it("teclado: Tab entra al radiogroup y las flechas mueven y seleccionan", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+    await screen.findByRole("heading", { name: "Bienvenido a FAROX" });
+
+    await user.tab();
+    expect(screen.getByRole("radio", { name: "Distribuidor" })).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+    const tienda = screen.getByRole("radio", { name: "Tienda" });
+    expect(tienda).toHaveFocus();
+    expect(tienda).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Distribuidor" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeEnabled();
+
+    await user.keyboard("{ArrowLeft}");
+    expect(screen.getByRole("radio", { name: "Distribuidor" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Seleccionar" })).toBeEnabled();
+  });
+
+  it("[Salir] reutiliza el signOut del AppShell (AuthProvider) — nunca quedás atrapado", async () => {
+    const user = userEvent.setup();
+    renderOnboarding();
+
+    await user.click(await screen.findByRole("button", { name: "Salir" }));
+
+    expect(authApi.signOut).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2.4, S-D3.A)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Cada describe comparte el userId "u1": sin este clear, la caché en
+    // memoria del gate hidrataría señales del describe anterior.
+    clearOnboardingSignalsCache();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
@@ -142,7 +297,7 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Distribuidor" }));
+    await elegir(user, "Distribuidor");
     await user.type(screen.getByLabelText("Nombre"), "Distribuidora Sur");
     await user.type(screen.getByLabelText("NIT"), "900123456-7");
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
@@ -161,14 +316,14 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     expect(authApi.fetchPrivileges).toHaveBeenCalledTimes(2);
     // refresh() releyó la señal con distributor presente ⇒ sin rebote al guard.
     expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
   });
 
   it("sin NIT: error inline y CERO requests (0003:16 UNIQUE NOT NULL, idea:198)", async () => {
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Distribuidor" }));
+    await elegir(user, "Distribuidor");
     await user.type(screen.getByLabelText("Nombre"), "Distribuidora Sur");
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
 
@@ -185,7 +340,7 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Distribuidor" }));
+    await elegir(user, "Distribuidor");
     await user.type(screen.getByLabelText("Nombre"), "Distribuidora Sur");
     await user.type(screen.getByLabelText("NIT"), "900123456-7");
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
@@ -208,7 +363,7 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Distribuidor" }));
+    await elegir(user, "Distribuidor");
     await user.type(screen.getByLabelText("Nombre"), "Distribuidora Sur");
     await user.type(screen.getByLabelText("NIT"), "900123456-7");
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
@@ -224,6 +379,9 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
 describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Cada describe comparte el userId "u1": sin este clear, la caché en
+    // memoria del gate hidrataría señales del describe anterior.
+    clearOnboardingSignalsCache();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
@@ -237,6 +395,8 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
       rows: [{ id: 1, name: "Minimercado" }],
       error: null,
     });
+    // Best-effort por defecto: sin dirección resuelta (p_address ⇒ NULL).
+    vi.mocked(nominatim.reverseGeocode).mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -244,14 +404,15 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
   });
 
   async function abrirTerminalMiTienda(user: ReturnType<typeof userEvent.setup>) {
-    await user.click(await screen.findByRole("button", { name: "Tienda" }));
-    await user.click(await screen.findByRole("button", { name: "Mi tienda" }));
+    // Flujo v2: seleccionar (no navega) + [Seleccionar] en cada nivel.
+    await elegir(user, "Tienda");
+    await elegir(user, "Mi tienda");
     // El catálogo carga por useEffect: esperar el form evita tipear en un
     // select todavía no montado (lección #509 del patrón B6/B7).
     await screen.findByRole("button", { name: "Crear mi tienda" });
   }
 
-  it("sin ubicación: Zod bloquea con errores inline y CERO requests (0002:131 NOT NULL)", async () => {
+  it("sin pin en el mapa: Zod bloquea con errores inline y CERO requests (0002:131 NOT NULL)", async () => {
     const user = userEvent.setup();
     renderOnboarding();
     await abrirTerminalMiTienda(user);
@@ -265,7 +426,7 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
     expect(onboardingApi.createStore).not.toHaveBeenCalled();
   });
 
-  it("éxito: createStore con la ubicación obligatoria ⇒ setea la señal y entra al inicio", async () => {
+  it("éxito: createStore con la ubicación del pin ⇒ setea la señal y entra al inicio", async () => {
     programarRefresh(CON_TIENDA);
     const user = userEvent.setup();
     renderOnboarding();
@@ -273,22 +434,73 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
 
     await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
-    await user.type(screen.getByLabelText("Latitud (-90 a 90)"), "4.6097");
-    await user.type(screen.getByLabelText("Longitud (-180 a 180)"), "-74.0631");
+    // El MAPA es el input de coordenadas (mockeado): colocar el pin emite
+    // { latitude, longitude } — el contenedor los serializa a string.
+    await user.click(screen.getByRole("button", { name: "Poner pin" }));
+    expect(await screen.findByText("4.6097,-74.0631")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
 
     expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
     // Payload mínimo (sin duplicar el CRUD de B7): nombre, tipo y coordenadas
-    // tal como las tipeó el usuario — el EWKT lng-first se arma en la capa api
-    // (cubierto en api.test.ts).
+    // del pin — el EWKT lng-first se arma en la capa api (cubierto en
+    // api.test.ts). address queda "" sin resolver ⇒ p_address NULL.
     expect(onboardingApi.createStore).toHaveBeenCalledWith({
       name: "Tienda Centro",
       store_type_id: "1",
       lat: "4.6097",
       lng: "-74.0631",
+      address: "",
     });
     expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
+  });
+
+  it("pin → reverse geocode diferido: p_address viaja con la dirección resuelta", async () => {
+    // ADD (map picker): el pin dispara Nominatim tras el debounce (~800ms) y
+    // el resultado completa el form → createStore lo pasa a p_address (que
+    // antes era el null hardcodeado).
+    vi.mocked(nominatim.reverseGeocode).mockResolvedValue({
+      latitude: 4.6097,
+      longitude: -74.0631,
+      address: "Carrera 7 #1-1, Bogotá",
+    });
+    programarRefresh(CON_TIENDA);
+    const user = userEvent.setup();
+    renderOnboarding();
+    await abrirTerminalMiTienda(user);
+
+    await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
+    await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
+    await user.click(screen.getByRole("button", { name: "Poner pin" }));
+
+    expect(await screen.findByText("Dirección resuelta: Carrera 7 #1-1, Bogotá")).toBeInTheDocument();
+    expect(nominatim.reverseGeocode).toHaveBeenCalledWith(4.6097, -74.0631);
+    await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
+
+    expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
+    expect(onboardingApi.createStore).toHaveBeenCalledWith(
+      expect.objectContaining({ address: "Carrera 7 #1-1, Bogotá" }),
+    );
+  });
+
+  it("Nominatim falla (best-effort): p_address viaja NULL y la alta PROCEDE igual", async () => {
+    vi.mocked(nominatim.reverseGeocode).mockResolvedValue(null);
+    programarRefresh(CON_TIENDA);
+    const user = userEvent.setup();
+    renderOnboarding();
+    await abrirTerminalMiTienda(user);
+
+    await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
+    await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
+    await user.click(screen.getByRole("button", { name: "Poner pin" }));
+
+    expect(await screen.findByText("4.6097,-74.0631")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
+
+    expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
+    expect(onboardingApi.createStore).toHaveBeenCalledWith(
+      expect.objectContaining({ address: "" }),
+    );
   });
 
   it("alta denegada (42501): mensaje mapeado, sin falso éxito ni navegación (HARD-1)", async () => {
@@ -299,8 +511,8 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
 
     await user.type(screen.getByLabelText("Nombre"), "Tienda Centro");
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
-    await user.type(screen.getByLabelText("Latitud (-90 a 90)"), "4.6097");
-    await user.type(screen.getByLabelText("Longitud (-180 a 180)"), "-74.0631");
+    await user.click(screen.getByRole("button", { name: "Poner pin" }));
+    await screen.findByText("4.6097,-74.0631");
     await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -315,6 +527,9 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
 describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.C)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Cada describe comparte el userId "u1": sin este clear, la caché en
+    // memoria del gate hidrataría señales del describe anterior.
+    clearOnboardingSignalsCache();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
@@ -333,11 +548,11 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Tienda" }));
-    await user.click(await screen.findByRole("button", { name: "Trabajo en tienda" }));
+    await elegir(user, "Tienda");
+    await elegir(user, "Trabajo en tienda");
 
     expect(
-      await screen.findByText(/un administrador te va a asignar las tiendas/),
+      await screen.findByText(/no vas a ver pedidos ni stock/),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Entendido" }));
 
@@ -354,8 +569,8 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     const user = userEvent.setup();
     renderOnboarding();
 
-    await user.click(await screen.findByRole("button", { name: "Tienda" }));
-    await user.click(await screen.findByRole("button", { name: "Trabajo en tienda" }));
+    await elegir(user, "Tienda");
+    await elegir(user, "Trabajo en tienda");
     await user.click(await screen.findByRole("button", { name: "Entendido" }));
     expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
     cleanup();
@@ -364,7 +579,7 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     // el ack era solo de sesión ⇒ la pregunta aparece de nuevo.
     renderOnboarding();
 
-    expect(await screen.findByRole("heading", { name: "¿Qué sos?" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
   });
 
   it("tras la asignación del admin (my_store_ids no vacío) la pregunta NO vuelve", async () => {
@@ -378,6 +593,6 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     renderOnboarding();
 
     expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
   });
 });

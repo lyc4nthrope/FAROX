@@ -6,6 +6,7 @@ import type { RoleName } from "../features/auth/types";
 import * as authApi from "../features/auth/api";
 import * as distributorsApi from "../features/distributors/api";
 import * as onboardingApi from "../features/onboarding/api";
+import { clearOnboardingSignalsCache } from "../features/onboarding/signalsCache";
 import * as productsApi from "../features/products/api";
 import * as profileApi from "../features/profile/api";
 import * as storesApi from "../features/stores/api";
@@ -96,6 +97,9 @@ function renderRuta(ruta: string) {
 describe("AppRoutes (V0-2/V0-4/§S2)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // El gate derivado hidrata señales desde su caché en memoria por userId:
+    // cada test arranca sin ella para que el mock de fetch mande solo.
+    clearOnboardingSignalsCache();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     // D2: el canje PKCE del callback se resuelve "sin código" para que la
@@ -240,9 +244,32 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
       error: null,
     });
     renderRuta("/");
-    expect(await screen.findByRole("heading", { name: "¿Qué sos?" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
     expect(screen.queryByText("Sesión iniciada como")).not.toBeInTheDocument();
     expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(1);
+  });
+
+  it("D3/v2: durante el onboarding NO hay chrome de app: ni nav de entidades, ni Perfil, ni utilities del header", async () => {
+    // Regresión del bug original: la pregunta se renderizaba DENTRO del
+    // AppShell y mostraba header + nav (links muertos: el gate rebotaba).
+    // /onboarding ahora es hermana del bloque AppShell ⇒ sin chrome por
+    // construcción, y el guard redirige cualquier otra ruta a la pregunta.
+    conSesion("operador");
+    vi.mocked(onboardingApi.fetchOnboardingSignals).mockResolvedValue({
+      signals: { hasDistributor: false, hasStore: false },
+      error: null,
+    });
+    renderRuta("/");
+
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FAROX" })).toBeInTheDocument();
+    // Sin <nav> de secciones (aria-label "Secciones") ni UN solo link.
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Perfil" })).not.toBeInTheDocument();
+    // Utilities del header del AppShell: el toggle Menú no existe (el único
+    // [Salir] es el discreto del onboarding, requisito v2).
+    expect(screen.queryByRole("button", { name: "Menú" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Salir" })).toBeInTheDocument();
   });
 
   it("D3/T2.2: sesión CON señal (distribuidor) ⇒ la pregunta jamás aparece: entra al home", async () => {
@@ -254,14 +281,14 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     renderRuta("/");
     const main = await screen.findByRole("main");
     expect(main).toHaveTextContent("Sesión iniciada como");
-    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
   });
 
   it("D3/S-D3.0: con señal, visita directa a /onboarding ⇒ redirige al home (no reaparece)", async () => {
     renderRuta("/onboarding");
     const main = await screen.findByRole("main");
     expect(main).toHaveTextContent("Sesión iniciada como");
-    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
   });
 
   it("D3: anónimo ⇒ CERO llamadas de detección (el gate vive tras RequireAuth)", async () => {

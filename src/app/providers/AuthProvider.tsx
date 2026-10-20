@@ -142,7 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void refreshPrivileges();
         return;
       }
-      // SIGNED_IN / USER_UPDATED: (re)valida privilegios desde la DB (D2).
+      // SIGNED_IN / USER_UPDATED del MISMO usuario: el SDK de Supabase los
+      // re-emite en cada visibilitychange (auth-js GoTrueClient.js:4737
+      // registra su propio listener; :4770/:4779 llama _recoverAndRefresh;
+      // :4163-4167 notifica SIGNED_IN con la sesión vigente AUNQUE no esté
+      // cerca del expiry). applySession acá pondría status "loading" y
+      // RequireAuth desmontaría toda la app en cada cambio de pestaña — el
+      // usuario veía la página "recargarse". Mismo userId ⇒ idéntico al
+      // camino TOKEN_REFRESHED: revalidación NO destructiva.
+      if (currentUserIdRef.current === session.userId) {
+        void refreshPrivileges();
+        return;
+      }
+      // userId distinto (cambio de cuenta real) o primera sesión ⇒ destructivo.
       void applySession(session);
     });
 

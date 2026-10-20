@@ -12,6 +12,10 @@ import {
   type OnboardingPhase,
 } from "../context";
 import { deriveNeedsOnboarding } from "../detection";
+import {
+  readCachedOnboardingSignals,
+  writeCachedOnboardingSignals,
+} from "../signalsCache";
 import type { OnboardingSignals } from "../types";
 
 // Guard DERIVADO post-RequireAuth (R-D3.1 · design #538 §5.2 y §8):
@@ -25,8 +29,21 @@ import type { OnboardingSignals } from "../types";
 
 function OnboardingProvider({ children }: { children: ReactNode }) {
   const { userId } = useAuth();
-  const [phase, setPhase] = useState<OnboardingPhase>("loading");
-  const [signals, setSignals] = useState<OnboardingSignals | null>(null);
+  // Hidratación desde la caché en memoria (signalsCache): un remount del
+  // layout (p. ej. el flicker de sesión de un visibilitychange) pinta el
+  // Outlet de INMEDIATO con la última señal conocida y revalida en
+  // background — jamás vuelve a blanquear la app con "Cargando tu perfil…".
+  // Seguridad contra caché vieja: solo hidrata respuestas exitosas del
+  // MISMO userId, y el fetch de fondo SIEMPRE corre y pisa estado + caché:
+  //   · señal vieja "sin tienda" ⇒ solo demora la entrada hasta el refresh;
+  //   · señal vieja "con tienda" ⇒ saltea la pregunta, jamás bloquea al
+  //     usuario (y el refresh la corrige en el mismo montaje).
+  // Arranque frío SIN caché ⇒ phase "loading" real, igual que siempre.
+  const cachedSignalsAtMount = userId === null ? null : readCachedOnboardingSignals(userId);
+  const [phase, setPhase] = useState<OnboardingPhase>(
+    cachedSignalsAtMount !== null ? "ready" : "loading",
+  );
+  const [signals, setSignals] = useState<OnboardingSignals | null>(cachedSignalsAtMount);
   const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -36,7 +53,14 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
     // solo por el tipo de AuthProvider.
     if (userId === null) return;
     let cancelled = false;
-    setPhase("loading");
+    const cached = readCachedOnboardingSignals(userId);
+    if (cached !== null) {
+      setSignals(cached);
+      setError(null);
+      setPhase("ready");
+    } else {
+      setPhase("loading");
+    }
     void (async () => {
       try {
         const result = await fetchOnboardingSignals(userId);
@@ -44,17 +68,29 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
         if (result.error !== null) {
           // Detección fallida ⇒ NUNCA adivinar (ni pasar al app ni preguntar):
           // banner mapeado + reintento explícito (HARD-1, sin texto crudo).
-          setError(mapError(result.error));
-          setPhase("error");
+          // Excepción con caché válida: el refresco de FONDO fallando no
+          // echa al usuario a una pantalla de error — se conserva la última
+          // respuesta conocida del mismo usuario.
+          if (cached === null) {
+            setError(mapError(result.error));
+            setPhase("error");
+          }
           return;
+        }
+        // La capa api garantiza signals<>null cuando error===null; el guard
+        // además deja el tipo cerrado para la caché.
+        if (result.signals !== null) {
+          writeCachedOnboardingSignals(userId, result.signals);
         }
         setSignals(result.signals);
         setError(null);
         setPhase("ready");
       } catch (thrown) {
         if (cancelled) return;
-        setError(mapError(thrown));
-        setPhase("error");
+        if (cached === null) {
+          setError(mapError(thrown));
+          setPhase("error");
+        }
       }
     })();
     return () => {
@@ -73,6 +109,9 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
         setError(mapError(result.error));
         setPhase("error");
         return;
+      }
+      if (result.signals !== null) {
+        writeCachedOnboardingSignals(userId, result.signals);
       }
       setSignals(result.signals);
       setError(null);
