@@ -4,6 +4,18 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      lint-stack:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+      vite-stack:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
