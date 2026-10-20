@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { CallbackPage, LoginPage, RegisterPage } from "../features/auth";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { ProductFormPage, ProductsPage } from "../features/products";
+import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
 import { StoreFormPage, StoresPage } from "../features/stores";
 import type { RoleName } from "../features/auth/types";
@@ -45,76 +46,88 @@ export function AppRoutes() {
           RequireAuth/AppShell como /login y /register. */}
       <Route path="/auth/callback" element={<CallbackPage />} />
       <Route element={<RequireAuth />}>
-        <Route element={<AppShell />}>
-          <Route path="/" element={<HomePage />} />
-          <Route
-            path="/distributors"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <DistributorsPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/distributors/new"
-            element={
-              <RequireRole roles={ADMIN_ONLY}>
-                <DistributorFormPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/distributors/:id"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <DistributorFormPage />
-              </RequireRole>
-            }
-          />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route
-            path="/products/new"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <ProductFormPage />
-              </RequireRole>
-            }
-          />
-          <Route path="/products/:id" element={<ProductFormPage />} />
-          <Route
-            path="/stores"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <StoresPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/stores/new"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <StoreFormPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/stores/:id"
-            element={
-              <RequireRole roles={ADMIN_OR_OPERATOR}>
-                <StoreFormPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/users"
-            element={
-              <RequireRole roles={ADMIN_ONLY}>
-                <RoutePlaceholder title="Usuarios" batch="B4" />
-              </RequireRole>
-            }
-          />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="*" element={<NotFound />} />
+        {/* OnboardingGate (D3, R-D3.1): layout DERIVADO post-RequireAuth —
+            RequireAuth/RequireRole quedan intactos. Si la sesión no tiene
+            tienda NI distributor (señales my_store_ids/my_distributor_id +
+            stores.created_by), cualquier ruta autenticada intercepta hacia
+            /onboarding; con señal presente, la pregunta jamás aparece
+            (S-D3.0). D2 llega de /auth/callback a "/" y el guard intercepta
+            acá (design #538 §8). */}
+        <Route element={<OnboardingGate />}>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<HomePage />} />
+            {/* /onboarding: pantalla propia de la pregunta de 2 niveles
+                (hermana de "/" dentro del árbol autenticado, T2.7). */}
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route
+              path="/distributors"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <DistributorsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/distributors/new"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <DistributorFormPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/distributors/:id"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <DistributorFormPage />
+                </RequireRole>
+              }
+            />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route
+              path="/products/new"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <ProductFormPage />
+                </RequireRole>
+              }
+            />
+            <Route path="/products/:id" element={<ProductFormPage />} />
+            <Route
+              path="/stores"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <StoresPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/stores/new"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <StoreFormPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/stores/:id"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <StoreFormPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RoutePlaceholder title="Usuarios" batch="B4" />
+                </RequireRole>
+              }
+            />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

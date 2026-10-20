@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoleName } from "../features/auth/types";
 import * as authApi from "../features/auth/api";
 import * as distributorsApi from "../features/distributors/api";
+import * as onboardingApi from "../features/onboarding/api";
 import * as productsApi from "../features/products/api";
 import * as profileApi from "../features/profile/api";
 import * as storesApi from "../features/stores/api";
@@ -51,6 +52,15 @@ vi.mock("../features/products/api", () => ({
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
+}));
+// D3 (T2.2/T2.7): el guard derivado OnboardingGate consulta la feature
+// onboarding — mockeada COMPLETA como el resto (sin esto, el módulo real
+// importa el cliente supabase, que valida el env en el arranque (V0-1)).
+vi.mock("../features/onboarding/api", () => ({
+  fetchOnboardingSignals: vi.fn(),
+  registerDistributor: vi.fn(),
+  createStore: vi.fn(),
+  fetchStoreTypes: vi.fn(),
 }));
 // B7 (T7.2): /stores ya no es placeholder — el api de la feature se mockea
 // COMPLETO como en el resto de los tests: sin esto, el módulo real importa el
@@ -129,6 +139,13 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     vi.mocked(storesApi.fetchStoreGeo).mockResolvedValue({ geo: null, error: null });
     vi.mocked(storesApi.fetchStoreTypes).mockResolvedValue({ rows: [], error: null });
     conSesion("admin");
+    // D3 (T2.2): por defecto la sesión YA tiene señal (tienda propia) ⇒ el
+    // guard derivado deja pasar al shell — así los tests preexistentes
+    // conservan su significado. Los casos "sin señal" la mockean a pelo.
+    vi.mocked(onboardingApi.fetchOnboardingSignals).mockResolvedValue({
+      signals: { hasDistributor: false, hasStore: true },
+      error: null,
+    });
   });
 
   afterEach(() => {
@@ -212,5 +229,45 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     renderRuta("/login");
     const main = await screen.findByRole("main");
     expect(main).toHaveTextContent("Sesión iniciada como Administrador");
+  });
+
+  it("D3/T2.2: sesión sin tienda ni distributor ⇒ CUALQUIER ruta intercepta a /onboarding", async () => {
+    // El guard derivado va tras RequireAuth: llegás autenticado a "/" (p. ej.
+    // tras /auth/callback de D2, design #538 §8) y te manda a la pregunta.
+    conSesion("operador");
+    vi.mocked(onboardingApi.fetchOnboardingSignals).mockResolvedValue({
+      signals: { hasDistributor: false, hasStore: false },
+      error: null,
+    });
+    renderRuta("/");
+    expect(await screen.findByRole("heading", { name: "¿Qué sos?" })).toBeInTheDocument();
+    expect(screen.queryByText("Sesión iniciada como")).not.toBeInTheDocument();
+    expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(1);
+  });
+
+  it("D3/T2.2: sesión CON señal (distribuidor) ⇒ la pregunta jamás aparece: entra al home", async () => {
+    conSesion("operador");
+    vi.mocked(onboardingApi.fetchOnboardingSignals).mockResolvedValue({
+      signals: { hasDistributor: true, hasStore: false },
+      error: null,
+    });
+    renderRuta("/");
+    const main = await screen.findByRole("main");
+    expect(main).toHaveTextContent("Sesión iniciada como");
+    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+  });
+
+  it("D3/S-D3.0: con señal, visita directa a /onboarding ⇒ redirige al home (no reaparece)", async () => {
+    renderRuta("/onboarding");
+    const main = await screen.findByRole("main");
+    expect(main).toHaveTextContent("Sesión iniciada como");
+    expect(screen.queryByRole("heading", { name: "¿Qué sos?" })).not.toBeInTheDocument();
+  });
+
+  it("D3: anónimo ⇒ CERO llamadas de detección (el gate vive tras RequireAuth)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    renderRuta("/");
+    expect(await screen.findByRole("heading", { name: "Iniciar sesión" })).toBeInTheDocument();
+    expect(onboardingApi.fetchOnboardingSignals).not.toHaveBeenCalled();
   });
 });
