@@ -74,6 +74,13 @@ describe("LoginPage (§S2 fila /login)", () => {
     expect(screen.queryByText(/Invalid login credentials/)).not.toBeInTheDocument();
   });
 
+  it("cross-link al registro (D1): Link a la ruta pública /register", () => {
+    renderLogin();
+    expect(
+      screen.getByRole("link", { name: "¿No tenés cuenta? Registrate" }),
+    ).toHaveAttribute("href", "/register");
+  });
+
   it("datos válidos: llama a signInWithPassword con el formulario", async () => {
     const user = userEvent.setup();
     renderLogin();

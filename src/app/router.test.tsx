@@ -17,6 +17,10 @@ vi.mock("../features/auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+  // D1 (T1.x): /register usa signUp y reenvío de confirmación — el barrel
+  // del router ya las importa, así que el mock debe exportarlas COMPLETO.
+  signUp: vi.fn(),
+  resendConfirmationEmail: vi.fn(),
 }));
 // B5 (T5.2): /distributors ya no es placeholder — el api de la feature se
 // mockea COMPLETO como en el resto de los tests: sin esto, el módulo real
@@ -128,6 +132,18 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     vi.mocked(authApi.getSession).mockResolvedValue(null);
     renderRuta("/stores");
     expect(await screen.findByText("Iniciar sesión")).toBeInTheDocument();
+    expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
+  });
+
+  it("anónimo en /register: formulario de registro — ruta PÚBLICA sin RequireAuth (D1)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    renderRuta("/register");
+    // El form monta sin sesión: nunca cae al guard de /login.
+    expect(
+      await screen.findByRole("heading", { name: "Crear tu cuenta" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
     expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
   });
 

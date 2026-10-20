@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { signInWithPassword } from "../api";
@@ -79,6 +79,12 @@ export function LoginPage() {
           onSubmit={handleSubmit}
         />
       </div>
+      {/* Cross-link Login ↔ Register (D1): /register es ruta pública. */}
+      <p className="mt-4 text-sm text-gray-600">
+        <Link to="/register" className="font-medium text-gray-900 underline">
+          ¿No tenés cuenta? Registrate
+        </Link>
+      </p>
     </div>
   );
 }

@@ -54,6 +54,49 @@ export async function signInWithPassword(
   return { error };
 }
 
+// Resultado del registro (D1). needsConfirmation = true cuando signUp NO
+// devuelve sesión: con "Confirm email" activo (D44) el flujo primario es
+// "esperar confirmación", no una sesión (instalado: auth-js GoTrueClient.d.ts
+// 292-293 — "If Confirm email is enabled, a user is returned but session is
+// null"). Si la confirmación la desactiva un humano, llega sesión y la
+// página redirige al home.
+export interface SignUpOutcome {
+  needsConfirmation: boolean;
+  error: AuthOperationError | null;
+}
+
+// ÚNICA vía de registro (no hay RPC custom): supabase.auth.signUp dispara el
+// INSERT en auth.users y el trigger on_auth_user_created (0004:397-400) crea
+// public.users con role operador ANTES de la confirmación de email.
+// fullName viaja en options.data.full_name: handle_new_user() lo lee de
+// raw_user_meta_data ->> 'full_name' (0004:336) — sin él, el nombre visible
+// degrada silenciosamente al local-part del email.
+export async function signUp(
+  email: string,
+  password: string,
+  fullName: string,
+): Promise<SignUpOutcome> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName } },
+  });
+  if (error !== null) {
+    return { needsConfirmation: false, error };
+  }
+  return { needsConfirmation: data.session === null, error: null };
+}
+
+// Reenvío del email de confirmación (type "signup" es el único válido acá;
+// ResendParams en auth-js lib/types.ts:747-749, VERIFICADO contra las types
+// instaladas de @supabase/supabase-js 2.118.0 / auth-js).
+export async function resendConfirmationEmail(
+  email: string,
+): Promise<{ error: AuthOperationError | null }> {
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  return { error };
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error !== null) {

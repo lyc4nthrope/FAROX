@@ -1,6 +1,6 @@
 import { Route, Routes } from "react-router-dom";
 
-import { LoginPage } from "../features/auth";
+import { LoginPage, RegisterPage } from "../features/auth";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { ProfilePage } from "../features/profile";
@@ -37,6 +37,9 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* /register: ruta PÚBLICA (D1) — el registro no exige sesión; queda
+          FUERA del layout RequireAuth/AppShell como /login. */}
+      <Route path="/register" element={<RegisterPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<HomePage />} />
