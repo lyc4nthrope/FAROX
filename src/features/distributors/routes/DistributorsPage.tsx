@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
+
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useList } from "../../../shared/hooks/useList";
-import { fetchDistributors } from "../api";
+import { fetchDistributorUserCounts, fetchDistributors } from "../api";
 import { DistributorList } from "../components/DistributorList";
-import type { DistributorListRow } from "../types";
+import type { DistributorListRow, DistributorUserCounts } from "../types";
 
 // Contenedor de /distributors (§S2 fila Distributor list · DIST-01, spec #483
 // S4 · idea:218): lista paginada vía useList (D4 — refetch al re-entrar la
@@ -13,6 +15,31 @@ export function DistributorsPage() {
   const { role } = useAuth();
   const list = useList<DistributorListRow>(fetchDistributors);
 
+  // sdd/admin-console T-E2 (in-scope #5): columna admin «Usuarios asignados».
+  // Query de APOYO independiente de la lista (patrón FLAG-4 de UsersPage):
+  // UNA sola lectura de users con el conteo por distributor_id en el cliente
+  // — sin N+1. Solo admin la dispara (el operador no puede leer users ⇒
+  // undefined = la columna no existe); si falla, queda null ⇒ celdas «—».
+  const [userCounts, setUserCounts] = useState<
+    DistributorUserCounts | null | undefined
+  >(role === "admin" ? null : undefined);
+
+  useEffect(() => {
+    if (role !== "admin") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await fetchDistributorUserCounts();
+        if (!cancelled) setUserCounts(result.counts);
+      } catch {
+        if (!cancelled) setUserCounts(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role]);
+
   return (
     <section>
       <h1 className="text-xl font-semibold">Distribuidores</h1>
@@ -21,6 +48,7 @@ export function DistributorsPage() {
         loading={list.loading}
         error={list.error}
         canWrite={role === "admin"}
+        userCounts={userCounts}
       />
     </section>
   );

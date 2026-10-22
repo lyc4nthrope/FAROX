@@ -1,5 +1,6 @@
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useList } from "../../../shared/hooks/useList";
+import { STORE_CAP_MESSAGE } from "../../../shared/lib/errors/mapError";
 import { fetchStores, type StoreListScope } from "../api";
 import { StoreList } from "../components/StoreList";
 import type { StoreListRow } from "../types";
@@ -17,13 +18,24 @@ import type { StoreListRow } from "../types";
 // El scope es estable por mount porque la ruta /stores está envuelta en
 // RequireRole: el rol ya resolvió antes de montar este contenedor.
 export function StoresPage() {
-  const { role } = useAuth();
+  const { role, premium } = useAuth();
   const scope: StoreListScope = role === "operador" ? "mine" : "all";
   const list = useList<StoreListRow>((query) => fetchStores(query, scope));
+
+  // sdd/admin-console T-E2 (in-scope #5 de la propuesta): hint proactivo del
+  // tope D34 con gate premium D7 — is_premium() = premium OR admin
+  // (0004:39-48), así que solo la sesión SIN premium y SIN rol admin está
+  // sujeta al cap (1 activa) y ve el copy. El mensaje sale de mapError.ts
+  // (STORE_CAP_MESSAGE): misma string que vería si el server levanta el
+  // RAISE — sin duplicar copy.
+  const sujetaAlTope = !premium && role !== "admin";
 
   return (
     <section>
       <h1 className="text-xl font-semibold">Tiendas</h1>
+      {sujetaAlTope && (
+        <p className="mt-2 text-sm text-gray-600">{STORE_CAP_MESSAGE}</p>
+      )}
       <StoreList
         rows={list.rows}
         loading={list.loading}

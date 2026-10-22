@@ -1,0 +1,65 @@
+-- ============================================================================
+-- FAROX — user_stores, read path (0014): GRANT SELECT (D2a)
+-- Spec:   sdd/admin-console (#598) — ADM-1 (1.1..1.5)
+-- Design: #599 §4 (lote A) · §7 (D2a = alternativa de 1 línea a la RPC
+--         nueva get_user_stores)
+-- Tasks:  #600 T-A1 (archivo) · T-A3 (tests de contenido, sin DB)
+--
+-- QUÉ HACE — EXACTAMENTE UNA sentencia, al final de este archivo:
+--   GRANT SELECT ON public.user_stores TO authenticated;
+-- NO es un cambio de esquema (sin tabla, sin columna, sin enum): solo
+-- restituye un privilegio de lectura sobre una tabla existente. Por eso la
+-- autoridad de DDL de Base de datos FAROX.md §9 queda acá como deuda de
+-- documentación y NO como bloqueo (ver R1 abajo).
+--
+-- CONTEXTO — activa una policy PRE-EXISTENTE; no crea nada nuevo:
+--   · user_stores_select existe desde 0006 (0006:308-310):
+--       CREATE POLICY user_stores_select ON public.user_stores
+--         FOR SELECT TO authenticated
+--         USING (user_id = auth.uid() OR public.my_role() = 'admin');
+--     y quedó INACTIVA A PROPÓSITO: la nota (2) del encabezado de 0006:16-19
+--     dice "la policy queda inactiva a propósito y se activa si algún día se
+--     grantea SELECT". Este archivo ES ese "algún día".
+--   · El REVOKE SELECT que este GRANT deja sin efecto para authenticated
+--     vive en 0006:373 (REVOKE SELECT ON public.user_stores, public.order_items
+--     FROM authenticated) — order_items NO se toca acá.
+--   · Efecto por rol (la policy manda; el grant solo habilita la lectura):
+--     - no-admins: SOLO sus propias filas (user_id = auth.uid());
+--     - admin: TODAS las filas de asignación;
+--     - anon: NINGUNA (nunca recibió el grant; 0011:545-547 lo revoca
+--       explícitamente además del lockdown general de anon).
+--   · Escritura SIN cambio: el DML sigue revocado a authenticated
+--     (0006:351-357) — la asignación de tiendas pasa SOLO por
+--     assign_user_stores(); este archivo no abre ninguna escritura.
+--
+-- COMPATIBILIDAD DE LOS VERIFY SCRIPTS (leídos para confirmar, NO tocados):
+--   · 0008 V5 (0008:179-183) chequea SOLO privilege_type IN
+--     ('INSERT','UPDATE','DELETE') sobre las 15 tablas RPC-only: un GRANT de
+--     SELECT no matchea ese filtro ⇒ V5 sigue emitiendo OK.
+--   · 0012 H1.5 (0012:402-405) chequea SOLO los privilegios del ROL anon
+--     (has_table_privilege('anon', ...)) sobre 25 tablas: un GRANT a
+--     authenticated no altera los privilegios de anon ⇒ H1.5 sigue OK.
+--   (Chequeo de texto en este change; correrlos contra la DB viva es paso
+--   manual del lote F / T-F3 — ADM-1.4.)
+--
+-- DEUDA DOC (R1): Base de datos FAROX.md §9 (línea 911) exige anotar los
+--   cambios PRIMERO en el .md ("este documento es la especificación base;
+--   cambios futuros se anotan aquí primero"). Editar cualquier .md NO está
+--   autorizado en el change admin-console ⇒ la deuda queda registrada EN
+--   ESTE header y diferida a un change "docs-sync" posterior (design #599
+--   §6, R1). Se acepta la deriva de 1-2 renglones mientras tanto.
+--
+-- APLICACIÓN: paso MANUAL en el SQL editor de Supabase (invariante I4),
+--   antes de la demo del lote B. Sin este GRANT las lecturas de user_stores
+--   devuelven 42501 y el front degrada con mensaje amigable, nunca crash.
+-- ============================================================================
+
+GRANT SELECT ON public.user_stores TO authenticated;
+
+-- ============================================================================
+-- INVERSE (comentado — bloque convención, 0009:29). NO ejecutar sin revisión.
+-- Restaura el estado exacto pre-0014: SELECT vuelve a estar revocado para
+-- authenticated (0006:373) y la policy user_stores_select queda inactiva
+-- de nuevo, tal como la documenta 0006:16-19.
+--   REVOKE SELECT ON public.user_stores FROM authenticated;
+-- ============================================================================

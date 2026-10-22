@@ -9,9 +9,14 @@ import { roleLabel, visibleNavItems } from "./navigation";
 // (no entradas de entidad), así el "solo productos" del distribuidor se
 // cumple literalmente en el nav.
 export function AppShell() {
-  const { role, signOut } = useAuth();
+  const { role, premium, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const items = visibleNavItems(role);
+  // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
+  // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
+  // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la
+  // insignia: está exento del gate premium.
+  const verInsigniaPremium = premium || role === "admin";
 
   return (
     <div className="min-h-dvh bg-white text-gray-900">
@@ -23,6 +28,11 @@ export function AppShell() {
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
             {roleLabel(role)}
           </span>
+          {verInsigniaPremium && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+              Premium
+            </span>
+          )}
           <div className="ml-auto flex items-center gap-3 text-sm">
             <Link to="/profile" className="text-gray-700 hover:text-gray-900 hover:underline">
               Perfil

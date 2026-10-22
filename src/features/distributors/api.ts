@@ -6,6 +6,7 @@ import {
   type ContactPreference,
   type DistributorListRow,
   type DistributorRow,
+  type DistributorUserCounts,
 } from "./types";
 
 // distributors tiene CRUD DIRECTO por tabla (T5.1 / DIST-1, spec #483 S4):
@@ -67,6 +68,34 @@ export async function fetchDistributors(
   }
   const rows = Array.isArray(data) ? data.map(normalizeListRow) : [];
   return { rows, count, error: null };
+}
+
+// sdd/admin-console T-E2 (in-scope #5): query de APOYO de la columna admin
+// «Usuarios asignados» — UNA sola lectura de users (policy users_select
+// admin 0006:202-204) con el conteo por distributor_id hecho en el cliente:
+// SIN N+1 (nunca una query por fila de la lista) y sin tocar la query de la
+// lista. Si falla, la columna degrada a «—» y la lista no se rompe (mismo
+// patrón de degradación que fetchUserStoreCounts en features/users/api.ts).
+export async function fetchDistributorUserCounts(): Promise<{
+  counts: DistributorUserCounts | null;
+  error: { message: string } | null;
+}> {
+  const { data, error } = await supabase.from("users").select("distributor_id");
+  if (error !== null) {
+    return { counts: null, error };
+  }
+  const counts: DistributorUserCounts = {};
+  if (Array.isArray(data)) {
+    for (const raw of data) {
+      const distributorId = (raw as { distributor_id?: unknown }).distributor_id;
+      // distributor_id null (usuarios sin alcance) no cuenta para ningún
+      // distributor; cualquier otra forma se ignora en vez de romper.
+      if (typeof distributorId === "number") {
+        counts[distributorId] = (counts[distributorId] ?? 0) + 1;
+      }
+    }
+  }
+  return { counts, error: null };
 }
 
 // .single(): sin fila (o una policy que la oculta) ⇒ PGRST116, que la UI

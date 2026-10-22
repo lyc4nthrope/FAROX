@@ -3,24 +3,31 @@ import { describe, expect, it } from "vitest";
 import { firstAllowedRoute, roleLabel, visibleNavItems } from "./navigation";
 
 describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () => {
-  it("admin ve las 4 entradas de entidad", () => {
+  it("admin ve las 7 entradas (4 entidades + Roles + Catálogos + Auditoría, sdd/admin-console T-C5/T-D2)", () => {
     expect(visibleNavItems("admin").map((item) => item.to)).toEqual([
       "/distributors",
       "/products",
       "/stores",
       "/users",
+      "/roles",
+      "/catalogs",
+      "/audit",
     ]);
   });
 
-  it("operador: distribuidores/productos/tiendas y SIN /users (V0-5)", () => {
-    expect(visibleNavItems("operador").map((item) => item.to)).toEqual([
-      "/distributors",
-      "/products",
-      "/stores",
-    ]);
+  it("operador: distribuidores/productos/tiendas y SIN /users ni rutas admin nuevas (ADM-12.2)", () => {
+    const visibles = visibleNavItems("operador").map((item) => item.to);
+    expect(visibles).toEqual(["/distributors", "/products", "/stores"]);
+    // La matriz negativa es la regla de negocio: ninguna entrada admin se
+    // cuela por agregar items al nav. /audit es solo-admin: audit_read
+    // exige my_role() = 'admin' (0006:330-332) — T-D2 / ADM-12.2.
+    expect(visibles).not.toContain("/users");
+    expect(visibles).not.toContain("/roles");
+    expect(visibles).not.toContain("/catalogs");
+    expect(visibles).not.toContain("/audit");
   });
 
-  it("distribuidor: solo lectura de productos (V0-5)", () => {
+  it("distribuidor: solo lectura de productos (V0-5) — las rutas admin nuevas tampoco", () => {
     expect(visibleNavItems("distribuidor").map((item) => item.to)).toEqual(["/products"]);
   });
 

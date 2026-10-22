@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { EmptyState, ErrorBanner } from "../../../shared/ui";
-import type { DistributorListRow } from "../types";
+import type { DistributorListRow, DistributorUserCounts } from "../types";
 
 export interface DistributorListProps {
   rows: DistributorListRow[];
@@ -11,12 +11,22 @@ export interface DistributorListProps {
   // SEC-01 (idea:119): solo admin escribe; operador es solo lectura. Ocultar
   // es UX, no seguridad (idea:134) — el enforcement vive en las policies.
   canWrite: boolean;
+  // sdd/admin-console T-E2: columna admin «Usuarios asignados». Ausencia del
+  // prop (undefined) = sin columna (sesión no-admin); null = la query de
+  // apoyo falló ⇒ celdas «—» sin romper la lista (mismo fallback FLAG-4).
+  userCounts?: DistributorUserCounts | null;
 }
 
 // Presentacional pura (D1): listado de distribuidores (§S2 fila /distributors,
 // DIST-01 FAROX-72). Vacío ⇒ EmptyState; error ⇒ ErrorBanner — nunca ambos
 // (vacío ≠ error, D4).
-export function DistributorList({ rows, loading, error, canWrite }: DistributorListProps) {
+export function DistributorList({
+  rows,
+  loading,
+  error,
+  canWrite,
+  userCounts,
+}: DistributorListProps) {
   return (
     <div className="mt-4">
       {canWrite && (
@@ -48,6 +58,9 @@ export function DistributorList({ rows, loading, error, canWrite }: DistributorL
               <th className="py-2 font-medium">Nombre</th>
               <th className="py-2 font-medium">NIT</th>
               <th className="py-2 font-medium">Estado</th>
+              {userCounts !== undefined && (
+                <th className="py-2 font-medium">Usuarios asignados</th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -60,6 +73,11 @@ export function DistributorList({ rows, loading, error, canWrite }: DistributorL
                 </td>
                 <td className="py-2 text-gray-700">{row.nit}</td>
                 <td className="py-2 text-gray-700">{row.is_active ? "Activo" : "Inactivo"}</td>
+                {userCounts !== undefined && (
+                  <td className="py-2 text-gray-700">
+                    {userCounts === null ? "—" : String(userCounts[row.id] ?? 0)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

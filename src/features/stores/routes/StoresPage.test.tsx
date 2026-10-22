@@ -52,9 +52,9 @@ const ERROR_RLS = { code: "42501", message: "permission denied for table stores_
 // admin|operador — distribuidor es ✘ total en tiendas (SEC-01 idea:114, §S2
 // "distribuidor NO"). RequireRole además resuelve el rol ANTES de montar el
 // contenedor, que es lo que hace estable el scope mine/all.
-function renderPagina(role: RoleName) {
+function renderPagina(role: RoleName, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
-  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium });
   return render(
     <MemoryRouter initialEntries={["/stores"]}>
       <AuthProvider>
@@ -150,5 +150,29 @@ describe("StoresPage (STORE-2 · §S2 fila /stores)", () => {
       "No tenés permisos para esta operación.",
     );
     expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
+  });
+
+  // sdd/admin-console T-E2 — hint del tope D34 con gate premium D7
+  // (is_premium() = premium OR admin, 0004:39-48).
+  it("T-E2: sesión SIN premium y SIN rol admin ⇒ el hint del tope D34 es visible", async () => {
+    renderPagina("operador");
+
+    expect(
+      await screen.findByText("Alcanzaste el tope de tiendas (1 activa; 3 con premium)."),
+    ).toBeInTheDocument();
+  });
+
+  it("T-E2: sesión premium ⇒ exenta del tope (D7) ⇒ sin hint", async () => {
+    renderPagina("operador", true);
+
+    expect(await screen.findByRole("link", { name: "Tienda Centro" })).toBeInTheDocument();
+    expect(screen.queryByText(/Alcanzaste el tope/)).not.toBeInTheDocument();
+  });
+
+  it("T-E2: admin sin premium ⇒ también exento (D7 = premium OR admin) ⇒ sin hint", async () => {
+    renderPagina("admin");
+
+    expect(await screen.findByRole("link", { name: "Nueva tienda" })).toBeInTheDocument();
+    expect(screen.queryByText(/Alcanzaste el tope/)).not.toBeInTheDocument();
   });
 });

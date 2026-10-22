@@ -368,8 +368,10 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     await user.type(screen.getByLabelText("NIT"), "900123456-7");
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
 
+    // T-B1 (sdd/admin-console): 23505 YA tiene mapping explícito en mapError
+    // ⇒ el mensaje es el friendly de duplicateName, nunca el crudo del constraint.
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ocurrió un error inesperado. Intentá de nuevo.",
+      "Ya existe un registro con ese nombre.",
     );
     expect(screen.queryByText(/duplicate key/)).not.toBeInTheDocument();
     expect(screen.queryByText("llegaste al inicio")).not.toBeInTheDocument();

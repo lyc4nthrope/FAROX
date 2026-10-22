@@ -16,9 +16,9 @@ vi.mock("../../features/auth/api", () => ({
   fetchPrivileges: vi.fn(),
 }));
 
-function renderShell(role: RoleName | null) {
+function renderShell(role: RoleName | null, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
-  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium });
   return render(
     <MemoryRouter initialEntries={["/products"]}>
       <AuthProvider>
@@ -83,5 +83,29 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
+  // sdd/admin-console T-E1 — ADM-11: el `premium` del contexto se vuelve
+  // visible en el shell junto al badge de rol, con la gate D7 (is_premium()
+  // = premium OR admin, 0004:39-48).
+  it("ADM-11.1: premium true ⇒ insignia «Premium» visible junto al rol", async () => {
+    renderShell("operador", true);
+
+    expect(await screen.findByText("Premium")).toBeInTheDocument();
+    expect(screen.getByText("Operador")).toBeInTheDocument();
+  });
+
+  it("ADM-11.2: premium false sin rol admin ⇒ sin insignia", async () => {
+    renderShell("operador", false);
+
+    expect(await screen.findByRole("link", { name: "Productos" })).toBeInTheDocument();
+    expect(screen.queryByText("Premium")).not.toBeInTheDocument();
+  });
+
+  it("ADM-11.3: admin con premium false ⇒ la insignia SÍ se ve (exención D7)", async () => {
+    renderShell("admin", false);
+
+    expect(await screen.findByText("Premium")).toBeInTheDocument();
+    expect(screen.getByText("Administrador")).toBeInTheDocument();
   });
 });

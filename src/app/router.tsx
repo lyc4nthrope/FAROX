@@ -1,16 +1,20 @@
 import { Route, Routes } from "react-router-dom";
 
 import { CallbackPage, LoginPage, RegisterPage } from "../features/auth";
+import { AuditPage } from "../features/audit";
+import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
+import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
+import { RoleFormPage, RolesPage } from "../features/roles";
 import { StoreFormPage, StoresPage } from "../features/stores";
+import { UserDetailPage, UsersPage } from "../features/users";
 import type { RoleName } from "../features/auth/types";
 import { RequireAuth } from "./guards/RequireAuth";
 import { RequireRole } from "./guards/RequireRole";
 import { NotFound } from "./NotFound";
-import { RoutePlaceholder } from "./RoutePlaceholder";
 import { AppShell } from "./shell/AppShell";
 import { HomePage } from "./shell/HomePage";
 
@@ -41,6 +45,11 @@ export function AppRoutes() {
       {/* /register: ruta PÚBLICA (D1) — el registro no exige sesión; queda
           FUERA del layout RequireAuth/AppShell como /login. */}
       <Route path="/register" element={<RegisterPage />} />
+      {/* /privacidad: ruta PÚBLICA — la Política de Privacidad se lee sin
+          sesión (enlace del checkbox de consentimiento del registro, que la
+          abre en pestaña nueva); hermana de /login y /register, fuera de
+          RequireAuth. */}
+      <Route path="/privacidad" element={<PrivacyPage />} />
       {/* /auth/callback: ruta PÚBLICA (D2) — el usuario llega del link de
           confirmación de email SIN sesión todavía; queda FUERA de
           RequireAuth/AppShell como /login y /register. */}
@@ -123,11 +132,88 @@ export function AppRoutes() {
                 </RequireRole>
               }
             />
+            {/* /users (sdd/admin-console T-B9 · ADM-3/ADM-13): reemplaza el
+                placeholder B4 con UsersPage MANTENIENDO el guard
+                RequireRole ADMIN_ONLY — la denegación ocurre ANTES de montar
+                el feature (ADM-3.3 ⇒ cero queries para no-admin). */}
             <Route
               path="/users"
               element={
                 <RequireRole roles={ADMIN_ONLY}>
-                  <RoutePlaceholder title="Usuarios" batch="B4" />
+                  <UsersPage />
+                </RequireRole>
+              }
+            />
+            {/* Detalle /users/:id — mismo guard: perfil + rol + toggles +
+                tiendas asignadas (ADM-4..7). */}
+            <Route
+              path="/users/:id"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <UserDetailPage />
+                </RequireRole>
+              }
+            />
+            {/* /roles (sdd/admin-console T-C5 · ADM-8/ADM-12): CRUD directo
+                de roles con la salvaguarda R3 — la denegación para
+                no-admin ocurre ANTES de montar el feature (ADM-12.3). */}
+            <Route
+              path="/roles"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RolesPage />
+                </RequireRole>
+              }
+            />
+            {/* Alta y edición de rol — misma guardia. El form protege los
+                roles semilla (name deshabilitado, sin borrar — ADM-8.5). */}
+            <Route
+              path="/roles/new"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RoleFormPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/roles/:id"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RoleFormPage />
+                </RequireRole>
+              }
+            />
+            {/* /catalogs (sdd/admin-console T-C5 · ADM-9/ADM-12, design
+                key-decision #4): índice con las 4 pantallas del motor
+                config-driven + ruta dinámica /catalogs/:catalogKey (clave
+                inválida ⇒ <NotFound/> dentro del feature). */}
+            <Route
+              path="/catalogs"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <CatalogsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/catalogs/:catalogKey"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <CatalogCrudPage />
+                </RequireRole>
+              }
+            />
+            {/* /audit (sdd/admin-console T-D2 · ADM-10/ADM-12): visor
+                read-only de la auditoría. Guard ADMIN_ONLY porque audit_read
+                exige my_role() = 'admin' (0006:330-332): la denegación para
+                no-admin ocurre ANTES de montar el feature (ADM-10.4 ⇒ cero
+                queries). El DML está revocado hasta para el rol de servicio
+                (0011:551-554) ⇒ la pantalla no tiene ni tendrá escritura. */}
+            <Route
+              path="/audit"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <AuditPage />
                 </RequireRole>
               }
             />

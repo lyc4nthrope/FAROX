@@ -47,7 +47,6 @@ const DEFERRED_TABLES = [
   "routes",
   "route_stops",
   "dashboard_daily",
-  "audit_log",
   "chat_conversations",
   "chat_messages",
 ];

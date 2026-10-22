@@ -105,3 +105,47 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     ).toBe("No tenés permisos para esta operación.");
   });
 });
+
+// sdd/admin-console T-B1: los 3 mappings nuevos que users (lote B) y
+// roles/catálogos (lote C) necesitan — texto exacto verificado contra el
+// spec #598 (ADM-8.4, ADM-9.3/9.4, camino de error de ADM-5).
+describe("mapError · sdd/admin-console T-B1 (23503, 23505, «usuario inexistente»)", () => {
+  it("23503 FK RESTRICT (rol o registro en uso)", () => {
+    expect(
+      mapError({
+        code: "23503",
+        message: 'update or delete on table "users" violates foreign key constraint',
+      }),
+    ).toBe("Este registro está en uso y no se puede eliminar.");
+  });
+
+  it("23505 UNIQUE (nombre duplicado en catálogos)", () => {
+    expect(
+      mapError({
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "roles_name_key"',
+      }),
+    ).toBe("Ya existe un registro con ese nombre.");
+  });
+
+  it("'usuario inexistente' (RAISE de update_user_role/set_user_premium/set_user_active)", () => {
+    expect(
+      mapError({ code: "P0001", message: "update_user_role: usuario inexistente: u-404" }),
+    ).toBe("No se encontró el usuario.");
+    expect(mapError({ message: "set_user_premium: usuario inexistente: u-404" })).toBe(
+      "No se encontró el usuario.",
+    );
+    expect(mapError({ message: "set_user_active: usuario inexistente: u-404" })).toBe(
+      "No se encontró el usuario.",
+    );
+  });
+
+  it("prevalencia T-B1: 23503/23505 ganan por SQLSTATE aunque el mensaje traiga otra pista", () => {
+    expect(
+      mapError({ code: "23503", message: "solo admin" }),
+    ).toBe("Este registro está en uso y no se puede eliminar.");
+    expect(
+      mapError({ code: "23505", message: "duplicate key value (raw)" }),
+    ).toBe("Ya existe un registro con ese nombre.");
+  });
+});

@@ -22,3 +22,8 @@ export interface DistributorRow extends DistributorListRow {
   email: string | null;
   contact_preference: ContactPreference;
 }
+
+// sdd/admin-console T-E2: conteo client-side de usuarios asignados por
+// distributor_id (clave = id de distributor) para la columna admin de la
+// lista — misma forma que UserStoreCounts de features/users.
+export type DistributorUserCounts = Record<number, number>;

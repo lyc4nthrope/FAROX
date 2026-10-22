@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,7 @@ import { DistributorsPage } from "./DistributorsPage";
 vi.mock("../api", () => ({
   fetchDistributors: vi.fn(),
   fetchDistributor: vi.fn(),
+  fetchDistributorUserCounts: vi.fn(),
   createDistributor: vi.fn(),
   updateDistributor: vi.fn(),
   deactivateDistributor: vi.fn(),
@@ -64,6 +65,10 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     vi.mocked(distributorsApi.fetchDistributors).mockResolvedValue({
       rows: [FILA],
       count: 1,
+      error: null,
+    });
+    vi.mocked(distributorsApi.fetchDistributorUserCounts).mockResolvedValue({
+      counts: { 1: 3 },
       error: null,
     });
   });
@@ -122,5 +127,48 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
 
     expect(await screen.findByText("Acceso denegado")).toBeInTheDocument();
     expect(distributorsApi.fetchDistributors).not.toHaveBeenCalled();
+  });
+
+  // sdd/admin-console T-E2 (in-scope #5 de la propuesta): columna admin
+  // «Usuarios asignados» sobre UNA sola query de users (sin N+1).
+  it("T-E2: admin ve la columna con el conteo; UNA llamada de conteo y UNA de lista", async () => {
+    renderPagina("admin");
+
+    const link = await screen.findByRole("link", { name: "Distribuidora Andes" });
+    expect(
+      screen.getByRole("columnheader", { name: "Usuarios asignados" }),
+    ).toBeInTheDocument();
+    const fila = within(link.closest("tr") as HTMLElement);
+    expect(fila.getByText("3")).toBeInTheDocument();
+    expect(distributorsApi.fetchDistributorUserCounts).toHaveBeenCalledTimes(1);
+    expect(distributorsApi.fetchDistributors).toHaveBeenCalledTimes(1);
+  });
+
+  it("T-E2: operador ⇒ SIN columna y CERO query de usuarios (no puede leer users)", async () => {
+    renderPagina("operador");
+
+    expect(await screen.findByRole("link", { name: "Distribuidora Andes" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: "Usuarios asignados" }),
+    ).toBeNull();
+    expect(distributorsApi.fetchDistributorUserCounts).not.toHaveBeenCalled();
+  });
+
+  it("T-E2: si la query de conteo falla ⇒ celdas «—», lista intacta y jamás texto crudo", async () => {
+    vi.mocked(distributorsApi.fetchDistributorUserCounts).mockResolvedValue({
+      counts: null,
+      error: ERROR_RLS,
+    });
+    renderPagina("admin");
+
+    const link = await screen.findByRole("link", { name: "Distribuidora Andes" });
+    const fila = within(link.closest("tr") as HTMLElement);
+    expect(
+      screen.getByRole("columnheader", { name: "Usuarios asignados" }),
+    ).toBeInTheDocument();
+    expect(fila.getByText("—")).toBeInTheDocument();
+    expect(fila.queryByText(/permission denied/)).toBeNull();
+    // La lista NO depende del conteo: la fila sigue renderizada.
+    expect(fila.getByText("Activo")).toBeInTheDocument();
   });
 });
