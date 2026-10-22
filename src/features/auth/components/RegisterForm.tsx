@@ -1,18 +1,21 @@
+import { Link } from "react-router-dom";
+
 import { ErrorBanner } from "../../../shared/ui";
-import type { RegisterInput } from "../schemas";
+import type { RegisterFormValues } from "../schemas";
 
 export interface RegisterFormErrors {
   full_name?: string;
   email?: string;
   password?: string;
+  privacy_policy_accepted?: string;
 }
 
 interface RegisterFormProps {
-  values: RegisterInput;
+  values: RegisterFormValues;
   errors: RegisterFormErrors;
   formError: string | null;
   pending: boolean;
-  onChange: (next: RegisterInput) => void;
+  onChange: (next: RegisterFormValues) => void;
   onSubmit: () => void;
 }
 
@@ -105,6 +108,49 @@ export function RegisterForm({
         {errors.password !== undefined && (
           <p id="register-password-error" className="mt-1 text-xs text-red-600">
             {errors.password}
+          </p>
+        )}
+      </div>
+      <div>
+        {/* Consentimiento de privacidad OBLIGATORIO (Ley 1581 de 2012):
+            checked controlado desde values (desmarcado por defecto) y validado
+            como literal true en schemas.ts ⇒ sin marcar, CERO requests. El
+            label queda asociado vía htmlFor; el Link es contenido INTERACTIVO
+            del label, y la spec de HTML le da activation behavior propio: la
+            pestaña nueva se abre sin togglear el checkbox, y además es una
+            parada de tabulación independiente del input. */}
+        <div className="flex items-start gap-2">
+          <input
+            id="register-privacy"
+            type="checkbox"
+            className="mt-1 h-4 w-4 shrink-0 rounded border-gray-300"
+            checked={values.privacy_policy_accepted}
+            aria-invalid={errors.privacy_policy_accepted !== undefined}
+            aria-describedby={
+              errors.privacy_policy_accepted === undefined
+                ? undefined
+                : "register-privacy-error"
+            }
+            onChange={(event) =>
+              onChange({ ...values, privacy_policy_accepted: event.target.checked })
+            }
+          />
+          <label htmlFor="register-privacy" className="text-sm text-gray-700">
+            Acepto la{" "}
+            <Link
+              to="/privacidad"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-gray-900 underline"
+            >
+              Política de Privacidad
+            </Link>{" "}
+            y el tratamiento de mis datos
+          </label>
+        </div>
+        {errors.privacy_policy_accepted !== undefined && (
+          <p id="register-privacy-error" className="mt-1 text-xs text-red-600">
+            {errors.privacy_policy_accepted}
           </p>
         )}
       </div>

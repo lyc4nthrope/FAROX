@@ -35,19 +35,35 @@ const FAKE_SESSION = { access_token: "token", user: FAKE_USER } as Session;
 const AUTH_ERROR = { message: "User already registered" } as AuthError;
 
 describe("auth api · signUp (D1 · única vía de registro)", () => {
+  // Consentimiento de privacidad del registro: el test usa timestamp fijo
+  // (la página lo estampa en tiempo real — ver RegisterPage.test.tsx).
+  const CONSENT = {
+    accepted_privacy_at: "2026-10-20T15:00:00.000Z",
+    accepted_privacy_version: "1.0",
+  } as const;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("envía full_name en options.data — es lo que lee el trigger 0004:336", async () => {
+  it("envía full_name y el consentimiento de privacidad en options.data", async () => {
     signUpMock.mockResolvedValue({ data: { user: null, session: null }, error: null });
 
-    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace");
+    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace", CONSENT);
 
+    // full_name lo lee el trigger handle_new_user (0004:336); el
+    // consentimiento queda en user_metadata como prueba de la aceptación
+    // (fecha ISO + versión de la política aceptada).
     expect(signUpMock).toHaveBeenCalledWith({
       email: "demo@farox.app",
       password: "secreto123",
-      options: { data: { full_name: "Ada Lovelace" } },
+      options: {
+        data: {
+          full_name: "Ada Lovelace",
+          accepted_privacy_at: "2026-10-20T15:00:00.000Z",
+          accepted_privacy_version: "1.0",
+        },
+      },
     });
     // Sin sesión ⇒ Confirm email activo (D44): el flujo es "confirmar", no login.
     expect(result).toEqual({ needsConfirmation: true, error: null });
@@ -59,7 +75,7 @@ describe("auth api · signUp (D1 · única vía de registro)", () => {
       error: null,
     });
 
-    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace");
+    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace", CONSENT);
 
     expect(result).toEqual({ needsConfirmation: false, error: null });
   });
@@ -70,7 +86,7 @@ describe("auth api · signUp (D1 · única vía de registro)", () => {
       error: AUTH_ERROR,
     });
 
-    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace");
+    const result = await signUp("demo@farox.app", "secreto123", "Ada Lovelace", CONSENT);
 
     expect(result.error).toBe(AUTH_ERROR);
     expect(result.needsConfirmation).toBe(false);

@@ -4,11 +4,19 @@ import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { ErrorBanner } from "../../../shared/ui";
 import { mapError } from "../../../shared/lib/errors/mapError";
+import { PRIVACY_VERSION } from "../../../shared/lib/legal/privacyVersion";
 import { resendConfirmationEmail, signUp } from "../api";
 import { RegisterForm, type RegisterFormErrors } from "../components/RegisterForm";
-import { registerSchema, type RegisterInput } from "../schemas";
+import { registerSchema, type RegisterFormValues } from "../schemas";
 
-const EMPTY_VALUES: RegisterInput = { full_name: "", email: "", password: "" };
+// La casilla de privacidad arranca SIN marcar: el consentimiento debe ser
+// explícito (unchecked por defecto, requisito de accesibilidad y de la ley).
+const EMPTY_VALUES: RegisterFormValues = {
+  full_name: "",
+  email: "",
+  password: "",
+  privacy_policy_accepted: false,
+};
 
 // Máquina de estados del registro (D1): idle → submitting → confirmation-
 // pending (flujo primario, D44: la confirmación de email está activa); un
@@ -47,7 +55,7 @@ function registerErrorMessage(message: string): string {
 // D44) y llega sesión activa, se redirige al home — se manejan AMBAS ramas.
 export function RegisterPage() {
   const { status } = useAuth();
-  const [values, setValues] = useState<RegisterInput>(EMPTY_VALUES);
+  const [values, setValues] = useState<RegisterFormValues>(EMPTY_VALUES);
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [phase, setPhase] = useState<RegisterPhase>("idle");
@@ -64,6 +72,7 @@ export function RegisterPage() {
         full_name: issues.fieldErrors.full_name?.[0],
         email: issues.fieldErrors.email?.[0],
         password: issues.fieldErrors.password?.[0],
+        privacy_policy_accepted: issues.fieldErrors.privacy_policy_accepted?.[0],
       });
       setFormError(null);
       setPhase("idle");
@@ -72,12 +81,20 @@ export function RegisterPage() {
     setErrors({});
     setFormError(null);
     setPhase("submitting");
+    // Consentimiento de privacidad: se estampa AL ENVIAR (fecha real del
+    // aceptación) y se versiona con PRIVACY_VERSION; viaja como metadata de
+    // user_metadata junto a full_name (ver api.ts SignUpPrivacyConsent).
+    const privacyConsent = {
+      accepted_privacy_at: new Date().toISOString(),
+      accepted_privacy_version: PRIVACY_VERSION,
+    };
     void (async () => {
       try {
         const result = await signUp(
           parsed.data.email,
           parsed.data.password,
           parsed.data.full_name,
+          privacyConsent,
         );
         if (result.error !== null) {
           setFormError(registerErrorMessage(result.error.message));

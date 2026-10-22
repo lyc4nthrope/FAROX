@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
+import { PRIVACY_VERSION } from "../../../shared/lib/legal/privacyVersion";
 import { RegisterPage } from "./RegisterPage";
 
 // D1: /register es pública — el harness monta SOLO RegisterPage (sin
@@ -40,10 +41,17 @@ async function completarFormulario(user: ReturnType<typeof userEvent.setup>): Pr
   await user.type(screen.getByLabelText("Contraseña"), "secreto123");
 }
 
+// El consentimiento es OBLIGATORIO: sin marcar, el schema rompe el parse y
+// no hay request. Los flujos exitosos lo marcan explícitamente.
+async function aceptarPrivacidad(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole("checkbox", { name: /Política de Privacidad/ }));
+}
+
 // Esperar el botón ANTES de tipear evita escribir en inputs de un formulario
 // que aún no montó (lección #509 del patrón de B6/B7).
 async function enviarRegistro(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await completarFormulario(user);
+  await aceptarPrivacidad(user);
   await user.click(await screen.findByRole("button", { name: "Crear cuenta" }));
 }
 
@@ -108,13 +116,13 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     expect(
       screen.getByText(/Revisá tu email para confirmar tu cuenta/),
     ).toBeInTheDocument();
-    // Datos en el ORDEN de la firma: (email, password, fullName) — el paso de
-    // full_name a options.data.full_name se prueba en api.test.ts.
-    expect(authApi.signUp).toHaveBeenCalledWith(
-      "demo@farox.app",
-      "secreto123",
-      "Ada Lovelace",
-    );
+    // Datos en el ORDEN de la firma: (email, password, fullName, consent) —
+    // el paso a options.data (full_name + consentimiento) se prueba en
+    // api.test.ts; acá solo el contrato del call site.
+    expect(authApi.signUp).toHaveBeenCalledWith("demo@farox.app", "secreto123", "Ada Lovelace", {
+      accepted_privacy_at: expect.any(String),
+      accepted_privacy_version: PRIVACY_VERSION,
+    });
     expect(screen.queryByRole("button", { name: "Crear cuenta" })).not.toBeInTheDocument();
   });
 
@@ -209,5 +217,48 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     expect(await screen.findByText("inicio")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Revisá tu email" })).not.toBeInTheDocument();
     expect(authApi.resendConfirmationEmail).not.toHaveBeenCalled();
+  });
+
+  // ── Consentimiento de privacidad (requerido) ──────────────────────────────
+
+  it("la casilla de privacidad existe y está SIN marcar por defecto", () => {
+    renderRegister();
+    expect(
+      screen.getByRole("checkbox", { name: /Política de Privacidad/ }),
+    ).not.toBeChecked();
+  });
+
+  it("campos válidos pero casilla SIN marcar: error inline y CERO llamadas a la api", async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    await completarFormulario(user);
+    await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
+
+    expect(
+      await screen.findByText("Debés aceptar la Política de Privacidad para crear tu cuenta"),
+    ).toBeInTheDocument();
+    expect(authApi.signUp).not.toHaveBeenCalled();
+  });
+
+  it("casilla marcada: signUp recibe la metadata con fecha ISO y la versión de la política", async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    await enviarRegistro(user); // completarFormulario + aceptarPrivacidad
+    await screen.findByRole("heading", { name: "Revisá tu email" });
+
+    expect(authApi.signUp).toHaveBeenCalledTimes(1);
+    const consent = vi.mocked(authApi.signUp).mock.calls[0][3];
+    // ISO 8601 con 'Z' (UTC): Date.parse valida el formato completo.
+    expect(consent.accepted_privacy_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+    expect(Number.isNaN(Date.parse(consent.accepted_privacy_at))).toBe(false);
+    expect(consent.accepted_privacy_version).toBe(PRIVACY_VERSION);
+  });
+
+  it("el link de privacidad apunta a /privacidad y abre en pestaña nueva", () => {
+    renderRegister();
+    const link = screen.getByRole("link", { name: "Política de Privacidad" });
+    expect(link).toHaveAttribute("href", "/privacidad");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 });

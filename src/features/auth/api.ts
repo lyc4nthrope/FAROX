@@ -71,15 +71,29 @@ export interface SignUpOutcome {
 // fullName viaja en options.data.full_name: handle_new_user() lo lee de
 // raw_user_meta_data ->> 'full_name' (0004:336) — sin él, el nombre visible
 // degrada silenciosamente al local-part del email.
+//
+// privacyConsent viaja igual, en options.data (user_metadata):
+//   accepted_privacy_at      → ISO 8601 del momento del registro
+//   accepted_privacy_version → PRIVACY_VERSION vigente (shared/lib/legal)
+// Elegimos user_metadata y NO una tabla propia porque este cambio es sin
+// migración: es AUDITABLE vía API (el propio usuario puede leer su metadata)
+// pero NO a prueba de alteraciones — una tabla de consentimientos con RLS
+// escrita server-side es la solución de largo plazo.
+export interface SignUpPrivacyConsent {
+  accepted_privacy_at: string;
+  accepted_privacy_version: string;
+}
+
 export async function signUp(
   email: string,
   password: string,
   fullName: string,
+  privacyConsent: SignUpPrivacyConsent,
 ): Promise<SignUpOutcome> {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName } },
+    options: { data: { full_name: fullName, ...privacyConsent } },
   });
   if (error !== null) {
     return { needsConfirmation: false, error };
