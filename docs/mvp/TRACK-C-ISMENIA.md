@@ -4,16 +4,91 @@
 > **Antes de empezar:** leer `docs/mvp/PLAN.md` §0–§6. Patrón a copiar: `src/features/stores` (escritura por RPC) y `src/features/distributors` (listados).
 > **Datos para probar:** mientras B4/B5 no estén, pedirle a Daniel que cargue por SQL editor stock de prueba en una tienda (asignaciones con `assign_product_to_store`).
 
+> **Orden:** primero la Fase 0 (C0.1–C0.6), después las funcionalidades (C1–C8).
+
 | ID | Tarea | Día | Depende de | Estado |
 |---|---|---|---|---|
-| C1 | Pedidos: api + listado por rol | 1–2 | — | ⬜ |
-| C2 | Crear pedido | 2–3 | C1 | ⬜ |
-| C3 | Detalle de pedido + cambios de estado | 3 | C2 | ⬜ |
-| C4 | Confirmar entrega (incluye parcial) | 4 | C3 | ⬜ |
-| C5 | Dashboard + realtime | 5–6 | C4, B6 (regla de realtime) | ⬜ |
-| C6 | Playwright: H1–H4 | 6–8 | C5, A4, A7 | ⬜ |
-| C7 | Manual de usuario | 8–9 | C6 | ⬜ |
+| **C0.1** | Paginación en todas las listas + conteos acotados | 1 | — | ⬜ |
+| **C0.2** | "Eliminar" = desactivar (+ reactivar) y formularios de edición seguros | 2 | C0.1 | ⬜ |
+| **C0.3** | Errores: `mapError` para 0013, NIT vs nombre, perfil | 2 | — | ⬜ |
+| **C0.4** | Roles, categorías, auditoría y límites entre features | 2 | — | ⬜ |
+| **C0.5** | Pruebas de la capa `api.ts` (productos, tiendas, catálogos, perfil) | 3 | C0.2 | ⬜ |
+| **C0.6** | Política de privacidad alineada con el sistema (Ley 1581) | 3 | — | ⬜ |
+| C1 | Pedidos: api + listado por rol | 4 | Fase 0 | ⬜ |
+| C2 | Crear pedido | 4–5 | C1 | ⬜ |
+| C3 | Detalle de pedido + cambios de estado | 5 | C2 | ⬜ |
+| C4 | Confirmar entrega (incluye parcial) | 6 | C3 | ⬜ |
+| C5 | Dashboard + realtime | 7 | C4, B6 (regla de realtime) | ⬜ |
+| C6 | Playwright: H1–H4 | 8–9 | C5, A4, A7 | ⬜ |
+| C7 | Manual de usuario | 9 | C6 | ⬜ |
 | C8 | Informe final + ensayo de demo ×2 | 10 | todo | ⬜ |
+
+---
+
+## Fase 0 — Correcciones de la auditoría (hacer primero)
+
+Referencia: `docs/audits/AUDITORIA-2026-10-23.md`. Cada tarea cita los hallazgos (F#) que cierra.
+
+### C0.1 — Paginación en todas las listas (cierra F6, F24-conteos)
+
+- **Archivos:** `src/shared/ui/DataTable/DataTable.tsx` (o un componente nuevo `src/shared/ui/Pagination.tsx`), `src/shared/hooks/useList.ts`, páginas de `users`, `products`, `stores`, `distributors`, `catalogs` + pruebas; `api.ts` de `users` y `distributors`.
+- **Pasos:**
+  1. Componente de paginación: "Anterior / Siguiente" y "Página X de Y" usando `list.count` (planned) y `list.setPage`; botones deshabilitados en los extremos; accesible (`nav` con `aria-label="Paginación"`).
+  2. Conectarlo en **todas** las listas que usan `useList`.
+  3. Orden estable: añadir `.order("id")` como segundo criterio después del orden visible (p. ej. `full_name`, `name`).
+  4. Conteos sin límite (`users/api.ts` `user_stores`, `distributors/api.ts` `users.distributor_id`): pedir solo los ids de la página visible (`.in("user_id", ids)` / `.in("distributor_id", ids)`), nunca la tabla completa. `onboarding/api.ts`: tiendas propias con `.limit(1)`.
+- **Pruebas:** con `count = 60` aparecen 3 páginas y "Siguiente" pide la página 2; los conteos solo piden los ids de la página.
+- **Commit:** `fix(front): paginate every list`
+
+### C0.2 — "Eliminar" = desactivar, y formularios de edición seguros (cierra F7)
+
+- **Archivos:** `ProductFormPage.tsx`, `StoreFormPage.tsx`, `DistributorFormPage.tsx`, sus `api.ts` y listas + pruebas.
+- **Pasos:**
+  1. Quitar el segundo paso (`DELETE` físico). El botón pasa a llamarse **"Desactivar"** (solo admin) y solo hace `is_active = false`, como dice la regla del proyecto ("eliminar = soft-delete").
+  2. Agregar **"Reactivar"** en los registros inactivos (admin) y un filtro "Mostrar inactivos" en las listas.
+  3. Borrar las funciones `deleteProduct`/`deleteStore`/`deleteDistributor` que queden sin uso y sus pruebas.
+  4. Si el registro no existe (`PGRST116`), mostrar "No se encontró" **sin** el formulario (no un formulario vacío que se pueda enviar).
+  5. `StoresPage`: mostrar el aviso de tope solo cuando el usuario ya tiene 1 tienda activa (no Premium) o 3 (Premium).
+- **Pruebas:** desactivar llama solo al UPDATE; reactivar vuelve `is_active = true`; un id inexistente no muestra el formulario; aviso de tope con 0 tiendas → no aparece.
+- **Commit:** `fix(front): deactivate instead of delete`
+
+### C0.3 — Errores y perfil (cierra F8, F24-perfil, F24-precisión)
+
+- **Archivos:** `src/shared/lib/errors/mapError.ts` + prueba, `src/features/onboarding/routes/OnboardingPage.test.tsx`, `src/features/profile/*`, `src/features/products/schemas.ts`.
+- **Pasos:**
+  1. `mapError`: textos amigables para los mensajes de 0013 — "ya existe un distribuidor con ese NIT" → "Ya hay un distribuidor registrado con ese NIT. Si es tu empresa, contactá al administrador."; "ya tenés un distribuidor asociado"; "ya registraste un distribuidor (1 por usuario)"; "usuario inactivo" → "Tu cuenta está desactivada."; "ubicación requerida" → "Elegí la ubicación de la tienda en el mapa."; "NIT requerido"; y los de A0.1 si ya están en `main`.
+  2. `23505`: distinguir por el nombre de la restricción (`details`/`message` contiene `nit`) → "Ya existe un distribuidor con ese NIT", y dejar "Ya existe un registro con ese nombre" para el resto.
+  3. Pruebas de onboarding: simular el error real (código `P0001` con el mensaje de la RPC), no un `23505`.
+  4. Perfil: `try/catch` en la carga, estado de carga, guarda de "0 filas" (`.select("id")` → 42501) en `updateMyProfile`, y errores por `mapError`.
+  5. `products/schemas.ts`: `base_quantity` con máximo 3 decimales y menor que 1.000.000.000 (como la columna `numeric(12,3)`).
+- **Commit:** `fix(front): friendly errors for registration and profile`
+
+### C0.4 — Roles, categorías, auditoría y límites entre features (cierra F9, F21, F24-categorías, F24-auditoría)
+
+- **Pasos:**
+  1. **Roles:** quitar "Nuevo rol" (los 3 roles son fijos del sistema). Cada fila enlaza a su edición, y en la edición solo se cambia la **descripción** (el nombre se muestra de solo lectura). Un id inexistente → "No se encontró", sin formulario.
+  2. **Categorías:** el selector de categoría padre excluye la propia categoría y **todos sus descendientes** (evita ciclos).
+  3. **Auditoría:** si "Cargar más" falla, mantener las filas ya cargadas y mostrar el error debajo con "Reintentar"; descartar respuestas de un filtro anterior (contador de secuencia); mostrar el nombre del actor (no el uuid truncado); fechas con `es-CO`.
+  4. **Límites entre features:** mover `ROLE_NAMES`, `RoleName`, `normalizeRole` y `roleLabel` a `src/shared/lib/auth/roles.ts`, y el esquema de perfil compartido a `src/shared/lib/profile/`; `users` y `roles` dejan de importar `../auth`, `../profile` y `app/shell`. Unificar `UserProfileForm` y `ProfileForm` en un componente de `shared/ui` si queda idéntico.
+  5. Restaurar los `vi.spyOn(window, "confirm")` en `afterEach` (`vi.restoreAllMocks()`).
+- **Commit:** `fix(front): roles, categories and audit correctness`
+
+### C0.5 — Pruebas de la capa `api.ts` (cierra F14)
+
+- **Archivos:** `src/features/{products,stores,catalogs,profile}/api.test.ts` (copiar el patrón de `src/features/users/api.test.ts`).
+- **Casos mínimos por archivo:** columnas exactas pedidas, `range` y `count: 'planned'`; parámetros exactos de cada RPC (`create_store`: `p_store_type_id` elegido y `p_location` con lng primero); cada UPDATE con `.select("id")` y "0 filas" → error `42501`; errores crudos devueltos tal cual (los traduce `mapError`).
+- **Aceptación:** cobertura de líneas de esos 4 archivos ≥ 90 %; las mutaciones M7 (quitar la guarda de "0 filas" en `products/api.ts`) y M8 (fijar `p_store_type_id`) hacen fallar alguna prueba (probarlo localmente y pegar el resultado en el PR).
+- **Commit:** `test(front): cover data access layer`
+
+### C0.6 — Política de privacidad alineada con el sistema (cierra F13)
+
+- **Archivo:** `src/features/legal/privacyContent.ts` (+ su prueba), `src/shared/lib/legal/privacyVersion.ts`.
+- **Pasos:**
+  1. Quitar la promesa de "eliminar la cuenta": describir lo que el sistema hace (el titular pide la supresión al administrador; el admin desactiva la cuenta y anonimiza nombre, teléfono y email por SQL; los registros de auditoría se conservan por obligación de trazabilidad durante el plazo definido).
+  2. Base legal según Ley 1581: autorización previa, expresa e informada (quitar "interés legítimo"); lista completa de derechos del art. 8; transferencia internacional (Supabase) con la región real que confirme Daniel; fecha de vigencia y plazos de respuesta (10 días hábiles para consultas y 15 para reclamos).
+  3. Subir la versión de la política (el registro guarda la versión aceptada).
+  4. Revisión del equipo antes del merge (es un texto legal).
+- **Commit:** `docs(legal): align privacy policy with system behavior`
 
 ---
 

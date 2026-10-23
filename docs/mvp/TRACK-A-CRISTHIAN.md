@@ -2,25 +2,89 @@
 
 > **Alcance:** chatbot (CHAT-01, CHAT-02), QR tienda↔distribuidor (INV-05), rutas y mapa (DIST-03), vistas del rol distribuidor, pasada de seguridad.
 > **Antes de empezar:** leer `docs/mvp/PLAN.md` §0–§6 (reglas, decisiones, receta de slice, DoD).
-> **Migraciones reservadas:** 0015 y 0016 (PLAN §3.3). Las aplica Daniel en el remoto después del merge.
+> **Migraciones reservadas:** 0015 (A0.1), 0016 (A1) y 0017 (A5) (PLAN §3.3). Las aplica Daniel en el remoto después del merge.
+> **Orden:** primero la Fase 0 (A0.1–A0.4), después las funcionalidades (A1–A9).
 
 | ID | Tarea | Día | Depende de | Estado |
 |---|---|---|---|---|
-| A1 | Migración 0015 — respuestas del bot | 1 | B1 | ⬜ |
-| A2 | n8n en VPS + webhook con identidad verificada | 2 | — | ⬜ |
-| A3 | Tools, propuestas y confirmación en n8n | 3 | A1 aplicada, A2 | ⬜ |
-| A4 | Pantalla del asistente | 4 | A3 | ⬜ |
-| A5 | Migración 0016 + QR + escáner + vínculo | 5 | B1 | ⬜ |
-| A6 | Rutas: planificación (admin) | 6 | — | ⬜ |
-| A7 | Mi ruta (distribuidor) + mapa + navegación del distribuidor | 7 | A6, C1 | ⬜ |
+| **A0.1** | Migración 0015 (guards de registro y último admin) + gate de onboarding | 1 | B0.1 | ⬜ |
+| **A0.2** | Callback de Auth + privilegios estables | 2 | — | ⬜ |
+| **A0.3** | Confirmaciones en acciones de usuario | 2 | A0.1 | ⬜ |
+| **A0.4** | Ubicación, accesibilidad del mapa y Nominatim | 3 | — | ⬜ |
+| A1 | Migración 0016 — respuestas del bot | 3 | A0.1 | ⬜ |
+| A2 | n8n en VPS + webhook con identidad verificada | 4 | — | ⬜ |
+| A3 | Tools, propuestas y confirmación en n8n | 5 | A1 aplicada, A2 | ⬜ |
+| A4 | Pantalla del asistente | 5–6 | A3 | ⬜ |
+| A5 | Migración 0017 + QR + escáner + vínculo | 6 | A1 | ⬜ |
+| A6 | Rutas: planificación (admin) | 7 | — | ⬜ |
+| A7 | Mi ruta (distribuidor) + mapa + navegación del distribuidor | 7–8 | A6, C1 | ⬜ |
 | A8 | Pruebas de seguridad del chatbot + export del workflow | 8 | A4 | ⬜ |
 | A9 | Pasada de seguridad general | 9 | todo | ⬜ |
 
 ---
 
-## A1 — Migración 0015: respuestas del bot (resuelve G1)
+## Fase 0 — Correcciones de la auditoría (hacer primero)
 
-- **Archivos:** `supabase/migrations/20261023000015_chat_replies.sql`, `Base de datos FAROX.md` (§4, §9, registro de decisiones)
+Referencia: `docs/audits/AUDITORIA-2026-10-23.md`. Cada tarea cita los hallazgos (F#) que cierra.
+
+### A0.1 — Migración 0015 + gate de onboarding (cierra F2, F5, F12-BD, F19)
+
+- **Depende de:** B0.1 (0011 corregida).
+- **Archivos:** `supabase/migrations/20261023000015_registration_guards.sql`, `Base de datos FAROX.md` (§4, §9, decisiones), `src/features/onboarding/detection.ts`, `src/features/onboarding/routes/OnboardingGate.tsx`, `src/features/onboarding/signalsCache.ts`, `src/shared/lib/errors/mapError.ts` + pruebas.
+- **Pasos — base de datos (doc-first primero):**
+  1. Anotar en el doc de BD los cambios de esta migración y una decisión nueva: "el autorregistro de distribuidor solo lo puede hacer un operador sin alcance; el admin verifica el NIT en Distribuidores y puede desactivarlo".
+  2. `CREATE OR REPLACE FUNCTION public.register_distributor(...)` con la **misma firma** que 0013 (no cambia la whitelist). Después de los guards de sesión y de usuario activo, y antes de cualquier otra lectura:
+     - `SELECT u.distributor_id, r.name INTO v_prior, v_role FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = auth.uid() FOR UPDATE OF u;` (cierra la carrera de F5).
+     - `IF v_role <> 'operador' THEN RAISE EXCEPTION 'register_distributor: solo una cuenta nueva sin rol asignado puede registrarse como distribuidor'; END IF;` (un admin o un distribuidor nunca se degradan).
+     - `IF cardinality(public.my_store_ids()) > 0 OR EXISTS (SELECT 1 FROM stores WHERE created_by = auth.uid()) THEN RAISE EXCEPTION 'register_distributor: la cuenta ya tiene tiendas; pedile al admin el cambio de rol'; END IF;`
+     - El resto del cuerpo igual que 0013.
+  3. **Último admin** (cierra la parte de BD de F12): en `update_user_role` y en `set_user_active`, `CREATE OR REPLACE` con la misma firma y el cuerpo actual (tomarlo de 0011 corregida), agregando antes del UPDATE: si el usuario objetivo es admin activo y el cambio lo deja sin rol admin o inactivo, y `(SELECT count(*) FROM users u JOIN roles r ON r.id = u.role_id WHERE r.name = 'admin' AND u.is_active) <= 1`, entonces `RAISE EXCEPTION 'no se puede quitar el último administrador activo'`.
+  4. Defensa extra: `REVOKE EXECUTE ON FUNCTION public.register_distributor(text, text, text, text, text, public.contact_preference) FROM PUBLIC, anon;` (F-nota de 0013).
+  5. Bloque `-- INVERSE:` comentado; encabezado con el contrato como el de 0013.
+- **Pasos — front:**
+  1. `detection.ts`: `deriveNeedsOnboarding(signals, acknowledged, role)` devuelve `false` si `role === 'admin'` o `role === 'distribuidor'`. `OnboardingGate` le pasa el rol de `useAuth()`.
+  2. El "Entendido" de "Trabajo en tienda" se guarda en `sessionStorage` (clave por `user_id`) en lugar de `useState`, para que sobreviva a los remontajes (F19).
+  3. `mapError`: agregar los textos nuevos ("último administrador", "la cuenta ya tiene tiendas", "solo una cuenta nueva…").
+- **Pruebas:** front: admin y distribuidor nunca ven `/onboarding`; operador sin señales sí; el ack sobrevive a un remontaje (render → unmount → render en la misma sesión). BD (smoke SQL o pgTAP si B3 ya está): admin llama `register_distributor` → error; operador con tienda → error; dos llamadas concurrentes → un solo distribuidor; desactivar o degradar al único admin → error.
+- **Commit:** `fix(db): guard distributor self-registration and last admin` · `fix(front): exempt admins and distributors from onboarding`
+
+### A0.2 — Callback de Auth y privilegios estables (cierra F18, F24-privilegios)
+
+- **Archivos:** `src/features/auth/api.ts`, `src/features/auth/routes/CallbackPage.tsx`, `src/app/providers/AuthProvider.tsx` + pruebas.
+- **Pasos:**
+  1. `signUp`: pasar `options.emailRedirectTo = `${window.location.origin}/auth/callback``.
+  2. `CallbackPage`: antes de declarar `missing-code`, llamar `supabase.auth.getSession()`; si ya hay sesión (flujo implícito con `#access_token`), es éxito: limpiar el hash y seguir.
+  3. Daniel confirma en el panel de Supabase Auth que el Site URL y las Redirect URLs incluyen `/auth/callback` del dominio de producción (anotarlo en el PR).
+  4. `AuthProvider.refreshPrivileges`: si `fetchPrivileges` falla por red o error transitorio, **conservar** los privilegios anteriores y reintentar en el siguiente evento; solo un resultado válido puede bajar el rol a `null`.
+- **Pruebas:** callback con sesión y sin `?code` → éxito; sin sesión y sin código → mensaje de link inválido; error transitorio en el refresco → el admin sigue viendo su pantalla.
+- **Commit:** `fix(front): accept implicit-flow sessions in auth callback`
+
+### A0.3 — Confirmaciones en acciones de usuario (cierra F12-UI)
+
+- **Archivos:** `src/features/users/components/UserDetail.tsx`, `src/features/users/routes/UserDetailPage.tsx` + pruebas.
+- **Pasos:** desactivar, activar, cambiar Premium y cambiar el rol de **cualquier** usuario piden confirmación con un diálogo que dice exactamente qué va a pasar ("Juan no podrá entrar al sistema"); guardar un formulario no borra lo que el otro formulario tiene sin guardar (recargar solo el bloque afectado).
+- **Pruebas:** cancelar el diálogo no llama la RPC; confirmar sí; el error "último administrador" se muestra amigable.
+- **Commit:** `fix(front): confirm destructive user changes`
+
+### A0.4 — Ubicación, accesibilidad del mapa y Nominatim (cierra F10, F11, F20)
+
+- **Archivos:** `src/shared/lib/geo/*`, `src/shared/ui/LocationPicker/*`, `src/features/stores/routes/StoreFormPage.tsx`, `src/features/onboarding/components/MyStoreSetupForm.tsx` + pruebas.
+- **Pasos:**
+  1. La ubicación en caché **no** se fija como pin: solo centra el mapa. El pin se fija con GPS fresco, clic, arrastre o los campos manuales.
+  2. En edición de una tienda con coordenadas, no lanzar geolocalización ni la búsqueda por IP.
+  3. Campos de latitud y longitud **siempre visibles** (no solo cuando falla el mapa), conectados con el pin en ambos sentidos; mensajes con `aria-live="polite"` y errores enlazados con `aria-describedby` (WCAG 2.1.1).
+  4. Mover el pin vuelve a calcular la dirección si la dirección fue autocompletada (no si la escribió el usuario).
+  5. Nominatim: caché en memoria por coordenada redondeada a 5 decimales, cola con un máximo de 1 petición por segundo, parámetro `email=` del proyecto, y `geocodeAddress` convierte `lat`/`lon` de string a número.
+  6. Teselas: `https://tile.openstreetmap.org/{z}/{x}/{y}.png` sin subdominios; tolerar errores sueltos de teselas (solo pasar a modo numérico si fallan todas durante 10 s) con botón "Reintentar mapa".
+  7. En táctil, permitir arrastrar el mapa con un dedo.
+- **Pruebas:** con caché, el pin no se fija hasta que hay GPS; teclado: se puede escribir lat/lng y se refleja en el pin; dos llamadas a la misma coordenada hacen una sola petición; `geocodeAddress` devuelve números.
+- **Commit:** `fix(front): reliable and accessible store location`
+
+---
+
+## A1 — Migración 0016: respuestas del bot (resuelve G1)
+
+- **Archivos:** `supabase/migrations/20261027000016_chat_replies.sql`, `Base de datos FAROX.md` (§4, §9, registro de decisiones)
 - **Pasos:**
   1. **Doc-first:** agregar en el doc de BD la fila de `append_chat_reply` en §4 y una decisión nueva ("el bot persiste respuestas con su propia RPC; `send_message` sigue siendo solo `user`").
   2. Crear `public.append_chat_reply(p_conversation bigint, p_role public.chat_role, p_content text, p_payload jsonb DEFAULT NULL) RETURNS bigint`:
@@ -32,7 +96,7 @@
      - `INSERT INTO chat_messages (conversation_id, role, content, payload) … RETURNING id`.
   3. `GRANT EXECUTE ON FUNCTION public.append_chat_reply(bigint, public.chat_role, text, jsonb) TO authenticated;` (nunca `anon`).
   4. Bloque `-- INVERSE:` comentado (`DROP FUNCTION …`).
-  5. Encabezado como el de 0013: qué hace, contrato exacto, whitelist 32 → 33.
+  5. Encabezado como el de 0013: qué hace, contrato exacto, whitelist +1 respecto de lo que deje 0015.
 - **Pruebas:** smoke SQL en el PR (hasta que exista B3): dueño con `assistant` ✔; `user` → error; conversación ajena → error; `anon` → `permission denied`. Cuando B3 esté en `main`, convertirlo en `supabase/tests/database/chat_replies.test.sql`.
 - **Aceptación:** Daniel la aplica en el remoto y `0012_verify_hardening.sql` no da `FAIL` (actualizar la lista de la whitelist si 0012 la verifica literal).
 - **Commit:** `feat(db): add append_chat_reply for assistant messages`
@@ -101,9 +165,9 @@
 - **Pruebas:** `api.test.ts` (header Bearer, cuerpo exacto, mapeo de errores HTTP); `AssistantPage.test.tsx` (render del historial, envío, propuesta → Confirmar envía `type: confirm` con el `messageId`, propuesta resuelta sin botones, error 429 visible).
 - **Commit:** `feat(front): add assistant chat`
 
-## A5 — Migración 0016 + QR + escáner + vínculo (INV-05, D3-10)
+## A5 — Migración 0017 + QR + escáner + vínculo (INV-05, D3-10)
 
-- **Archivos:** `supabase/migrations/20261029000016_store_links.sql`, `Base de datos FAROX.md`; `src/features/store-links/…`; dependencias `qrcode`, `html5-qrcode`, `jszip`.
+- **Archivos:** `supabase/migrations/20261030000017_store_links.sql`, `Base de datos FAROX.md`; `src/features/store-links/…`; dependencias `qrcode`, `html5-qrcode`, `jszip`.
 - **Migración (doc-first igual que A1):**
   - `ALTER TABLE stores ADD COLUMN link_code text UNIQUE DEFAULT encode(gen_random_bytes(9), 'hex')` + backfill de filas existentes.
   - `REVOKE SELECT (link_code) ON stores FROM authenticated` si la columna quedaría legible por la policy `USING (true)`; en su lugar, `get_store_link_code(p_store bigint) RETURNS text` (dueño de la tienda o admin).
@@ -160,4 +224,4 @@ Checklist con evidencia en el PR:
 - [ ] Un distribuidor no lee `price_publications` ni `link_code`.
 - [ ] n8n: editor con login, sin credencial `service_role`, respaldo verificado.
 - [ ] `npm audit --audit-level=high` limpio o justificado.
-- [ ] `0012_verify_hardening.sql` sin `FAIL` en producción tras aplicar 0015/0016.
+- [ ] `0012_verify_hardening.sql` sin `FAIL` en producción tras aplicar 0015, 0016 y 0017.

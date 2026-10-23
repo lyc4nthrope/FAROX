@@ -14,7 +14,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 3.0 — 2026-10-23 (reemplaza la v2: incorpora todo lo que Daniel construyó entre el 19 y el 21 de octubre) |
+| Versión | 3.1 — 2026-10-23 (v3 + **Fase 0: correcciones de la auditoría** [`docs/audits/AUDITORIA-2026-10-23.md`](../audits/AUDITORIA-2026-10-23.md)) |
 | Entrega | **Demo final: viernes 2026-11-06** · congelamiento de código: **miércoles 2026-11-04, 23:59** |
 | Días hábiles restantes | 10 (vie 23 oct → jue 5 nov) |
 
@@ -31,6 +31,7 @@
 
 ## 0. Reglas para todos (y para los agentes)
 
+0. **Primero la Fase 0.** Cada track empieza por sus tareas `X0.*` (correcciones de la auditoría). **Ninguna funcionalidad nueva se empieza hasta que la Fase 0 de ese track esté en `main`.** La excepción es B0.1, que es urgente y desbloquea a todos: va antes que todo lo demás.
 1. **Una tarea a la vez**, en el orden de tu archivo de track. No empezar una tarea cuyas dependencias no estén en `main`.
 2. **No tocar archivos fuera del alcance de la tarea.** Los únicos archivos compartidos que todos editan son los de la §4.4; ahí, cambios mínimos y PR pequeño.
 3. **La base de datos manda.** Toda regla de negocio y seguridad vive en Postgres (RLS + RPC). El front y n8n solo llaman con el JWT del usuario. `service_role` jamás en `src/` ni en n8n (lo bloquea `check-scope`).
@@ -85,8 +86,8 @@ Trabajas en el repositorio FARØX (React + Supabase).
 | DIST-02 | Pedidos: crear, listar por rol, detalle, estados, **confirmar entrega** | C |
 | INT-01 | Dashboard (`get_dashboard`) + tiempo real | C |
 | DIST-03 | Rutas: planificar (admin), "mi ruta" (distribuidor), mapa, paradas | A |
-| INV-05 | QR tienda↔distribuidor (necesita migración **0016**) | A |
-| CHAT-01/02 | Chatbot n8n + pantalla (necesita migración **0015**) | A |
+| INV-05 | QR tienda↔distribuidor (necesita migración **0017**) | A |
+| CHAT-01/02 | Chatbot n8n + pantalla (necesita migración **0016**) | A |
 | Rol distribuidor | Hoy solo ve Productos: le faltan "Mis pedidos" y "Mi ruta" | A (nav) + C (pedidos) |
 | DevOps | Confirmar estado remoto de 0013/0014; `config.toml` + baseline (spike U3); despliegue del front (Azure SWA, spike U1); `schema-check` cubre solo 0001–0012 | B |
 | Calidad BD | No hay pruebas automatizadas por RPC (solo los scripts 0008/0012) | B (harness) + cada track (sus RPC) |
@@ -97,12 +98,37 @@ Trabajas en el repositorio FARØX (React + Supabase).
 
 | # | Deuda | Evidencia | Tarea |
 |---|---|---|---|
-| G1 | `send_message()` solo inserta `role='user'`: el bot no puede guardar sus respuestas | `supabase/entities/23_chat_messages.sql` | A1 (migración 0015) |
-| G2 | D42 dice que el QR vincula tienda↔distribuidor, pero no hay tabla de vínculo | `Base de datos FAROX.md` §3.9 | A5 (migración 0016) |
+| G1 | `send_message()` solo inserta `role='user'`: el bot no puede guardar sus respuestas | `supabase/entities/23_chat_messages.sql` | A1 (migración 0016) |
+| G2 | D42 dice que el QR vincula tienda↔distribuidor, pero no hay tabla de vínculo | `Base de datos FAROX.md` §3.9 | A5 (migración 0017) |
 | G3 | Contradicción: n8n con `service_role` (doc BD, D48) vs prohibido (requisitos, pilar 3) | ambos docs | Decisión D3-7 |
-| G4 | 0013 exigía anotar `Base de datos FAROX.md` §4/§9 antes de aplicarse ("doc-first"), pero el documento no se modificó | `git log` del doc | B1 |
-| G5 | `schema-check.yml` lista a mano las versiones 0001–0012: no verifica 0013/0014 ni las siguientes | `.github/workflows/schema-check.yml` | B2 |
+| G4 | 0013 exigía anotar `Base de datos FAROX.md` §4/§9 antes de aplicarse ("doc-first"), pero el documento no se modificó | `git log` del doc | B0.2 |
+| G5 | `schema-check.yml` lista a mano las versiones 0001–0012: no verifica 0013/0014 ni las siguientes | `.github/workflows/schema-check.yml` | B0.3 |
 | G6 | `check-scope.mjs` bloquea las RPC/tablas "diferidas": cada slice debe sacarlas de la lista en su PR | `scripts/check-scope.mjs` | todas las slices (§4.1 paso 2) |
+
+### 1.4 Auditoría del 23 oct y Fase 0
+
+La auditoría completa está en [`docs/audits/AUDITORIA-2026-10-23.md`](../audits/AUDITORIA-2026-10-23.md) (hallazgos F1–F24 con evidencia). Resumen de lo que se midió: 432 pruebas en verde, 0 errores de lint y tipos, 0 vulnerabilidades, cobertura de líneas 81,7 %, 6 de 8 mutaciones detectadas. **Pero:**
+
+| Hallazgo | Gravedad | Se corrige en |
+|---|---|---|
+| F1 La migración 0011 tiene `session_user()` (error de sintaxis): no se aplica en ningún lado; Schema Check 17/17 en rojo | Bloqueante | **B0.1** |
+| F2 El admin cae en el onboarding y puede degradarse a distribuidor con un clic | Bloqueante | **A0.1** |
+| F3 El backup subiría datos de producción sin cifrar a un repo **público** | Bloqueante (latente) | **B0.4** |
+| F4 `main` sin protección: los checks en rojo no bloquean merges | Grave | **B0.4** |
+| F5 Autorregistro de distribuidor sin guard de rol y con condición de carrera | Grave | **A0.1** |
+| F6 Ninguna lista pagina: desde el registro 26 no se ve nada | Grave | **C0.1** |
+| F7 "Eliminar" desactiva y luego borra en dos pasos (deja registros ocultos) | Grave | **C0.2** |
+| F8 Errores de 0013 sin traducir (NIT duplicado, etc.) | Grave | **C0.3** |
+| F9 Roles: crear/editar nunca funciona | Grave | **C0.4** |
+| F10/F11 Ubicación: la caché fija un pin equivocado; sin teclado no se puede ubicar una tienda | Grave | **A0.4** |
+| F12 Desactivar/Premium/rol con un clic, sin confirmación ni protección del último admin | Grave | **A0.1** (BD) + **A0.3** (UI) |
+| F13 La política de privacidad promete un borrado que el sistema no hace | Grave | **C0.6** |
+| F14 Capa `api.ts` de productos, tiendas, catálogos y perfil sin pruebas | Grave | **C0.5** |
+| F15 Doc-first de 0013/0014 sin hacer; 0012 fallará por la whitelist | Grave | **B0.2** |
+| F16 `schema-check` verifica solo 12 migraciones; parser no reconoce la salida real | Grave | **B0.3** |
+| F17 Secretos del backup expuestos a todo el job; entorno sin restricción | Grave | **B0.4** |
+| F18 Callback de confirmación de email muestra "link inválido" con sesión válida | Grave | **A0.2** |
+| F19–F24 Menores (ack del onboarding, Nominatim, límites entre features, Prettier, `.atl`, varios) | Menor | A0.1, A0.2, A0.4, B0.5, C0.1, C0.3, C0.4 |
 
 ---
 
@@ -136,15 +162,17 @@ Web responsive para **tiendas y distribuidores**: qué tiene cada tienda, qué s
 | D3-11 | **Realtime permitido solo** en `alerts` y `dashboard_daily`, suscrito solo con la pestaña visible; `check-scope` se ajusta para permitir `.channel(` únicamente en esos dos módulos | Requisito INT-01 sin abrir la puerta a suscripciones en todo el front |
 | D3-12 | **Pruebas pgTAP** de las RPC que usa cada slice (flujo feliz + 2 negativos mínimo), con el harness que entrega B | Hoy no hay prueba automatizada de la BD por RPC |
 | D3-13 | n8n se aloja en un **VPS** con Docker Compose + Caddy (HTTPS) | El acta incluye VPS; Azure SWA solo sirve estáticos |
-| D3-14 | E2E con **Playwright** para H1–H4; corre contra el stack local cuando exista `config.toml` (B2); mientras tanto, contra el proyecto de producción con usuarios de prueba y solo en ejecución manual | Prueba de punta a punta sin tocar datos reales en CI |
+| D3-14 | E2E con **Playwright** para H1–H4; corre contra el stack local cuando exista `config.toml` (B10); mientras tanto, contra el proyecto de producción con usuarios de prueba y solo en ejecución manual | Prueba de punta a punta sin tocar datos reales en CI |
 
 ### 3.3 Números de migración reservados (evita choques)
 
 | Número | Contenido | Track |
 |---|---|---|
-| 0015 | `append_chat_reply()` — respuestas del bot | A |
-| 0016 | `store_distributors` + `link_code` + RPC de vínculo | A |
-| 0017+ | Correcciones que encuentren las pruebas pgTAP | Pedir el número en el canal del equipo antes de crear el archivo |
+| (0011, 0012) | Se **corrigen en el mismo archivo** (B0.1): nunca se pudieron aplicar en ningún lado por el error de sintaxis, así que no hay historia que romper. Única excepción a la regla 4 | B |
+| 0015 | `registration_guards` — guard de rol y `FOR UPDATE` en `register_distributor`, protección del último admin | A (A0.1) |
+| 0016 | `append_chat_reply()` — respuestas del bot | A (A1) |
+| 0017 | `store_distributors` + `link_code` + RPC de vínculo | A (A5) |
+| 0018+ | Correcciones que encuentren las pruebas pgTAP | Pedir el número en el canal del equipo antes de crear el archivo |
 
 ---
 
@@ -172,7 +200,7 @@ Patrón de referencia: **`src/features/distributors`** (CRUD por tabla) y **`src
 
 1. **Doc-first**: anotar el cambio en `Base de datos FAROX.md` (§3/§4/§9 y registro de decisiones) en el mismo PR.
 2. Migración nueva con el número reservado (§3.3), encabezado como el de 0013 (qué hace, por qué, contrato), `SECURITY DEFINER` + `SET search_path = pg_catalog, public`, `GRANT EXECUTE` explícito solo a `authenticated` (deny-by-default, D48), guard `assert_admin()` si es solo-admin, bloque `-- INVERSE:` **comentado**.
-3. Actualizar la lista de la whitelist donde se verifique (0012/pgTAP) y `schema-check` (B2 lo vuelve automático).
+3. Actualizar la lista de la whitelist donde se verifique (0012/pgTAP) y `schema-check` (B0.3 lo vuelve automático).
 4. **Aplicación al remoto: solo Daniel** (gate H1) después del merge; luego correr `0012_verify_hardening.sql` y pegar el resultado en el PR.
 
 ### 4.3 UI
@@ -226,21 +254,21 @@ Sincronización diaria de 15 minutos: qué se fusionó, qué está bloqueado. De
 
 | Día | Fecha | A — Cristhian | B — Daniel | C — Ismenia |
 |---|---|---|---|---|
-| 1 | vie 23 oct | A1 migración 0015 (doc-first) | B1 estado remoto 0013/0014 + doc de BD | C1 pedidos: api + listado por rol |
-| 2 | lun 26 oct | A2 n8n en VPS + webhook seguro | B2 `schema-check` dinámico · B3 harness pgTAP | C1 (cont.) · C2 crear pedido |
-| 3 | mar 27 oct | A3 tools + propuestas del chatbot | B4 inventario: asignar producto + umbral | C2 (cont.) · C3 detalle + estados |
-| 4 | mié 28 oct | A4 pantalla de chat | B5 movimientos (entrada/salida/reverso) | C4 confirmar entrega (parcial) |
-| 5 | jue 29 oct | A5 migración 0016 + QR + escáner | B5 (cont.) · B6 alertas + realtime | C5 dashboard + realtime |
-| 6 | vie 30 oct | A6 rutas: planificar (admin) | B7 precios | C5 (cont.) · C6 Playwright: instalación + H1 |
-| 7 | lun 2 nov | A7 mi ruta (distribuidor) + mapa + nav del distribuidor | B8 fiado | C6 H2–H3 |
-| 8 | mar 3 nov | A8 pruebas de seguridad del chatbot | B9 despliegue del front (Azure SWA) | C6 H4 · C7 manual |
-| 9 | mié 4 nov | A9 pasada de seguridad · **congelamiento 23:59** | B10 baseline + aplicar todo al remoto + verificación | C7 (cont.) · corrección de defectos |
+| 1 | vie 23 oct | **A0.1** migración 0015 (guards) + gate del admin | **B0.1** arreglar 0011 + estado remoto · **B0.2** doc-first | **C0.1** paginación |
+| 2 | lun 26 oct | **A0.2** callback de Auth + privilegios · **A0.3** confirmaciones | **B0.3** schema-check · **B0.4** proteger `main` + backup | **C0.2** eliminar = desactivar · **C0.3** errores · **C0.4** roles |
+| 3 | mar 27 oct | **A0.4** ubicación y Nominatim · A1 migración 0016 | **B0.5** higiene + Prettier · B3 harness pgTAP | **C0.5** pruebas de `api.ts` · **C0.6** política de privacidad |
+| 4 | mié 28 oct | A2 n8n en VPS + webhook seguro | B4 inventario: asignar producto + umbral | C1 pedidos: api + listado · C2 crear pedido |
+| 5 | jue 29 oct | A3 tools + propuestas · A4 pantalla de chat | B5 movimientos (entrada/salida/reverso) | C2 (cont.) · C3 detalle + estados |
+| 6 | vie 30 oct | A4 (cont.) · A5 migración 0017 + QR + escáner | B6 alertas + realtime · B7 precios | C4 confirmar entrega (parcial) |
+| 7 | lun 2 nov | A6 rutas (admin) · A7 mi ruta + nav del distribuidor | B8 fiado · B9 despliegue del front | C5 dashboard + realtime |
+| 8 | mar 3 nov | A7 (cont.) · A8 pruebas de seguridad del chatbot | B9 (cont.) · pgTAP de B4–B8 | C6 Playwright H1–H4 |
+| 9 | mié 4 nov | A9 pasada de seguridad · **congelamiento 23:59** | B10 baseline + aplicar todo al remoto + verificación | C6 (cont.) · C7 manual |
 | 10 | jue 5 nov | Corrección de defectos · ensayo | Verificación final en producción · ensayo | C8 informe final · **ensayo ×2** |
 | — | **vie 6 nov** | **Demo final** | | |
 
-**Ruta crítica:** B1 → (A1, B4) → C2 → C4 → C5 → A3 → A4 → C6 → B10. Se revisa primero cada día.
+**Ruta crítica:** B0.1 → B0.4 (protección de `main`) → A0.1 → (A1, B4) → C2 → C4 → C5 → A3 → A4 → C6 → B10. Se revisa primero cada día.
 
-**Si vamos tarde, se recorta en este orden (las pruebas no se recortan):** (1) fiado en UI (B8; queda en BD), (2) QR masivo, (3) historial de precios, (4) realtime del dashboard (queda refresco manual), (5) regenerar código QR.
+**Si vamos tarde, se recorta en este orden (las pruebas y la Fase 0 no se recortan):** (1) fiado en UI (B8; queda en BD), (2) QR masivo, (3) historial de precios, (4) realtime del dashboard (queda refresco manual), (5) regenerar código QR.
 
 ---
 
@@ -264,7 +292,7 @@ Cada escenario se prueba con Playwright (C6) y se ensaya en vivo.
 |---|---|
 | 10 días para 8 módulos | 3 tracks independientes por dominio; lista de recortes §6; sincronización diaria |
 | Choques en archivos compartidos (§4.4) | PR chicos, rebase antes de revisión, aviso al fusionar |
-| Estado del remoto desconocido (0013/0014, baseline) | B1 lo confirma el día 1; solo Daniel aplica migraciones |
+| Estado del remoto desconocido (0013/0014, baseline) | B0.1 lo confirma el día 1; solo Daniel aplica migraciones |
 | Sin pruebas automáticas de BD | Harness pgTAP (B3) el día 2; mientras tanto, smoke SQL en cada PR |
 | n8n/OpenRouter caído en la demo | Probar el día 8; modelo alternativo configurado; video de respaldo de H4 |
 | La cámara no lee el QR | HTTPS en producción; ingreso manual del código; prueba en Android e iOS |
