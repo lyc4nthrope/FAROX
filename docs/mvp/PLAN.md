@@ -34,7 +34,9 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ✅ | B8 · Fiado | `/fiado` + bloque en pedido entregado: crear crédito, pagos, reverso, anular |
 | ✅ | A6 + A7 · Rutas | `/rutas` (admin planifica), `/rutas/:id`, `/mi-ruta` (distribuidor): paradas, llegada/completar/omitir, enlace a Google Maps |
 | ✅ | C5 · Dashboard | `/dashboard`: `get_dashboard` por rango, totales, por distribuidor y por día (sin realtime) |
-| ⬜ | Aplicar 0015 en producción + verificar 0012 | Daniel (gate H1) |
+| ✅ | Migración 0018 · recursión de RLS | `routes`↔`route_stops`↔`stock` en ciclo (42P17): sin esto inventario y rutas fallan para no-admin. Corregida con helpers `SECURITY DEFINER` |
+| ✅ | Verificación de punta a punta | `scripts/smoke-local.mjs`: 37/37 flujos (H1–H3 + fiado) en verde contra Supabase local con 0001–0018 |
+| ⬜ | **Aplicar 0015 y 0018 en producción** + verificar con 0012 | Daniel (gate H1). Sin 0018 el inventario y las rutas fallan en producción |
 | ⬜ | A1–A4, A8 · Chatbot | migración 0016, n8n en VPS, tools, pantalla |
 | ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
 | ⬜ | C0.1 paginación · C0.2 desactivar · C0.4 roles · C0.5 pruebas api viejas · C0.6 privacidad | correcciones de la auditoría pendientes |

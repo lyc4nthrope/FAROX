@@ -908,6 +908,8 @@ END $$;
 
 ## 9. Pendientes
 
+- [x] **0018 (2026-10-24) — recursión de RLS corregida**: `routes_select` ↔ `route_stops_select` (0009) y `stock_select` (0006) formaban un ciclo (`ERROR 42P17 infinite recursion detected in policy for relation "route_stops"`): todo SELECT de un no-admin sobre `stock`/`routes`/`route_stops` fallaba. Se reemplazaron las subconsultas cruzadas por 3 helpers `SECURITY DEFINER` (`my_route_ids()`, `routes_with_my_stores()`, `stores_on_my_routes()`); la visibilidad por rol no cambia. Whitelist +3 firmas (volver a correr 0012 da FAIL esperado en el conteo exacto). Detectado con `scripts/smoke-local.mjs` (37/37 flujos en verde con 0001–0018).
+
 - [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7 (**incluye el hardening 0009→0012: pegar en orden y en UNA sola ventana de mantenimiento** — nota ALTO D50).
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
 - [x] Premium alineado en el `.md` principal (tabla `users`, no `app_metadata`; `is_premium()` única y con `SET search_path`).

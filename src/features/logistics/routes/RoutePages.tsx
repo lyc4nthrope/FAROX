@@ -73,7 +73,11 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
             Iniciar ruta
           </button>
         )}
-        {(route.status === "planned" || route.status === "active") && (role === "admin" || role === "distribuidor") && (
+        {role === "distribuidor" && route.status === "planned" && (
+          <p className="text-sm text-gray-600">El administrador debe iniciar la ruta para poder terminarla.</p>
+        )}
+        {((role === "admin" && (route.status === "planned" || route.status === "active")) ||
+          (role === "distribuidor" && route.status === "active")) && (
           <button className={buttonClass} type="button" onClick={() => void act(() => updateRouteStatus(route.id, "completed"), "Ruta completada.")}>
             Terminar ruta
           </button>
