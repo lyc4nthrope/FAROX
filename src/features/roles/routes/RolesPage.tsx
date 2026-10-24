@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { fetchRoles } from "../api";
@@ -43,12 +42,6 @@ export function RolesPage() {
     <section>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Roles</h1>
-        <Link
-          to="/roles/new"
-          className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
-        >
-          Nuevo rol
-        </Link>
       </div>
       <RoleTable rows={rows} loading={loading} error={error} />
     </section>

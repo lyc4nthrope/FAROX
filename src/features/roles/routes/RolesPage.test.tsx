@@ -111,26 +111,19 @@ describe("RolesPage (ADM-8 · lista /roles)", () => {
     ).toBeInTheDocument();
   });
 
-  it("ADM-8.5: las filas semilla NO tienen link, ni botones de renombrar/borrar", async () => {
+  it("C0.4: toda fila enlaza a su edición y no hay botones de borrar en la lista", async () => {
     renderPagina();
 
     const admin = await screen.findByText("admin");
-    const filaAdmin = admin.closest("tr");
-    expect(filaAdmin).not.toBeNull();
-    expect(filaAdmin?.querySelector("a")).toBeNull();
-    // Ninguna fila de la lista ofrece controles de renombrar ni borrar: el
-    // único link de la tabla es el del rol legacy (cleanup path).
+    expect(admin.closest("a")).toHaveAttribute("href", expect.stringMatching(/^\/roles\/\d+$/));
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByText(/eliminar|borrar/i)).toBeNull();
-    expect(screen.getAllByRole("link")).toHaveLength(2); // supervisor + «Nuevo rol»
   });
 
-  it("ofrece «Nuevo rol» hacia /roles/new (ADM-8.1 la vía de alta)", async () => {
+  it("C0.4: no ofrece «Nuevo rol» (los roles del sistema son fijos)", async () => {
     renderPagina();
-
-    expect(
-      await screen.findByRole("link", { name: "Nuevo rol" }),
-    ).toHaveAttribute("href", "/roles/new");
+    await screen.findByText("admin");
+    expect(screen.queryByRole("link", { name: "Nuevo rol" })).toBeNull();
   });
 
   it("sin roles ⇒ estado vacío amigable, vacío NO es error", async () => {

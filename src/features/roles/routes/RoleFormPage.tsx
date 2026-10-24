@@ -76,7 +76,8 @@ export function RoleFormPage() {
   // deshab.
   const esFilaSemilla =
     nombreOriginal !== null && loadingRow === false && esRolSemilla(nombreOriginal);
-  const nombreDeshabilitado = esFilaSemilla;
+  // C0.4: los roles son fijos del sistema; en edición solo cambia la descripción.
+  const nombreDeshabilitado = esFilaSemilla || roleId !== null;
 
   function handleSubmit(): void {
     // URL de edición inválida (/roles/abc): nunca emitir un request.

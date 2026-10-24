@@ -26,14 +26,12 @@ const COLUMNAS: DataTableColumn<RoleListRow>[] = [
   {
     key: "nombre",
     header: "Nombre",
-    render: (row) =>
-      esLegacy(row.name) ? (
-        <Link to={`/roles/${row.id}`} className="text-gray-900 underline">
-          {row.name}
-        </Link>
-      ) : (
-        <span className="text-gray-900">{row.name}</span>
-      ),
+    // C0.4: toda fila enlaza a su edición (descripción).
+    render: (row) => (
+      <Link to={`/roles/${row.id}`} className="text-gray-900 underline">
+        {row.name}
+      </Link>
+    ),
   },
   {
     key: "descripcion",

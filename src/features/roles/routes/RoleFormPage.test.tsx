@@ -202,12 +202,12 @@ describe("RoleFormPage · edición /roles/:id (ADM-8.4/8.5)", () => {
     expect(await screen.findByText("Lista de roles")).toBeInTheDocument();
   });
 
-  it("rol legacy: name editable (pero igual atrapa Zod) y con botón de borrar", async () => {
+  it("rol legacy: en edición el nombre queda bloqueado (C0.4) y se puede borrar", async () => {
     vi.mocked(rolesApi.fetchRole).mockResolvedValue({ row: LEGACY, error: null });
     renderPagina("/roles/4");
 
     const input = await screen.findByLabelText("Nombre del rol");
-    expect(input).toBeEnabled();
+    expect(input).toBeDisabled();
     expect(input).toHaveValue("supervisor");
     expect(
       screen.getByRole("button", { name: "Eliminar rol" }),

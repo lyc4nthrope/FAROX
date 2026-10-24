@@ -41,8 +41,10 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
 | ✅ | C0.1 paginación | Anterior/Siguiente en productos, tiendas, distribuidores, usuarios y catálogos |
 | ✅ | C0.2 (parte) desactivar | "Eliminar" ahora es "Desactivar" (soft-delete, sin DELETE físico). Falta: botón Reactivar y filtro de inactivos |
-| ⬜ | C0.4 roles · C0.5 pruebas api viejas · C0.6 privacidad | correcciones de la auditoría pendientes |
-| ⬜ | A0.2 callback · A0.3 confirmaciones · A0.4 ubicación | correcciones de la auditoría pendientes |
+| ✅ | C0.4 (parte) roles | sin "Nuevo rol" (los 3 roles son fijos); toda fila enlaza a su edición; el nombre queda bloqueado y se edita la descripción |
+| ✅ | A0.3 confirmaciones | cambiar rol, Premium o activar/desactivar un usuario pide confirmación |
+| ⬜ | C0.5 pruebas api viejas · C0.6 privacidad · resto de C0.4 (ciclos de categorías, auditoría) | correcciones de la auditoría pendientes |
+| ⬜ | A0.2 callback · A0.4 ubicación | correcciones de la auditoría pendientes |
 | ⬜ | B0.3–B0.5 · CI, backup, protección de `main`, higiene | correcciones de la auditoría pendientes |
 | ⬜ | Realtime (alertas, dashboard) · C6 Playwright · B9 despliegue · C7 manual · C8 informe | cierre |
 

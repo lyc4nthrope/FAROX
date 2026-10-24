@@ -117,6 +117,8 @@ function renderPagina(role: RoleName = "admin", targetId = "u2") {
 }
 
 beforeEach(() => {
+  // A0.3: las acciones piden confirmación; por defecto el usuario acepta.
+  vi.spyOn(window, "confirm").mockReturnValue(true);
   vi.clearAllMocks();
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
   vi.mocked(authApi.signOut).mockResolvedValue(undefined);
@@ -133,6 +135,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   cleanup();
 });
 
@@ -319,6 +322,18 @@ describe("UserDetailPage · ADM-6 (toggles premium y activo + guarda propia)", (
     expect(usersApi.fetchUser).toHaveBeenCalledTimes(1); // solo la carga inicial
     // Premium propio sí está habilitado (ADM-6: sin extra).
     expect(screen.getByRole("switch", { name: "Premium" })).toBeEnabled();
+  });
+
+  it("A0.3: si se cancela la confirmación, desactivar NO llama a la RPC", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    renderPagina();
+    expect(await screen.findByDisplayValue("Omar Prueba")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("switch", { name: "Activo" }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(usersApi.setUserActive).not.toHaveBeenCalled();
   });
 
   it("ADM-6.3: desactivar a OTRO ⇒ set_user_active(false) y la fila queda visible e inactiva", async () => {

@@ -235,12 +235,14 @@ export function UserDetailPage() {
 
     // ADM-6 (spec): cambio de rol PROPIO permitido CON confirmación — el
     // riesgo es la auto-degradación. (La auto-desactivación no: ver abajo.)
-    if (currentUserId !== null && usuario.id === currentUserId) {
-      const confirmado = window.confirm(
-        "Vas a cambiar tu propio rol. ¿Querés continuar?",
-      );
-      if (!confirmado) return;
-    }
+    // A0.3: todo cambio de rol pide confirmación (propio o ajeno).
+    const esPropio = currentUserId !== null && usuario.id === currentUserId;
+    const confirmado = window.confirm(
+      esPropio
+        ? "Vas a cambiar tu propio rol. ¿Querés continuar?"
+        : `Vas a cambiar el rol de ${usuario.full_name} a «${parsed.data.role}». ¿Querés continuar?`,
+    );
+    if (!confirmado) return;
 
     setGuardandoRol(true);
     const distribuidor =
@@ -271,6 +273,15 @@ export function UserDetailPage() {
   // ADM-6.1 · premium SOLO vía set_user_premium; refetch posterior (HARD-3).
   function alternarPremium(value: boolean): void {
     if (usuario === null) return;
+    // A0.3: confirmación antes de cambiar el plan.
+    if (
+      !window.confirm(
+        value
+          ? `¿Dar Premium a ${usuario.full_name}?`
+          : `¿Quitar Premium a ${usuario.full_name}? Perderá movimientos manuales, dashboard y QR masivo.`,
+      )
+    )
+      return;
     setBusyPremium(true);
     setErrorToggles(null);
     setAvisoToggles(null);
@@ -297,6 +308,15 @@ export function UserDetailPage() {
   function alternarActivo(value: boolean): void {
     if (usuario === null) return;
     if (currentUserId !== null && usuario.id === currentUserId && !value) return;
+    // A0.3: confirmación explícita; desactivar deja al usuario sin acceso.
+    if (
+      !window.confirm(
+        value
+          ? `¿Reactivar a ${usuario.full_name}?`
+          : `¿Desactivar a ${usuario.full_name}? No podrá entrar al sistema.`,
+      )
+    )
+      return;
     setBusyActivo(true);
     setErrorToggles(null);
     setAvisoToggles(null);
