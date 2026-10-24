@@ -39,7 +39,9 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ⬜ | **Aplicar 0015 y 0018 en producción** + verificar con 0012 | Daniel (gate H1). Sin 0018 el inventario y las rutas fallan en producción |
 | ⬜ | A1–A4, A8 · Chatbot | migración 0016, n8n en VPS, tools, pantalla |
 | ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
-| ⬜ | C0.1 paginación · C0.2 desactivar · C0.4 roles · C0.5 pruebas api viejas · C0.6 privacidad | correcciones de la auditoría pendientes |
+| ✅ | C0.1 paginación | Anterior/Siguiente en productos, tiendas, distribuidores, usuarios y catálogos |
+| ✅ | C0.2 (parte) desactivar | "Eliminar" ahora es "Desactivar" (soft-delete, sin DELETE físico). Falta: botón Reactivar y filtro de inactivos |
+| ⬜ | C0.4 roles · C0.5 pruebas api viejas · C0.6 privacidad | correcciones de la auditoría pendientes |
 | ⬜ | A0.2 callback · A0.3 confirmaciones · A0.4 ubicación | correcciones de la auditoría pendientes |
 | ⬜ | B0.3–B0.5 · CI, backup, protección de `main`, higiene | correcciones de la auditoría pendientes |
 | ⬜ | Realtime (alertas, dashboard) · C6 Playwright · B9 despliegue · C7 manual · C8 informe | cierre |

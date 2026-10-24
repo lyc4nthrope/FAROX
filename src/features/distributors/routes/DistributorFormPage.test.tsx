@@ -167,12 +167,12 @@ describe("DistributorFormPage (DIST-1 · §S2 fila Distributor form)", () => {
     expect(screen.getByRole("button", { name: "Crear distribuidor" })).toBeInTheDocument();
   });
 
-  it("borrar en DOS pasos: desactiva y DESPUÉS borra, en ese orden (0006:133-135)", async () => {
+  it("admin: desactivar solo hace soft-delete (C0.2) — nunca borra la fila", async () => {
     vi.mocked(distributorsApi.fetchDistributor).mockResolvedValue({ row: D1, error: null });
     const user = userEvent.setup();
     renderRutas("/distributors/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar distribuidor" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar distribuidor" }));
 
     // "listado de distribuidores" NO existe en la UI: esa frase solo vive en un
     // comentario (DistributorList.tsx:16). El título real del listado es
@@ -181,20 +181,16 @@ describe("DistributorFormPage (DIST-1 · §S2 fila Distributor form)", () => {
     // Prueba estructural de que navigate("/distributors") salió del form al listado.
     expect(await screen.findByRole("heading", { name: "Distribuidores" })).toBeInTheDocument();
     expect(distributorsApi.deactivateDistributor).toHaveBeenCalledWith(1);
-    expect(distributorsApi.deleteDistributor).toHaveBeenCalledWith(1);
-    const ordenDesactivar =
-      vi.mocked(distributorsApi.deactivateDistributor).mock.invocationCallOrder[0];
-    const ordenBorrar = vi.mocked(distributorsApi.deleteDistributor).mock.invocationCallOrder[0];
-    expect(ordenDesactivar).toBeLessThan(ordenBorrar);
+    expect(distributorsApi.deleteDistributor).not.toHaveBeenCalled();
   });
 
-  it("si la desactivación falla, el paso 2 NO corre y el error es amigable", async () => {
+  it("si la desactivación falla, el error es amigable y no se navega", async () => {
     vi.mocked(distributorsApi.fetchDistributor).mockResolvedValue({ row: D1, error: null });
     vi.mocked(distributorsApi.deactivateDistributor).mockResolvedValue({ error: ERROR_RLS });
     const user = userEvent.setup();
     renderRutas("/distributors/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar distribuidor" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar distribuidor" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No tenés permisos para esta operación.",
@@ -215,6 +211,6 @@ describe("DistributorFormPage (DIST-1 · §S2 fila Distributor form)", () => {
     expect(screen.getByText("Vista de solo lectura: solo un administrador puede editar distribuidores.")).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Eliminar distribuidor" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desactivar distribuidor" })).not.toBeInTheDocument();
   });
 });

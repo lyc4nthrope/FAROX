@@ -392,7 +392,7 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
 
     const botonGuardar = await screen.findByRole("button", { name: "Guardar cambios" });
     // SEC-01 idea:114: el operador crea/edita pero NO borra (idea:130).
-    expect(screen.queryByRole("button", { name: "Eliminar tienda" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desactivar tienda" })).not.toBeInTheDocument();
     await user.clear(screen.getByLabelText("Nombre"));
     await user.type(screen.getByLabelText("Nombre"), "Tienda Ajenal");
     await user.click(botonGuardar);
@@ -405,31 +405,27 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     expect(screen.queryByRole("heading", { name: "Tiendas" })).not.toBeInTheDocument();
   });
 
-  it("admin: eliminar en DOS pasos — desactiva y DESPUÉS purga, en ese orden (0006:172-174)", async () => {
+  it("admin: desactivar solo hace soft-delete (C0.2) — nunca borra la fila", async () => {
     vi.mocked(storesApi.fetchStore).mockResolvedValue({ row: T1, error: null });
     vi.mocked(storesApi.fetchStoreGeo).mockResolvedValue({ geo: GEO1, error: null });
     const user = userEvent.setup();
     renderRutas("/stores/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar tienda" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar tienda" }));
 
     expect(await screen.findByRole("heading", { name: "Tiendas" })).toBeInTheDocument();
     expect(storesApi.deactivateStore).toHaveBeenCalledWith(1);
-    expect(storesApi.deleteStore).toHaveBeenCalledWith(1);
-    const ordenDesactivar =
-      vi.mocked(storesApi.deactivateStore).mock.invocationCallOrder[0];
-    const ordenBorrar = vi.mocked(storesApi.deleteStore).mock.invocationCallOrder[0];
-    expect(ordenDesactivar).toBeLessThan(ordenBorrar);
+    expect(storesApi.deleteStore).not.toHaveBeenCalled();
   });
 
-  it("si la desactivación falla, el paso 2 NO corre y el error es amigable", async () => {
+  it("si la desactivación falla, el error es amigable y no se navega", async () => {
     vi.mocked(storesApi.fetchStore).mockResolvedValue({ row: T1, error: null });
     vi.mocked(storesApi.fetchStoreGeo).mockResolvedValue({ geo: GEO1, error: null });
     vi.mocked(storesApi.deactivateStore).mockResolvedValue({ error: ERROR_RLS });
     const user = userEvent.setup();
     renderRutas("/stores/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar tienda" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar tienda" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No tenés permisos para esta operación.",

@@ -281,33 +281,29 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
 
     expect(await screen.findByDisplayValue("Café molido")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Eliminar producto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desactivar producto" })).not.toBeInTheDocument();
   });
 
-  it("admin: eliminar en DOS pasos — desactiva y DESPUÉS purga, en ese orden (0006:156-158)", async () => {
+  it("admin: desactivar solo hace soft-delete (C0.2) — nunca borra la fila", async () => {
     vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
     const user = userEvent.setup();
     renderRutas("/products/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar producto" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar producto" }));
 
     // Prueba estructural de que navigate("/products") salió del form al listado.
     expect(await screen.findByRole("heading", { name: "Productos" })).toBeInTheDocument();
     expect(productsApi.deactivateProduct).toHaveBeenCalledWith(1);
-    expect(productsApi.deleteProduct).toHaveBeenCalledWith(1);
-    const ordenDesactivar =
-      vi.mocked(productsApi.deactivateProduct).mock.invocationCallOrder[0];
-    const ordenBorrar = vi.mocked(productsApi.deleteProduct).mock.invocationCallOrder[0];
-    expect(ordenDesactivar).toBeLessThan(ordenBorrar);
+    expect(productsApi.deleteProduct).not.toHaveBeenCalled();
   });
 
-  it("si la desactivación falla, el paso 2 NO corre y el error es amigable", async () => {
+  it("si la desactivación falla, el error es amigable y no se navega", async () => {
     vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
     vi.mocked(productsApi.deactivateProduct).mockResolvedValue({ error: ERROR_RLS });
     const user = userEvent.setup();
     renderRutas("/products/1", "admin");
 
-    await user.click(await screen.findByRole("button", { name: "Eliminar producto" }));
+    await user.click(await screen.findByRole("button", { name: "Desactivar producto" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No tenés permisos para esta operación.",
@@ -337,6 +333,6 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Eliminar producto" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Desactivar producto" })).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,6 @@ import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   createDistributor,
   deactivateDistributor,
-  deleteDistributor,
   fetchDistributor,
   updateDistributor,
 } from "../api";
@@ -136,7 +135,7 @@ export function DistributorFormPage() {
   function handleDelete(): void {
     if (distributorId === null || !Number.isInteger(distributorId)) return;
     const confirmed = window.confirm(
-      "¿Eliminar este distribuidor? Primero queda desactivado y después se borra.",
+      "¿Desactivar este registro? Quedará desactivado y oculto de las listas; un administrador puede reactivarlo.",
     );
     if (!confirmed) return;
     setFormError(null);
@@ -147,12 +146,6 @@ export function DistributorFormPage() {
         const deactivate = await deactivateDistributor(distributorId);
         if (deactivate.error !== null) {
           setFormError(mapError(deactivate.error));
-          return;
-        }
-        // Paso 2: borrar la fila YA desactivada (0006:133-135).
-        const remove = await deleteDistributor(distributorId);
-        if (remove.error !== null) {
-          setFormError(mapError(remove.error));
           return;
         }
         navigate("/distributors");

@@ -4,6 +4,7 @@ import { STORE_CAP_MESSAGE } from "../../../shared/lib/errors/mapError";
 import { fetchStores, type StoreListScope } from "../api";
 import { StoreList } from "../components/StoreList";
 import type { StoreListRow } from "../types";
+import { Pager } from "../../../shared/ui/Pager";
 
 // Contenedor de /stores (§S2 fila Store list · STORE-2, spec #483 S6 ·
 // idea:68/207 CRUD de Tiendas): lista paginada vía useList (D4 — refetch al
@@ -42,6 +43,7 @@ export function StoresPage() {
         error={list.error}
         canCreate={role === "admin" || role === "operador"}
       />
+      <Pager list={list} />
     </section>
   );
 }

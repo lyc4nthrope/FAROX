@@ -17,6 +17,7 @@ import { CatalogTable } from "../components/CatalogTable";
 import { getCatalogDefinition, type CatalogDefinition } from "../definitions";
 import type { CatalogFormErrors, CatalogFormValues } from "../schemas";
 import type { CatalogRow, ParentOption } from "../types";
+import { Pager } from "../../../shared/ui/Pager";
 
 // Contenedor genérico de /catalogs/:catalogKey (sdd/admin-console T-C4/T-C6,
 // design key-decision #4). UNA sola pantalla para las 4 tablas: la variación
@@ -221,6 +222,7 @@ function CatalogCrudScreen({ definition }: { definition: CatalogDefinition }) {
         onDelete={handleDelete}
         onDeactivate={handleDeactivate}
       />
+      <Pager list={list} />
     </section>
   );
 }

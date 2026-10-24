@@ -3,6 +3,7 @@ import { useList } from "../../../shared/hooks/useList";
 import { fetchProducts } from "../api";
 import { ProductList } from "../components/ProductList";
 import type { ProductListRow } from "../types";
+import { Pager } from "../../../shared/ui/Pager";
 
 // Contenedor de /products (§S2 fila Product list · PROD-1, spec #483 S5 ·
 // idea:206 CRUD de Productos): lista paginada vía useList (D4 — refetch al
@@ -23,6 +24,7 @@ export function ProductsPage() {
         error={list.error}
         canCreate={role === "admin" || role === "operador"}
       />
+      <Pager list={list} />
     </section>
   );
 }

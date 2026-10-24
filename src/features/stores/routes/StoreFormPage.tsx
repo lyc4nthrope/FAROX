@@ -8,7 +8,6 @@ import type { GeoCoords } from "../../../shared/lib/geo/useGeolocation";
 import {
   createStore,
   deactivateStore,
-  deleteStore,
   fetchStore,
   fetchStoreGeo,
   fetchStoreTypes,
@@ -193,7 +192,7 @@ export function StoreFormPage() {
   function handleDelete(): void {
     if (storeId === null || !Number.isInteger(storeId)) return;
     const confirmed = window.confirm(
-      "¿Eliminar esta tienda? Primero queda desactivada y después se borra.",
+      "¿Desactivar este registro? Quedará desactivada y oculto de las listas; un administrador puede reactivarlo.",
     );
     if (!confirmed) return;
     setFormError(null);
@@ -204,12 +203,6 @@ export function StoreFormPage() {
         const deactivate = await deactivateStore(storeId);
         if (deactivate.error !== null) {
           setFormError(mapError(deactivate.error));
-          return;
-        }
-        // Paso 2: purgar la fila YA desactivada (0006:172-174).
-        const remove = await deleteStore(storeId);
-        if (remove.error !== null) {
-          setFormError(mapError(remove.error));
           return;
         }
         navigate("/stores");

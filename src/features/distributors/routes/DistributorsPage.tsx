@@ -5,6 +5,7 @@ import { useList } from "../../../shared/hooks/useList";
 import { fetchDistributorUserCounts, fetchDistributors } from "../api";
 import { DistributorList } from "../components/DistributorList";
 import type { DistributorListRow, DistributorUserCounts } from "../types";
+import { Pager } from "../../../shared/ui/Pager";
 
 // Contenedor de /distributors (§S2 fila Distributor list · DIST-01, spec #483
 // S4 · idea:218): lista paginada vía useList (D4 — refetch al re-entrar la
@@ -50,6 +51,7 @@ export function DistributorsPage() {
         canWrite={role === "admin"}
         userCounts={userCounts}
       />
+      <Pager list={list} />
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { useList } from "../../../shared/hooks/useList";
 import { fetchUserStoreCounts, fetchUsers } from "../api";
 import { UserList } from "../components/UserList";
 import type { UserListRow, UserStoreCounts } from "../types";
+import { Pager } from "../../../shared/ui/Pager";
 
 // Contenedor de /users (sdd/admin-console T-B4, ADM-3): lista paginada vía
 // useList (D4 — 25/página, refetch al re-entrar la ruta, cero realtime) bajo
@@ -46,6 +47,7 @@ export function UsersPage() {
     <section>
       <h1 className="text-xl font-semibold">Usuarios</h1>
       <UserList rows={rows} loading={list.loading} error={list.error} />
+      <Pager list={list} />
     </section>
   );
 }

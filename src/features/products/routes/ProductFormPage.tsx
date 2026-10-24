@@ -6,7 +6,6 @@ import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   createProduct,
   deactivateProduct,
-  deleteProduct,
   fetchBrands,
   fetchProduct,
   fetchProductCategories,
@@ -175,7 +174,7 @@ export function ProductFormPage() {
   function handleDelete(): void {
     if (productId === null || !Number.isInteger(productId)) return;
     const confirmed = window.confirm(
-      "¿Eliminar este producto? Primero queda desactivado y después se borra.",
+      "¿Desactivar este registro? Quedará desactivado y oculto de las listas; un administrador puede reactivarlo.",
     );
     if (!confirmed) return;
     setFormError(null);
@@ -186,12 +185,6 @@ export function ProductFormPage() {
         const deactivate = await deactivateProduct(productId);
         if (deactivate.error !== null) {
           setFormError(mapError(deactivate.error));
-          return;
-        }
-        // Paso 2: purgar la fila YA desactivada (0006:156-158).
-        const remove = await deleteProduct(productId);
-        if (remove.error !== null) {
-          setFormError(mapError(remove.error));
           return;
         }
         navigate("/products");
