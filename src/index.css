@@ -1,1 +1,20 @@
 @import "tailwindcss";
+
+/* Tablas legibles en todas las pantallas (cabecera, bordes y zebra). */
+@layer base {
+  main table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+  main th {
+    @apply border-b border-gray-300 bg-gray-50 px-3 py-2 font-medium text-gray-700;
+  }
+  main td {
+    @apply border-b border-gray-100 px-3 py-2 align-top;
+  }
+  main tbody tr:nth-child(even) {
+    @apply bg-gray-50/50;
+  }
+  main h1 {
+    @apply text-gray-900;
+  }
+}
