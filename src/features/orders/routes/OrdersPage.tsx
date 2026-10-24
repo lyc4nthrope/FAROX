@@ -3,8 +3,15 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Status, inputClass } from "../../../shared/ui/Box";
+import { Badge, Box, Status, inputClass, type BadgeTone } from "../../../shared/ui/Box";
 import { ORDER_STATUS_LABELS, fetchOrders, type OrderStatus } from "../api";
+
+const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
+  pending: "amber",
+  in_route: "blue",
+  delivered: "green",
+  cancelled: "gray",
+};
 
 /** /pedidos — lista por estado (la RLS limita lo visible por rol). */
 export function OrdersPage() {
@@ -60,9 +67,9 @@ export function OrdersPage() {
                     #{o.id}
                   </Link>
                 </td>
-                <td>{ORDER_STATUS_LABELS[o.status]}</td>
+                <td><Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge></td>
                 <td>{o.store_name}</td>
-                <td>{o.distributor_name}</td>
+                <td>{o.distributor_name || "—"}</td>
                 <td>{o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—"}</td>
               </tr>
             ))}

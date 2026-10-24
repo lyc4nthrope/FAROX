@@ -66,6 +66,11 @@ export async function fetchMyStores(isAdmin: boolean): Promise<LoadResult<StoreO
   return { data: (data ?? []) as StoreOption[], error };
 }
 
+export async function fetchStoreName(storeId: number): Promise<LoadResult<string>> {
+  const { data, error } = await supabase.from("stores").select("name").eq("id", storeId).maybeSingle();
+  return { data: data ? String((data as { name: unknown }).name) : null, error };
+}
+
 export async function fetchStock(storeId: number): Promise<LoadResult<StockRow[]>> {
   const { data, error } = await supabase
     .from("stock")

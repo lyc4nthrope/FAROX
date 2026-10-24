@@ -3,7 +3,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { Badge, Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { formatCOP } from "../../../shared/lib/format";
 import {
   ORDER_STATUS_LABELS,
   confirmDelivery,
@@ -12,6 +13,12 @@ import {
   fetchOrderItems,
   updateOrderStatus,
 } from "../api";
+
+const LINE_LABELS: Record<string, string> = {
+  pending: "Pendiente",
+  received: "Recibido",
+  partial: "Parcial",
+};
 
 /** /pedidos/:orderId — detalle, cambio de estado, confirmar entrega y fiado. */
 export function OrderDetailPage() {
@@ -66,9 +73,14 @@ export function OrderDetailPage() {
       <Status loading={order.loading} error={order.error ?? msg.error} ok={msg.ok} />
       {o && (
         <Box title="Resumen">
-          <p>Estado: {ORDER_STATUS_LABELS[o.status]}</p>
+          <p>
+            Estado:{" "}
+            <Badge tone={o.status === "delivered" ? "green" : o.status === "cancelled" ? "gray" : o.status === "in_route" ? "blue" : "amber"}>
+              {ORDER_STATUS_LABELS[o.status]}
+            </Badge>
+          </p>
           <p>Tienda: {o.store_name}</p>
-          <p>Distribuidor: {o.distributor_name}</p>
+          <p>Distribuidor: {o.distributor_name || (role === "distribuidor" ? "Tu distribuidora" : "—")}</p>
           <p>Fecha prometida: {o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—"}</p>
           {o.delivered_at && <p>Entregado: {new Date(o.delivered_at).toLocaleString("es-CO")}</p>}
           {o.notes && <p>Notas: {o.notes}</p>}
@@ -95,8 +107,8 @@ export function OrderDetailPage() {
                 <td>{i.product_name}</td>
                 <td>{i.quantity}</td>
                 <td>{i.received_quantity ?? "—"}</td>
-                <td>{i.status}</td>
-                {showPrice && <td>{i.unit_price ?? "—"}</td>}
+                <td>{LINE_LABELS[i.status] ?? i.status}</td>
+                {showPrice && <td>{i.unit_price === null ? "—" : formatCOP(i.unit_price)}</td>}
                 {open && role !== "admin" && (
                   <td>
                     <input

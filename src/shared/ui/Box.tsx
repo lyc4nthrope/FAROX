@@ -67,3 +67,27 @@ export async function runAction(
     return mapError(thrown);
   }
 }
+
+const BADGE_TONES = {
+  gray: "bg-gray-100 text-gray-800",
+  green: "bg-green-100 text-green-800",
+  amber: "bg-amber-100 text-amber-900",
+  red: "bg-red-100 text-red-800",
+  blue: "bg-blue-100 text-blue-800",
+} as const;
+
+export type BadgeTone = keyof typeof BADGE_TONES;
+
+/** Etiqueta de estado con color (siempre acompañada de texto, nunca solo color). */
+export function Badge({ tone, children }: { tone: BadgeTone; children: ReactNode }) {
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${BADGE_TONES[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
+/** Grilla de 2 columnas en pantallas anchas para cajas de formulario. */
+export function TwoColumns({ children }: { children: ReactNode }) {
+  return <div className="grid gap-x-4 lg:grid-cols-2">{children}</div>;
+}

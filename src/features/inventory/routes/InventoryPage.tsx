@@ -3,7 +3,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { Badge, Box, Field, Status, TwoColumns, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { formatCOP, formatQty } from "../../../shared/lib/format";
 import {
   assignProduct,
   fetchActiveProducts,
@@ -12,6 +13,7 @@ import {
   fetchMyStores,
   fetchPrices,
   fetchStock,
+  fetchStoreName,
   registerMovement,
   reverseMovement,
   setPrice,
@@ -41,10 +43,10 @@ export function InventoryStoresPage() {
   );
 }
 
-function stockStatus(quantity: number, threshold: number | null): string {
-  if (quantity === 0) return "Agotado";
-  if (threshold !== null && quantity <= threshold) return "Bajo";
-  return "OK";
+function StockBadge({ quantity, threshold }: { quantity: number; threshold: number | null }) {
+  if (quantity === 0) return <Badge tone="red">Agotado</Badge>;
+  if (threshold !== null && quantity <= threshold) return <Badge tone="amber">Bajo</Badge>;
+  return <Badge tone="green">OK</Badge>;
 }
 
 /** /inventario/:storeId — stock, movimientos y precios de una tienda. */
@@ -53,6 +55,7 @@ export function InventoryPage() {
   const { role, premium } = useAuth();
   const isAdmin = role === "admin";
 
+  const storeName = useLoad(() => fetchStoreName(storeId), [storeId]);
   const stock = useLoad(() => fetchStock(storeId), [storeId]);
   const movements = useLoad(() => fetchMovements(storeId), [storeId]);
   const prices = useLoad(() => fetchPrices(storeId), [storeId]);
@@ -128,6 +131,9 @@ export function InventoryPage() {
     void act(() => setPrice(storeId, Number(price.productId), Number(price.price)), "Precio guardado.");
   }
 
+  // Movimientos que ya tienen reverso: no se pueden revertir de nuevo.
+  const reversed = new Set((movements.data ?? []).map((m) => m.reverso_of_id).filter((id) => id !== null));
+
   const motiveOptions =
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
 
@@ -138,7 +144,7 @@ export function InventoryPage() {
           ← Tiendas
         </Link>
       </p>
-      <h1 className="text-xl font-semibold">Inventario de la tienda #{storeId}</h1>
+      <h1 className="text-xl font-semibold">Inventario — {storeName.data ?? `tienda #${storeId}`}</h1>
       <p className="text-sm">
         <Link className="underline" to={`/tiendas/${storeId}/qr`}>
           QR de vínculo para distribuidores
@@ -162,10 +168,10 @@ export function InventoryPage() {
             {stock.data?.map((r) => (
               <tr key={r.product_id}>
                 <td>{r.product_name}</td>
-                <td>{r.quantity}</td>
-                <td>{r.threshold ?? "—"}</td>
+                <td>{formatQty(r.quantity)}</td>
+                <td>{r.threshold === null ? "—" : formatQty(r.threshold)}</td>
                 <td>{r.expiry_date ?? "—"}</td>
-                <td>{stockStatus(r.quantity, r.threshold)}</td>
+                <td><StockBadge quantity={r.quantity} threshold={r.threshold} /></td>
               </tr>
             ))}
           </tbody>
@@ -173,6 +179,7 @@ export function InventoryPage() {
         {stock.data?.length === 0 && <p>La tienda no tiene productos asignados.</p>}
       </Box>
 
+      <TwoColumns>
       <Box title="Asignar producto a la tienda">
         <form onSubmit={onAssign}>
           <Field label="Producto">
@@ -274,6 +281,8 @@ export function InventoryPage() {
         </form>
       </Box>
 
+      </TwoColumns>
+
       <Box title="Últimos movimientos">
         <Status loading={movements.loading} error={movements.error} />
         <table className="w-full text-left text-sm">
@@ -291,13 +300,13 @@ export function InventoryPage() {
             {movements.data?.map((m) => (
               <tr key={m.id}>
                 <td>{new Date(m.created_at).toLocaleString("es-CO")}</td>
-                <td>{m.type === "entry" ? "Entrada" : "Salida"}</td>
+                <td>{m.type === "entry" ? <Badge tone="green">Entrada</Badge> : <Badge tone="blue">Salida</Badge>}</td>
                 <td>{m.product_name}</td>
                 <td>{m.quantity}</td>
                 <td>{m.reverso_of_id === null ? m.motive_name : `reverso de #${m.reverso_of_id}`}</td>
                 {isAdmin && (
                   <td>
-                    {m.reverso_of_id === null && (
+                    {m.reverso_of_id === null && !reversed.has(m.id) && (
                       <button
                         className={buttonClass}
                         type="button"
@@ -322,7 +331,7 @@ export function InventoryPage() {
         <ul className="list-disc pl-5 text-sm">
           {prices.data?.map((p) => (
             <li key={p.product_id}>
-              {p.product_name}: {p.price} {p.currency}
+              {p.product_name}: {formatCOP(p.price)}
             </li>
           ))}
         </ul>

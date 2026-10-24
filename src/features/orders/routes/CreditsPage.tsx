@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { Badge, Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { formatCOP } from "../../../shared/lib/format";
 import {
   cancelCredit,
   fetchCredits,
@@ -42,7 +43,10 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
         <Link className="underline" to={`/pedidos/${credit.order_id}`}>
           #{credit.order_id}
         </Link>{" "}
-        · Total {credit.total_amount} · Saldo {credit.balance} · {CREDIT_LABELS[credit.status] ?? credit.status}
+        · Total {formatCOP(credit.total_amount)} · Saldo <strong>{formatCOP(credit.balance)}</strong>{" "}
+        <Badge tone={credit.status === "paid" ? "green" : credit.status === "cancelled" ? "gray" : "amber"}>
+          {CREDIT_LABELS[credit.status] ?? credit.status}
+        </Badge>
         {credit.due_date && ` · vence ${credit.due_date}`}
       </p>
       <Status error={msg.error ?? payments.error} ok={msg.ok} />
@@ -85,7 +89,7 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
       <ul className="mt-2 list-disc pl-5 text-sm">
         {payments.data?.map((p) => (
           <li key={p.id}>
-            {new Date(p.paid_at).toLocaleDateString("es-CO")}: {p.amount} ({p.payment_method})
+            {new Date(p.paid_at).toLocaleDateString("es-CO")}: {formatCOP(p.amount)} ({p.payment_method})
             {p.reverso_of_id !== null && ` — reverso de #${p.reverso_of_id}`}
             {role === "admin" && p.reverso_of_id === null && (
               <button

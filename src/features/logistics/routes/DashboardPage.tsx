@@ -4,6 +4,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { supabase } from "../../../shared/lib/supabase/client";
 import { Box, Field, Status, inputClass } from "../../../shared/ui/Box";
+import { formatCOP } from "../../../shared/lib/format";
 
 interface DashboardRow {
   day: string;
@@ -102,8 +103,8 @@ export function DashboardPage() {
       </Box>
       <Box title="Totales del rango">
         <ul className="text-sm">
-          <li>Entradas: {totals.entries} (valor {totals.entriesValue.toFixed(2)})</li>
-          <li>Salidas: {totals.exits} (valor {totals.exitsValue.toFixed(2)})</li>
+          <li>Entradas: {totals.entries} (valor {formatCOP(totals.entriesValue)})</li>
+          <li>Salidas: {totals.exits} (valor {formatCOP(totals.exitsValue)})</li>
         </ul>
       </Box>
       <Box title="Por distribuidor">
@@ -122,7 +123,7 @@ export function DashboardPage() {
                 <td>{label(id)}</td>
                 <td>{v.entries}</td>
                 <td>{v.exits}</td>
-                <td>{v.value.toFixed(2)}</td>
+                <td>{formatCOP(v.value)}</td>
               </tr>
             ))}
           </tbody>

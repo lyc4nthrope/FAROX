@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { Badge, Box, Field, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
 import {
   ROUTE_LABELS,
   STOP_LABELS,
@@ -47,7 +47,10 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
       <ol className="mt-2 list-decimal pl-5 text-sm">
         {route.stops.map((s) => (
           <li key={s.id} className="mb-1">
-            {s.store_name} {s.estimated_time && `(${s.estimated_time.slice(0, 5)})`} — {STOP_LABELS[s.status]}
+            {s.store_name} {s.estimated_time && `(${s.estimated_time.slice(0, 5)})`}{" "}
+            <Badge tone={s.status === "completed" ? "green" : s.status === "skipped" ? "gray" : s.status === "arrived" ? "blue" : "amber"}>
+              {STOP_LABELS[s.status]}
+            </Badge>
             {s.lat !== null && ` · ${s.lat.toFixed(5)}, ${s.lng?.toFixed(5)}`}
             {role === "distribuidor" && (s.status === "pending" || s.status === "arrived") && (
               <span className="ml-2 inline-flex gap-1">
@@ -232,7 +235,9 @@ export function RoutesPage() {
               <Link className="underline" to={`/rutas/${r.id}`}>
                 {r.route_date} — {r.distributor_name}
               </Link>{" "}
-              ({ROUTE_LABELS[r.status]})
+              <Badge tone={r.status === "completed" ? "green" : r.status === "cancelled" ? "gray" : r.status === "active" ? "blue" : "amber"}>
+                {ROUTE_LABELS[r.status]}
+              </Badge>
             </li>
           ))}
         </ul>

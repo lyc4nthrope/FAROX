@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Box, Status, buttonClass, runAction } from "../../../shared/ui/Box";
+import { Badge, Box, Status, buttonClass, runAction } from "../../../shared/ui/Box";
 import { ALERT_LABELS, fetchOpenAlerts, markAlertRead } from "../alertsApi";
 
 /** /alertas — alertas abiertas del alcance del usuario. */
@@ -25,7 +25,8 @@ export function AlertsPage() {
         <ul className="flex flex-col gap-2">
           {alerts.data?.map((a) => (
             <li key={a.id} className="rounded border border-gray-200 p-2 text-sm">
-              <strong>{ALERT_LABELS[a.type] ?? a.type}</strong> — {a.message}
+              <Badge tone={a.type === "stock_low" || a.type === "credit_overdue" ? "red" : "amber"}>{ALERT_LABELS[a.type] ?? a.type}</Badge>{" "}
+              {a.message}
               <div className="text-xs text-gray-600">
                 {new Date(a.created_at).toLocaleString("es-CO")}
                 {a.read_at !== null && " · leída"}
