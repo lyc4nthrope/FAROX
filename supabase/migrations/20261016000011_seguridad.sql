@@ -56,7 +56,7 @@ BEGIN
   -- jamás toman el bypass; la sesión del SQL editor/MCP (session_user =
   -- 'postgres', sin JWT ⇒ auth.uid() IS NULL) sí, preservando el bootstrap
   -- del primer admin (C2, R16.3).
-  IF session_user() = 'postgres' AND auth.uid() IS NULL THEN
+  IF session_user = 'postgres' AND auth.uid() IS NULL THEN
     RETURN;  -- sesión del SQL editor: bootstrap del primer admin (C2)
   END IF;
   SELECT EXISTS (
