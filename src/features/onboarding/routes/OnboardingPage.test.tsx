@@ -346,9 +346,9 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     await user.click(screen.getByRole("button", { name: "Registrarme como distribuidor" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Ocurrió un error inesperado. Intentá de nuevo.",
+      "Tu cuenta ya tiene un distribuidor asociado.",
     );
-    expect(screen.queryByText(/distribuidor asociado/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ya tenés un distribuidor asociado/)).not.toBeInTheDocument();
     // Sigo en el form (retry) y sin refetch de señales.
     expect(screen.getByRole("button", { name: "Registrarme como distribuidor" })).toBeInTheDocument();
     expect(screen.queryByText("llegaste al inicio")).not.toBeInTheDocument();
@@ -576,6 +576,8 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     await user.click(await screen.findByRole("button", { name: "Entendido" }));
     expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();
     cleanup();
+    // Nueva sesión = sessionStorage vacío (el ack vive por sesión de navegador).
+    window.sessionStorage.clear();
 
     // Segundo arranque (nueva sesión, el admin todavía no asignó tiendas):
     // el ack era solo de sesión ⇒ la pregunta aparece de nuevo.

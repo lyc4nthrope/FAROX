@@ -10,42 +10,14 @@ const SRC = join(process.cwd(), "src");
 
 // §S8-1 · 21 RPCs diferidos (whitelist Base:642-659; 10 en alcance + 21 = 31).
 const DEFERRED_RPCS = [
-  "assign_product_to_store",
-  "set_price",
-  "register_entry",
-  "register_exit",
-  "register_reverse",
-  "create_order",
-  "update_order_status",
-  "confirm_delivery",
-  "get_order_items",
-  "save_route",
-  "mark_stop",
-  "update_route_status",
-  "create_credit",
-  "cancel_credit",
-  "register_payment",
-  "register_payment_reverse",
-  "mark_alert_read",
   "get_stock",
-  "get_dashboard",
   "create_chat",
   "send_message",
 ];
 
-// §S8-2 · 15 tablas diferidas (10 en alcance + 15 = 25).
+// Tablas todavía no habilitadas en el front (el resto ya tiene slice).
 const DEFERRED_TABLES = [
-  "motives",
-  "stock",
-  "movements",
-  "orders",
   "order_items",
-  "credits",
-  "credit_payments",
-  "price_publications",
-  "alerts",
-  "routes",
-  "route_stops",
   "dashboard_daily",
   "chat_conversations",
   "chat_messages",

@@ -18,6 +18,32 @@
 | Entrega | **Demo final: viernes 2026-11-06** · congelamiento de código: **miércoles 2026-11-04, 23:59** |
 | Días hábiles restantes | 10 (vie 23 oct → jue 5 nov) |
 
+### Estado integrado al 2026-10-24 (manda sobre la división en tracks)
+
+Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanza en orden sobre esta lista única. Los archivos de track quedan como detalle técnico de cada tarea.
+
+| Estado | Tarea | Qué quedó |
+|---|---|---|
+| ✅ | B0.1 · 0011 corregida | `session_user` sin paréntesis (Daniel, `45d00ea`) |
+| ✅ | A0.1 BD · migración 0015 | guards de `register_distributor` y último admin (Daniel, `45d00ea`) — **falta aplicarla en producción** |
+| ✅ | A0.1 front | admin y distribuidor no pasan por el onboarding; el "Entendido" sobrevive a remontajes |
+| ✅ | C0.3 (parte) | `mapError` traduce los errores de negocio de todas las RPC (NIT duplicado, stock insuficiente, sin precio, premium, etc.) |
+| ✅ | B4 + B5 + B7 · Inventario | `/inventario/:tienda`: stock con estado, asignar producto + umbral, entrada/salida con motivo y vencimiento, reverso (admin), precios (admin) |
+| ✅ | B6 · Alertas | `/alertas`: abiertas + marcar leída (sin realtime todavía) |
+| ✅ | C1–C4 · Pedidos | `/pedidos`, `/pedidos/nuevo`, `/pedidos/:id`: listar por rol, crear, en ruta, cancelar (admin), confirmar entrega parcial |
+| ✅ | B8 · Fiado | `/fiado` + bloque en pedido entregado: crear crédito, pagos, reverso, anular |
+| ✅ | A6 + A7 · Rutas | `/rutas` (admin planifica), `/rutas/:id`, `/mi-ruta` (distribuidor): paradas, llegada/completar/omitir, enlace a Google Maps |
+| ✅ | C5 · Dashboard | `/dashboard`: `get_dashboard` por rango, totales, por distribuidor y por día (sin realtime) |
+| ⬜ | Aplicar 0015 en producción + verificar 0012 | Daniel (gate H1) |
+| ⬜ | A1–A4, A8 · Chatbot | migración 0016, n8n en VPS, tools, pantalla |
+| ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
+| ⬜ | C0.1 paginación · C0.2 desactivar · C0.4 roles · C0.5 pruebas api viejas · C0.6 privacidad | correcciones de la auditoría pendientes |
+| ⬜ | A0.2 callback · A0.3 confirmaciones · A0.4 ubicación | correcciones de la auditoría pendientes |
+| ⬜ | B0.3–B0.5 · CI, backup, protección de `main`, higiene | correcciones de la auditoría pendientes |
+| ⬜ | Realtime (alertas, dashboard) · C6 Playwright · B9 despliegue · C7 manual · C8 informe | cierre |
+
+UI de las pantallas nuevas: intencionalmente simple ("cajas"), con estados de carga/error y textos amigables; el pulido visual queda para el final.
+
 ### Jerarquía de documentos
 
 | Tema | Documento autoridad |

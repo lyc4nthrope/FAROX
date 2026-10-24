@@ -143,20 +143,10 @@ const extractQuotedNames = (blockName: string): string[] => {
   );
 };
 
-describe("T-A2 · D2b: audit fuera de DEFERRED_TABLES, el resto intacto", () => {
-  it("DEFERRED_TABLES queda con exactamente los 14 nombres restantes (ADM-2.4)", () => {
+describe("T-A2 · gate de alcance: solo lo que aún no tiene slice sigue diferido", () => {
+  it("DEFERRED_TABLES queda con las 4 tablas pendientes (chat y agregados internos)", () => {
     expect(extractQuotedNames("DEFERRED_TABLES")).toEqual([
-      "motives",
-      "stock",
-      "movements",
-      "orders",
       "order_items",
-      "credits",
-      "credit_payments",
-      "price_publications",
-      "alerts",
-      "routes",
-      "route_stops",
       "dashboard_daily",
       "chat_conversations",
       "chat_messages",
@@ -164,35 +154,11 @@ describe("T-A2 · D2b: audit fuera de DEFERRED_TABLES, el resto intacto", () => 
   });
 
   it("el nombre de la tabla de auditoría ya no está en DEFERRED_TABLES", () => {
-    const tables = extractQuotedNames("DEFERRED_TABLES");
-    expect(tables).toHaveLength(14);
-    expect(tables).not.toContain(auditTableName);
+    expect(extractQuotedNames("DEFERRED_TABLES")).not.toContain(auditTableName);
   });
 
-  it("los 21 DEFERRED_RPCS siguen intactos (ADM-2.2)", () => {
-    expect(extractQuotedNames("DEFERRED_RPCS")).toEqual([
-      "assign_product_to_store",
-      "set_price",
-      "register_entry",
-      "register_exit",
-      "register_reverse",
-      "create_order",
-      "update_order_status",
-      "confirm_delivery",
-      "get_order_items",
-      "save_route",
-      "mark_stop",
-      "update_route_status",
-      "create_credit",
-      "cancel_credit",
-      "register_payment",
-      "register_payment_reverse",
-      "mark_alert_read",
-      "get_stock",
-      "get_dashboard",
-      "create_chat",
-      "send_message",
-    ]);
+  it("DEFERRED_RPCS queda con las 3 RPC del chatbot aún sin slice", () => {
+    expect(extractQuotedNames("DEFERRED_RPCS")).toEqual(["get_stock", "create_chat", "send_message"]);
   });
 });
 
@@ -219,12 +185,12 @@ const runGateOn = (
 
 // [descripción, clave única, contenido del probe, subcadena de la regla]
 const forbiddenProbes: ReadonlyArray<[string, string, string, string]> = [
-  ["la tabla diferida stock", "tabla-stock", probeFrom("stock"), "tabla diferida: stock"],
+  ["la tabla diferida order_items", "tabla-order-items", probeFrom("order_items"), "tabla diferida: order_items"],
   [
-    "la RPC diferida create_order",
-    "rpc-create-order",
-    probeRpc("create_order"),
-    "RPC diferido: create_order",
+    "la RPC diferida send_message",
+    "rpc-send-message",
+    probeRpc("send_message"),
+    "RPC diferido: send_message",
   ],
   [
     "la cadena " + serviceRoleName,

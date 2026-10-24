@@ -28,7 +28,7 @@ import type { OnboardingSignals } from "../types";
 // terminales lo refrescan con éxito en vez de re-preguntar.
 
 function OnboardingProvider({ children }: { children: ReactNode }) {
-  const { userId } = useAuth();
+  const { userId, role } = useAuth();
   // Hidratación desde la caché en memoria (signalsCache): un remount del
   // layout (p. ej. el flicker de sesión de un visibilitychange) pinta el
   // Outlet de INMEDIATO con la última señal conocida y revalida en
@@ -44,7 +44,13 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
     cachedSignalsAtMount !== null ? "ready" : "loading",
   );
   const [signals, setSignals] = useState<OnboardingSignals | null>(cachedSignalsAtMount);
-  const [acknowledged, setAcknowledged] = useState(false);
+  // A0.1/F19: el ack de "Trabajo en tienda" vive en sessionStorage por usuario
+  // para sobrevivir a los remontajes del layout dentro de la misma sesión.
+  const ackKey = userId === null ? null : `farox.onboarding.ack.${userId}`;
+  const [acknowledged, setAcknowledged] = useState(() => readAck(ackKey));
+  useEffect(() => {
+    setAcknowledged(readAck(ackKey));
+  }, [ackKey]);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -124,11 +130,19 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
 
   // [Trabajo en tienda]: sin señal persistente ⇒ ack SOLO de sesión (S-D3.C:
   // en los próximos logins la pregunta vuelve hasta que el admin asigne).
-  const acknowledge = useCallback(() => setAcknowledged(true), []);
+  const acknowledge = useCallback(() => {
+    setAcknowledged(true);
+    writeAck(ackKey);
+  }, [ackKey]);
   const retry = useCallback(() => setAttempt((previous) => previous + 1), []);
 
   const needsOnboarding =
-    phase === "ready" && signals !== null && deriveNeedsOnboarding(signals, acknowledged);
+    // A0.1/F2: admin y distribuidor nunca pasan por el onboarding.
+    role !== "admin" &&
+    role !== "distribuidor" &&
+    phase === "ready" &&
+    signals !== null &&
+    deriveNeedsOnboarding(signals, acknowledged);
 
   const value = useMemo<OnboardingContextValue>(
     () => ({ phase, needsOnboarding, error, refresh, acknowledge, retry }),
@@ -182,4 +196,22 @@ export function OnboardingGate() {
       <OnboardingGuard />
     </OnboardingProvider>
   );
+}
+
+function readAck(key: string | null): boolean {
+  if (key === null) return false;
+  try {
+    return window.sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeAck(key: string | null): void {
+  if (key === null) return;
+  try {
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    // Sin almacenamiento: el ack dura lo que dure el componente.
+  }
 }

@@ -4,6 +4,9 @@ import { CallbackPage, LoginPage, RegisterPage } from "../features/auth";
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
+import { AlertsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
+import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
+import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
 import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
@@ -37,6 +40,7 @@ import { HomePage } from "./shell/HomePage";
 //   cuyo scope "mine"/"all" depende del rol (§S2 "operador own").
 const ADMIN_ONLY: readonly RoleName[] = ["admin"];
 const ADMIN_OR_OPERATOR: readonly RoleName[] = ["admin", "operador"];
+const DISTRIBUTOR_ONLY: readonly RoleName[] = ["distribuidor"];
 
 export function AppRoutes() {
   return (
@@ -217,6 +221,17 @@ export function AppRoutes() {
                 </RequireRole>
               }
             />
+            <Route path="/inventario" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryStoresPage /></RequireRole>} />
+            <Route path="/inventario/:storeId" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryPage /></RequireRole>} />
+            <Route path="/alertas" element={<AlertsPage />} />
+            <Route path="/pedidos" element={<OrdersPage />} />
+            <Route path="/pedidos/nuevo" element={<RequireRole roles={ADMIN_OR_OPERATOR}><NewOrderPage /></RequireRole>} />
+            <Route path="/pedidos/:orderId" element={<OrderDetailPage />} />
+            <Route path="/fiado" element={<RequireRole roles={ADMIN_OR_OPERATOR}><CreditsPage /></RequireRole>} />
+            <Route path="/rutas" element={<RequireRole roles={ADMIN_ONLY}><RoutesPage /></RequireRole>} />
+            <Route path="/rutas/:routeId" element={<RequireRole roles={ADMIN_ONLY}><RouteDetailPage /></RequireRole>} />
+            <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<NotFound />} />
           </Route>

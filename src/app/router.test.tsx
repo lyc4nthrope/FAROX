@@ -118,6 +118,24 @@ vi.mock("../features/catalogs/api", () => ({
 vi.mock("../features/audit/api", () => ({
   fetchAuditPage: vi.fn(),
 }));
+// Features nuevas (inventario, pedidos, rutas, dashboard) usan el cliente
+// directo: un builder encadenable que siempre resuelve a lista vacía.
+vi.mock("../shared/lib/supabase/client", () => {
+  const result = { data: [], error: null };
+  const chain: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "neq", "is", "in", "order", "limit", "range"]) {
+    chain[method] = () => chain;
+  }
+  chain.single = () => Promise.resolve({ data: null, error: null });
+  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  chain.then = (ok: (v: unknown) => unknown) => Promise.resolve(result).then(ok);
+  return {
+    supabase: {
+      from: () => chain,
+      rpc: () => Promise.resolve(result),
+    },
+  };
+});
 
 const SESSION = { userId: "u1", email: "demo@farox.app" };
 

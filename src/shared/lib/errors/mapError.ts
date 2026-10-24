@@ -33,6 +33,45 @@ const FRIENDLY = {
 // devuelve cuando el server levanta el RAISE del cap 0004:376).
 export const STORE_CAP_MESSAGE = FRIENDLY.storeCap;
 
+// Mensajes de RAISE EXCEPTION de las RPC (migraciones 0004–0015), en minúsculas.
+// El orden importa: el primero que coincide gana.
+const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
+  ["ya existe un distribuidor con ese nit", "Ya hay un distribuidor registrado con ese NIT. Si es tu empresa, contactá al administrador."],
+  ["ya tenés un distribuidor asociado", "Tu cuenta ya tiene un distribuidor asociado."],
+  ["ya registraste un distribuidor", "Ya registraste un distribuidor; pedile al administrador cualquier cambio."],
+  ["nit requerido", "El NIT es obligatorio."],
+  ["ubicación requerida", "Elegí la ubicación de la tienda en el mapa."],
+  ["usuario inactivo", "Tu cuenta está desactivada."],
+  ["último administrador", "No se puede quitar al último administrador activo."],
+  ["requiere premium", "Esta acción requiere una cuenta Premium."],
+  ["stock insuficiente", "No hay stock suficiente para esa salida."],
+  ["sin precio activo", "Ese producto no tiene precio en la tienda. Un administrador debe asignarle precio primero."],
+  ["fuera del alcance", "Esa tienda no está en tu alcance."],
+  ["sin alcance", "No tenés acceso a ese registro."],
+  ["producto repetido", "Hay un producto repetido en la lista."],
+  ["items vacíos", "Agregá al menos un producto."],
+  ["items requeridos", "Agregá al menos un producto."],
+  ["quantity debe ser > 0", "La cantidad debe ser mayor que 0."],
+  ["excede la cantidad pedida", "La cantidad recibida no puede superar la pedida."],
+  ["ya confirmado", "Este pedido ya fue confirmado."],
+  ["no re-entregable", "El pedido no se puede entregar en su estado actual."],
+  ["delivered solo se registra", "La entrega se registra con \"Confirmar entrega\"."],
+  ["cancelar exige reason", "Para cancelar hay que escribir un motivo."],
+  ["inactivo o inexistente", "Hay un registro inactivo o inexistente en el formulario."],
+  ["no pertenece al pedido", "Ese producto no pertenece al pedido."],
+  ["ya tiene reverso", "Ese movimiento ya fue revertido."],
+  ["reverso-de-reverso", "No se puede revertir un reverso."],
+  ["reason requerido", "Escribí un motivo."],
+  ["route_date requerida", "Elegí la fecha de la ruta."],
+  ["stop_order debe ser", "El orden de las paradas debe empezar en 1."],
+  ["transición inválida", "Ese cambio de estado no está permitido."],
+  ["excede el máximo de 366", "El rango de fechas no puede superar 366 días."],
+  ["excede el saldo", "El pago supera el saldo pendiente."],
+  ["ya tiene un crédito vigente", "Ese pedido ya tiene un crédito."],
+  ["el fiado solo se registra", "Solo se puede fiar un pedido entregado."],
+  ["price debe ser > 0", "El precio debe ser mayor que 0."],
+];
+
 // PostgrestError trae { message, code, details, hint }; AuthError trae
 // { message, status }; un fetch rechazado trae TypeError. Se acepta unknown
 // y se extrae lo mínimo: nunca se devuelve el original al caller.
@@ -113,6 +152,13 @@ export function mapError(error: unknown): string {
   }
   if (message.includes("invalid login credentials")) {
     return FRIENDLY.invalidCredentials;
+  }
+
+  // Reglas de negocio de las RPC (RAISE EXCEPTION): substring → texto de UI.
+  for (const [needle, friendly] of BUSINESS_RULES) {
+    if (message.includes(needle)) {
+      return friendly;
+    }
   }
 
   // 3) Red / timeout — fetch rechazado por el navegador o el runtime.
