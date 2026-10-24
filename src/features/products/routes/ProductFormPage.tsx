@@ -15,6 +15,7 @@ import {
 import { ProductForm, type ProductFormErrors } from "../components/ProductForm";
 import { productSchema, type ProductFormValues } from "../schemas";
 import type { CatalogRef } from "../types";
+import { ReactivateBanner } from "../../../shared/ui/ReactivateBanner";
 
 const EMPTY_VALUES: ProductFormValues = {
   name: "",
@@ -203,6 +204,7 @@ export function ProductFormPage() {
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (
         <div className="mt-6">
+          {typeof productId === "number" && <ReactivateBanner table="products" id={productId} />}
           <ProductForm
             values={values}
             errors={errors}

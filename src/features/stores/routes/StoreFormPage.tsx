@@ -16,6 +16,7 @@ import {
 import { StoreForm, type StoreFormErrors } from "../components/StoreForm";
 import { storeSchema, type StoreFormValues } from "../schemas";
 import type { StoreTypeRef } from "../types";
+import { ReactivateBanner } from "../../../shared/ui/ReactivateBanner";
 
 const EMPTY_VALUES: StoreFormValues = {
   name: "",
@@ -221,6 +222,7 @@ export function StoreFormPage() {
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (
         <div className="mt-6">
+          {typeof storeId === "number" && <ReactivateBanner table="stores" id={storeId} />}
           <StoreForm
             values={values}
             errors={errors}

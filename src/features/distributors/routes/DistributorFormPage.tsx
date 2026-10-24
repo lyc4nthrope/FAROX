@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { DistributorForm, type DistributorFormErrors } from "../components/DistributorForm";
 import { distributorSchema, type DistributorFormValues } from "../schemas";
+import { ReactivateBanner } from "../../../shared/ui/ReactivateBanner";
 
 const EMPTY_VALUES: DistributorFormValues = {
   name: "",
@@ -166,6 +167,7 @@ export function DistributorFormPage() {
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (
         <div className="mt-6">
+          {typeof distributorId === "number" && <ReactivateBanner table="distributors" id={distributorId} />}
           <DistributorForm
             values={values}
             errors={errors}

@@ -10,6 +10,14 @@ import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { RequireRole } from "../../../app/guards/RequireRole";
 import { StoreFormPage } from "./StoreFormPage";
 
+// ReactivateBanner consulta is_active con el cliente directo: sin fila ⇒ no se muestra.
+vi.mock("../../../shared/lib/supabase/client", () => {
+  const chain: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "update"]) chain[m] = () => chain;
+  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  return { supabase: { from: () => chain } };
+});
+
 // ESCAPE HATCH del mapa (progressive enhancement): si el chunk de Leaflet
 // FALLA al cargar, el ErrorBoundary de MapLocationField renderiza los inputs
 // numéricos legacy con su warning — el form NUNCA queda sin salida. Acá se

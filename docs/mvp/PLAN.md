@@ -40,7 +40,7 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ⬜ | A1–A4, A8 · Chatbot | migración 0016, n8n en VPS, tools, pantalla |
 | ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
 | ✅ | C0.1 paginación | Anterior/Siguiente en productos, tiendas, distribuidores, usuarios y catálogos |
-| ✅ | C0.2 (parte) desactivar | "Eliminar" ahora es "Desactivar" (soft-delete, sin DELETE físico). Falta: botón Reactivar y filtro de inactivos |
+| ✅ | C0.2 desactivar / reactivar | "Eliminar" ahora es "Desactivar" (soft-delete, sin DELETE físico) y el admin puede **Reactivar** desde el formulario |
 | ✅ | C0.4 (parte) roles | sin "Nuevo rol" (los 3 roles son fijos); toda fila enlaza a su edición; el nombre queda bloqueado y se edita la descripción |
 | ✅ | A0.3 confirmaciones | cambiar rol, Premium o activar/desactivar un usuario pide confirmación |
 | ⬜ | C0.5 pruebas api viejas · C0.6 privacidad · resto de C0.4 (ciclos de categorías, auditoría) | correcciones de la auditoría pendientes |

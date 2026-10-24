@@ -11,6 +11,14 @@ import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { DistributorFormPage } from "./DistributorFormPage";
 import { DistributorsPage } from "./DistributorsPage";
 
+// ReactivateBanner consulta is_active con el cliente directo: sin fila ⇒ no se muestra.
+vi.mock("../../../shared/lib/supabase/client", () => {
+  const chain: Record<string, unknown> = {};
+  for (const m of ["select", "eq", "update"]) chain[m] = () => chain;
+  chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  return { supabase: { from: () => chain } };
+});
+
 // D7 (componente, api de la feature mockeada COMPLETA): los escenarios de
 // escritura de DIST-1 (spec #483 S4). /distributors usa la página REAL para
 // probar "la fila aparece en la lista tras el refetch" (HARD-3, D4).
