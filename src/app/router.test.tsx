@@ -535,10 +535,8 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     cleanup();
 
     renderRuta("/roles");
-    expect(await screen.findByText("admin")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Nuevo rol" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "admin" })).toHaveAttribute("href", "/roles/1");
+    expect(screen.queryByRole("link", { name: "Nuevo rol" })).toBeNull();
   });
 
   it("§S2: distribuidor con /stores por URL directa → denegado (SEC-01 tiendas NO)", async () => {
