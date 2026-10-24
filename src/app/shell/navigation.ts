@@ -41,6 +41,7 @@ const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
+  { to: "/vincular", label: "Vincular tienda" },
   { to: "/alertas", label: "Alertas" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/products", label: "Productos" },

@@ -7,6 +7,7 @@ import { DistributorFormPage, DistributorsPage } from "../features/distributors"
 import { AlertsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
 import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
+import { LinkStorePage, StoreQrPage } from "../features/store-links";
 import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
@@ -232,6 +233,9 @@ export function AppRoutes() {
             <Route path="/rutas/:routeId" element={<RequireRole roles={ADMIN_ONLY}><RouteDetailPage /></RequireRole>} />
             <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/tiendas/:storeId/qr" element={<RequireRole roles={ADMIN_OR_OPERATOR}><StoreQrPage /></RequireRole>} />
+            <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
+            <Route path="/vincular/:code" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="*" element={<NotFound />} />
           </Route>

@@ -141,6 +141,25 @@ check("admin inicia la ruta", !ra.error, msg(ra.error));
 const rc = await di.rpc("update_route_status", { p_route: myRoute.data?.id, p_status: "completed" });
 check("distribuidor termina la ruta", !rc.error, msg(rc.error));
 
+// --- INV-05: QR tienda ↔ distribuidor (0017)
+const code = await op.rpc("get_store_link_code", { p_store: storeId });
+check("dueño obtiene el código QR de su tienda", !code.error && typeof code.data === "string" && code.data.length >= 12, msg(code.error));
+const leak = await di.from("stores").select("link_code").eq("id", storeId);
+check("link_code no es legible por SELECT directo", !!leak.error, JSON.stringify(leak.data));
+const notOwner = await op2.rpc("get_store_link_code", { p_store: storeId });
+check("otro operador no obtiene el código", !!notOwner.error, "no dio error");
+const opLink = await op.rpc("link_distributor_to_store", { p_code: code.data });
+check("un operador no puede vincularse", !!opLink.error, "no dio error");
+const link = await di.rpc("link_distributor_to_store", { p_code: code.data });
+check("distribuidor se vincula con el código", !link.error && link.data === storeId, msg(link.error));
+const links = await di.from("store_distributors").select("store_id,distributor_id");
+check("distribuidor ve su vínculo", links.data?.length === 1, JSON.stringify(links.error ?? links.data));
+const regen = await op.rpc("regenerate_store_link_code", { p_store: storeId });
+const old = await di.rpc("link_distributor_to_store", { p_code: code.data });
+check("código regenerado invalida el anterior", !regen.error && !!old.error, msg(regen.error));
+const storesList = await op.from("stores").select("id,name,city,is_active").limit(5);
+check("listado de tiendas sigue funcionando", !storesList.error, msg(storesList.error));
+
 // --- dashboard y fiado
 const db = await op.rpc("get_dashboard", { p_from: "2026-01-01", p_to: today });
 check("dashboard premium devuelve filas", !db.error && db.data?.length > 0, msg(db.error));

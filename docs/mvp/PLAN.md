@@ -35,10 +35,10 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ✅ | A6 + A7 · Rutas | `/rutas` (admin planifica), `/rutas/:id`, `/mi-ruta` (distribuidor): paradas, llegada/completar/omitir, enlace a Google Maps |
 | ✅ | C5 · Dashboard | `/dashboard`: `get_dashboard` por rango, totales, por distribuidor y por día (sin realtime) |
 | ✅ | Migración 0018 · recursión de RLS | `routes`↔`route_stops`↔`stock` en ciclo (42P17): sin esto inventario y rutas fallan para no-admin. Corregida con helpers `SECURITY DEFINER` |
-| ✅ | Verificación de punta a punta | `scripts/smoke-local.mjs`: 37/37 flujos (H1–H3 + fiado) en verde contra Supabase local con 0001–0018 |
-| ⬜ | **Aplicar 0015 y 0018 en producción** + verificar con 0012 | Daniel (gate H1). Sin 0018 el inventario y las rutas fallan en producción |
+| ✅ | Verificación de punta a punta | `scripts/smoke-local.mjs`: 45/45 flujos (H1–H3 + QR + fiado) en verde contra Supabase local con 0001–0018 |
+| ⬜ | **Aplicar 0015, 0017 y 0018 en producción** + verificar con 0012 | Daniel (gate H1). Sin 0018 el inventario y las rutas fallan en producción |
 | ⬜ | A1–A4, A8 · Chatbot | migración 0016, n8n en VPS, tools, pantalla |
-| ⬜ | A5 · QR | migración 0017, QR de tienda, escáner, vínculo |
+| ✅ | A5 · QR (INV-05) | migración 0017 (`store_distributors`, `link_code` no legible por SELECT, 4 RPC); `/tiendas/:id/qr` (QR imprimible, regenerar, desvincular) y `/vincular` (distribuidor; el QR abre la URL desde la cámara del celular). Falta: QR masivo Premium |
 | ✅ | C0.1 paginación | Anterior/Siguiente en productos, tiendas, distribuidores, usuarios y catálogos |
 | ✅ | C0.2 desactivar / reactivar | "Eliminar" ahora es "Desactivar" (soft-delete, sin DELETE físico) y el admin puede **Reactivar** desde el formulario |
 | ✅ | C0.4 (parte) roles | sin "Nuevo rol" (los 3 roles son fijos); toda fila enlaza a su edición; el nombre queda bloqueado y se edita la descripción |

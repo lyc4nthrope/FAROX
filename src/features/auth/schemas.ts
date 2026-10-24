@@ -33,7 +33,7 @@ export const registerSchema = z.object({
     .min(1, "Ingresá tu contraseña")
     .min(6, "La contraseña debe tener al menos 6 caracteres"),
   privacy_policy_accepted: z.literal(true, {
-    errorMap: () => ({ message: "Debés aceptar la Política de Privacidad para crear tu cuenta" }),
+    error: "Debés aceptar la Política de Privacidad para crear tu cuenta",
   }),
 });
 

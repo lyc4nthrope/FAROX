@@ -139,6 +139,11 @@ export function InventoryPage() {
         </Link>
       </p>
       <h1 className="text-xl font-semibold">Inventario de la tienda #{storeId}</h1>
+      <p className="text-sm">
+        <Link className="underline" to={`/tiendas/${storeId}/qr`}>
+          QR de vínculo para distribuidores
+        </Link>
+      </p>
       <Status error={msg.error} ok={msg.ok} />
 
       <Box title="Stock">

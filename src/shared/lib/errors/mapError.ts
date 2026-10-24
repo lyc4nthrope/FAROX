@@ -70,6 +70,9 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["ya tiene un crédito vigente", "Ese pedido ya tiene un crédito."],
   ["el fiado solo se registra", "Solo se puede fiar un pedido entregado."],
   ["price debe ser > 0", "El precio debe ser mayor que 0."],
+  ["código de tienda inválido", "El código no corresponde a ninguna tienda activa. Pedile a la tienda su QR actual."],
+  ["solo un distribuidor activo puede vincularse", "Solo una cuenta de distribuidor puede vincularse a una tienda."],
+  ["solo el dueño de la tienda o un admin", "Solo el dueño de la tienda o un administrador puede hacer esto."],
 ];
 
 // PostgrestError trae { message, code, details, hint }; AuthError trae
