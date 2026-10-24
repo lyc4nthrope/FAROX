@@ -9,6 +9,8 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 export interface Privileges {
   role: RoleName | null;
   premium: boolean;
+  /** A0.2: true si la lectura falló por red/servidor (no es un rol real). */
+  transient?: boolean;
 }
 
 // Normaliza lo que devuelve my_role(): un nombre fuera del catálogo de roles

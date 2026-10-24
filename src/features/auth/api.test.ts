@@ -63,6 +63,7 @@ describe("auth api · signUp (D1 · única vía de registro)", () => {
           accepted_privacy_at: "2026-10-20T15:00:00.000Z",
           accepted_privacy_version: "1.0",
         },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     // Sin sesión ⇒ Confirm email activo (D44): el flujo es "confirmar", no login.
@@ -137,12 +138,20 @@ describe("auth api · confirmEmailConfirmationCode (D2 · canje PKCE)", () => {
     expect(outcome).toEqual({ status: "ok" });
   });
 
-  it("sin code en la URL: missing-code con CERO llamadas a la api (sin hang)", async () => {
+  it("sin code y sin sesión: missing-code sin intentar el canje", async () => {
+    authGetSessionMock.mockResolvedValue({ data: { session: null }, error: null } as never);
     const outcome = await confirmEmailConfirmationCode();
 
     expect(outcome).toEqual({ status: "missing-code" });
     expect(exchangeMock).not.toHaveBeenCalled();
-    expect(authGetSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("A0.2: sin code pero con sesión ya creada (flujo implícito): ok", async () => {
+    authGetSessionMock.mockResolvedValue({ data: { session: { user: { id: "u1" } } }, error: null } as never);
+    const outcome = await confirmEmailConfirmationCode();
+
+    expect(outcome).toEqual({ status: "ok" });
+    expect(exchangeMock).not.toHaveBeenCalled();
   });
 
   it("código expirado/inválido y sin sesión: status error con el error de Auth", async () => {

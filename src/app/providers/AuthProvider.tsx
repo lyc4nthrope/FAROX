@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (userId === null) return;
     const privileges = await fetchPrivileges();
     if (currentUserIdRef.current !== userId) return;
+    // A0.2: un fallo pasajero no degrada al usuario; se conservan los privilegios.
+    if (privileges.transient === true) return;
     setState((previous) =>
       previous.userId === userId
         ? { ...previous, role: privileges.role, premium: privileges.premium }

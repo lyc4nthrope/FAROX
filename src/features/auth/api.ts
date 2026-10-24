@@ -93,7 +93,11 @@ export async function signUp(
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, ...privacyConsent } },
+    // A0.2: el link del email vuelve a /auth/callback de este mismo origen.
+    options: {
+      data: { full_name: fullName, ...privacyConsent },
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
   });
   if (error !== null) {
     return { needsConfirmation: false, error };
@@ -129,7 +133,10 @@ export type ConfirmEmailOutcome =
 export async function confirmEmailConfirmationCode(): Promise<ConfirmEmailOutcome> {
   const code = new URLSearchParams(window.location.search).get("code");
   if (code === null || code === "") {
-    return { status: "missing-code" };
+    // A0.2: en flujo implícito el link trae #access_token y supabase-js ya
+    // creó la sesión: eso también es una confirmación exitosa.
+    const { data } = await supabase.auth.getSession();
+    return data.session ? { status: "ok" } : { status: "missing-code" };
   }
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error === null) {
@@ -173,11 +180,11 @@ export async function fetchPrivileges(): Promise<Privileges> {
         "[FAROX] Privilegios no disponibles:",
         roleResult.error ?? premiumResult.error,
       );
-      return { role: null, premium: false };
+      return { role: null, premium: false, transient: true };
     }
     return { role: normalizeRole(roleResult.data), premium: premiumResult.data === true };
   } catch (error) {
     console.error("[FAROX] Sin conexión para leer privilegios:", error);
-    return { role: null, premium: false };
+    return { role: null, premium: false, transient: true };
   }
 }
