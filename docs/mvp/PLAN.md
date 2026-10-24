@@ -45,7 +45,8 @@ Desde el 24 oct el trabajo se ejecuta **integrado** (sin dividir en 3): se avanz
 | ✅ | A0.3 confirmaciones | cambiar rol, Premium o activar/desactivar un usuario pide confirmación |
 | ⬜ | C0.5 pruebas api viejas · C0.6 privacidad · resto de C0.4 (ciclos de categorías, auditoría) | correcciones de la auditoría pendientes |
 | ✅ | A0.2 callback y privilegios | `emailRedirectTo` a `/auth/callback`; el callback acepta una sesión ya creada (flujo implícito); un error de red pasajero ya no le quita el rol al usuario. **Daniel:** confirmar en Supabase Auth que la Site URL y las Redirect URLs incluyen `/auth/callback` del dominio de producción |
-| ⬜ | A0.4 ubicación | corrección de la auditoría pendiente |
+| ✅ | A0.4 (parte) ubicación | el pin ya no se fija con la ubicación en caché ni con la aproximada por IP: solo con GPS fresco o eligiendo en el mapa (F10) |
+| ⬜ | A0.4 resto | coordenadas manuales siempre visibles (F11, teclado), cuota de Nominatim, teselas sin subdominios |
 | ⬜ | B0.3–B0.5 · CI, backup, protección de `main`, higiene | correcciones de la auditoría pendientes |
 | ⬜ | Realtime (alertas, dashboard) · C6 Playwright · B9 despliegue · C7 manual · C8 informe | cierre |
 

@@ -117,6 +117,7 @@ export function LocationPicker({
     longitude: geoLongitude,
     loading: geoLoading,
     error: geoError,
+    accuracy: geoAccuracy,
     hasLocation,
     refetch,
   } = useGeolocation();
@@ -233,6 +234,11 @@ export function LocationPicker({
     if (hasInitializedWithGeo.current) return;
     if (!hasLocation) return;
     if (hasCoords) return;
+    // A0.4/F10: no fijar el pin con la ubicación en caché (puede ser de otra
+    // tienda) ni con la aproximada por IP (precisión desconocida): solo con
+    // una lectura de GPS fresca. Si no la hay, el usuario elige en el mapa.
+    if (geoLoading) return;
+    if (geoAccuracy === null) return;
     hasInitializedWithGeo.current = true;
     if (geoLatitude === null || geoLongitude === null) return;
     const nextLat = round6(geoLatitude);
@@ -242,7 +248,7 @@ export function LocationPicker({
     if (!disabledRef.current) {
       emitCoords(nextLat, nextLon);
     }
-  }, [hasLocation, hasCoords, geoLatitude, geoLongitude, setMarkerPosition, emitCoords]);
+  }, [hasLocation, hasCoords, geoLoading, geoAccuracy, geoLatitude, geoLongitude, setMarkerPosition, emitCoords]);
 
   // ─── Sync coords externas -> marker, con de-dupe por firma ────────────────
   // (NOSEE StoreMapPicker.jsx:325-337): la firma evita el loop
