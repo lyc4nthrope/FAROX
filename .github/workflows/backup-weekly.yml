@@ -26,7 +26,7 @@ jobs:
       PRODUCTION_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
       PRODUCTION_PROJECT_ID: ${{ secrets.PRODUCTION_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: supabase/setup-cli@v1
         # U5 (design #507 §1): sin input de versión — nombre del input UNVERIFIED ("default latest first").

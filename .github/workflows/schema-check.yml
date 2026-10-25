@@ -26,7 +26,7 @@ jobs:
   schema-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: supabase/setup-cli@v1
         # U5 (design #507 §1): sin input de versión — el nombre del input de versión de
