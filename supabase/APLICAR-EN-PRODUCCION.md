@@ -56,6 +56,12 @@ UNION ALL SELECT '0017 link_code NO legible por la app',
        ELSE 'n/a (0017 sin aplicar)' END
 UNION ALL SELECT '0018 my_route_ids',
   (to_regprocedure('public.my_route_ids()') IS NOT NULL)::text
+UNION ALL SELECT '0019 distributor_products',
+  (to_regclass('public.distributor_products') IS NOT NULL)::text
+UNION ALL SELECT '0019 RPCs de catálogo',
+  (to_regprocedure('public.add_distributor_product(bigint)') IS NOT NULL
+   AND to_regprocedure('public.remove_distributor_product(bigint)') IS NOT NULL
+   AND to_regprocedure('public.unassign_product_from_store(bigint,bigint)') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -79,6 +85,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0016 | *(no existe — reservada para el chatbot)* | — | — |
 | 0017 | `20261024000017_store_links.sql` | `0017 … = true` (los tres) | ✅ |
 | 0018 | `20261024000018_fix_routes_rls_recursion.sql` | `0018 … = true` — **sin esta, inventario y rutas fallan para no-admin** | ✅ |
+| 0019 | `20261025000019_catalogo_por_rol.sql` | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla** | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
@@ -119,6 +126,11 @@ SELECT has_column_privilege('authenticated','public.stores','link_code','SELECT'
 -- Las RPC nuevas sí son invocables por un usuario autenticado
 SELECT has_function_privilege('authenticated','public.get_store_link_code(bigint)','EXECUTE');      -- true
 SELECT has_function_privilege('authenticated','public.internal_can_manage_store(bigint)','EXECUTE'); -- false
+-- 0019: catálogo por entidad
+SELECT has_function_privilege('authenticated','public.add_distributor_product(bigint)','EXECUTE');           -- true
+SELECT has_function_privilege('authenticated','public.remove_distributor_product(bigint)','EXECUTE');        -- true
+SELECT has_function_privilege('authenticated','public.unassign_product_from_store(bigint,bigint)','EXECUTE'); -- true
+SELECT has_table_privilege('authenticated','public.distributor_products','SELECT');                          -- true
 ```
 
 Y después:
@@ -137,17 +149,19 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas
 
-- **Nunca re-ejecutar 0011 después de 0013/0015/0017/0018.** `0011:467` hace `REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM authenticated` y sólo re-otorga 31 firmas. Las 9 funciones nuevas (0015: 1, 0017: 4 ejecutables, 0018: 3) quedarían sin permiso y el front rompería en inventario, rutas, stock y vínculos QR. Si hay que re-aplicar 0011, re-otorgar después:
+- **Nunca re-ejecutar 0011 después de 0013/0015/0017/0018/0019.** `0011:467` hace `REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM authenticated` y sólo re-otorga 31 firmas. Las 12 funciones nuevas (0015: 1, 0017: 4 ejecutables, 0018: 3, 0019: 3) quedarían sin permiso y el front rompería en inventario, rutas, stock, vínculos QR y catálogos. Si hay que re-aplicar 0011, re-otorgar después:
   ```sql
   GRANT EXECUTE ON FUNCTION public.register_distributor(text,text,text,text,text,public.contact_preference),
     public.get_store_link_code(bigint), public.regenerate_store_link_code(bigint),
     public.link_distributor_to_store(text), public.unlink_distributor(bigint,bigint),
-    public.my_route_ids(), public.routes_with_my_stores(), public.stores_on_my_routes()
+    public.my_route_ids(), public.routes_with_my_stores(), public.stores_on_my_routes(),
+    public.add_distributor_product(bigint), public.remove_distributor_product(bigint),
+    public.unassign_product_from_store(bigint,bigint)
   TO authenticated, service_role;
   ```
 - **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4.
