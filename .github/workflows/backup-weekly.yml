@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         # U5 (design #507 §1): sin input de versión — nombre del input UNVERIFIED ("default latest first").
 
       - name: "Fail-fast de secretos (DEV-07 · design §4 fila 1 — nunca skip silencioso)"

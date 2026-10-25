@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         # U5 (design #507 §1): sin input de versión — el nombre del input de versión de
         # setup-cli es UNVERIFIED ("default latest first"). Confirmar antes de fijar versión.
 
