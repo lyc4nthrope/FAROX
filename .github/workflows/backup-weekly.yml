@@ -9,8 +9,8 @@
 name: Backup Weekly
 
 on:
-  schedule:
-    - cron: "0 6 * * 1"  # lunes 06:00 UTC — semanal, RPO 7d (proposal/design §2.7; ajustable)
+  # schedule DESACTIVADO hasta B0.4 (cifrado age + secrets por step): F3 — volcado de producción
+  # sin cifrar a repo público. Reactivar solo con el punto 5 de B0.4.
   workflow_dispatch:      # DEV-10: camino de recuperación manual bajo demanda
 
 permissions:
