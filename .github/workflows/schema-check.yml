@@ -5,6 +5,12 @@
 # así que la config de G3 no cambia: job id = `schema-check`, SIN `name:` a nivel de job.
 # Sin ningún secret ⇒ ejecutable en pull_request de forks sin exponer nada (DEV-06 sc3).
 # Sin npm/lockfile ⇒ NO depende de T0.1; si sale rojo, los mensajes dicen qué falta (design §4 filas 11-12).
+#
+# FAILs ACEPTADOS: 0012 H1.1/H1.3/H1.4 salen FAIL en stack fresco porque PostGIS se instala en
+# `public` (0001:9) y sus funciones traen EXECUTE para PUBLIC; 0011 no puede revocarlas. Es el
+# estado esperado documentado en supabase/APLICAR-EN-PRODUCCION.md §4. El parser acepta SOLO
+# esos tres códigos (ACCEPTED_FAILS) y sigue fallando ante cualquier otro [FAIL] o conteo
+# inconsistente — el self-test prove-by-break lo verifica con fixtures.
 
 name: Schema Check
 
@@ -39,7 +45,18 @@ jobs:
             echo "::error::self-test: el parser salió 0 con output truncado (PARSE-MISS) — parser roto (D7)"
             exit 1
           fi
-          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0"
+          # Allowlist de FAILs aceptados (H1.1/H1.3/H1.4 por PostGIS en public — APLICAR-EN-PRODUCCION.md §4):
+          # el caso conocido pasa, y la allowlist NO puede tapar un FAIL nuevo ni un conteo inconsistente.
+          node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-fails.log
+          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-plus-new.log; then
+            echo "::error::self-test: la allowlist silenció un FAIL no aceptado — parser roto (regresión tapada)"
+            exit 1
+          fi
+          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-count-mismatch.log; then
+            echo "::error::self-test: el parser aceptó un RESUMEN con conteo inconsistente — parser roto (D7)"
+            exit 1
+          fi
+          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0, known-fails=0, known+new!=0, count-mismatch!=0"
 
       - name: "supabase init — gap de config.toml (#506); condicional por T4.2 (se commitea después)"
         run: |

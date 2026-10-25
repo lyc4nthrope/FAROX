@@ -164,7 +164,7 @@ Y después:
     public.unassign_product_from_store(bigint,bigint)
   TO authenticated, service_role;
   ```
-- **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4.
+- **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4. El job `schema-check` los trata como fallos conocidos y aceptados (`ACCEPTED_FAILS` en `scripts/parse-verify-output.mjs`) y sigue fallando ante cualquier otro `[FAIL]` o ante un `RESUMEN` cuyo conteo no cuadre con las líneas del log.
 - **0012 sólo verifica**: no cambia el esquema, se puede correr en cualquier momento.
 - **No purgar `audit_log`**: el tope anti-huérfano de `register_distributor` cuenta las filas de auditoría.
 - **`stores.link_code` no se lee por SELECT directo** (0017 revoca el SELECT de tabla y lo re-otorga columna por columna). Un `select('*')` sobre `stores` falla con `permission denied for column link_code`: pedir columnas explícitas.
