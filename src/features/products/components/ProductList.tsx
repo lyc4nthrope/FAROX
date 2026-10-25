@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { formatQty } from "../../../shared/lib/format";
@@ -13,6 +14,8 @@ export interface ProductListProps {
   error: string | null;
   // Columna "Cantidad" (catálogo de tienda).
   quantity?: boolean;
+  // Acción por fila (catálogo propio: quitar). Sin esto la tabla es de solo lectura.
+  renderAction?: (row: ProductListRow & { quantity?: number | null }) => ReactNode;
   emptyTitle?: string;
   emptyHint?: string;
 }
@@ -25,6 +28,7 @@ export function ProductList({
   loading,
   error,
   quantity = false,
+  renderAction,
   emptyTitle = "No hay productos todavía",
   emptyHint = "Cuando haya productos, van a aparecer acá.",
 }: ProductListProps) {
@@ -45,6 +49,7 @@ export function ProductList({
               <th className="py-2 font-medium">Categoría</th>
               {quantity && <th className="py-2 font-medium">Cantidad</th>}
               <th className="py-2 font-medium">Estado</th>
+              {renderAction !== undefined && <th className="py-2 font-medium">Acción</th>}
             </tr>
           </thead>
           <tbody>
@@ -66,6 +71,7 @@ export function ProductList({
                   </td>
                 )}
                 <td className="py-2 text-gray-700">{row.is_active ? "Activo" : "Inactivo"}</td>
+                {renderAction !== undefined && <td className="py-2">{renderAction(row)}</td>}
               </tr>
             ))}
           </tbody>

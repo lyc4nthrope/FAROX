@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -91,15 +91,18 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       error: null,
     });
     vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
-      data: [ENTRADA_TIENDA],
+      rows: [ENTRADA_TIENDA],
+      count: 1,
       error: null,
     });
     vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-      data: [{ ...FILA, quantity: null }],
+      rows: [{ ...FILA, quantity: null }],
+      count: 1,
       error: null,
     });
     vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
-      data: [FILA, OTRO_PRODUCTO],
+      rows: [OTRO_PRODUCTO],
+      count: 1,
       error: null,
     });
     vi.mocked(productsApi.addStoreCatalogProduct).mockResolvedValue({ error: null });
@@ -126,7 +129,10 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
 
     expect(await screen.findByText("Catálogo de Tienda Centro")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledWith(7);
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledWith(7, {
+      page: 0,
+      pageSize: 25,
+    });
     expect(productsApi.fetchProducts).not.toHaveBeenCalled();
   });
 
@@ -139,7 +145,10 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
 
     expect(await screen.findByText("Catálogo de mi distribuidora")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledTimes(1);
+    expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledWith({
+      page: 0,
+      pageSize: 25,
+    });
     expect(productsApi.fetchStoreCatalog).not.toHaveBeenCalled();
   });
 
@@ -166,6 +175,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2),
     );
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
+    // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
   });
 
@@ -184,6 +194,141 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       expect(productsApi.removeDistributorCatalogProduct).toHaveBeenCalledWith(1),
     );
     expect(productsApi.removeStoreCatalogProduct).not.toHaveBeenCalled();
+  });
+
+  it("S5: un producto INACTIVO ya asignado a la tienda se puede quitar", async () => {
+    // El registro "agregar" solo lista activos; si el catálogo ocultara los
+    // inactivos asignados, quedarían sin salida (dead end).
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: [{ ...FILA, is_active: false, quantity: 0 }],
+      count: 1,
+      error: null,
+    });
+    renderPagina("operador");
+
+    expect(await screen.findByText("Inactivo")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Quitar" })).toBeInTheDocument();
+  });
+
+  it("S5: con existencias no se ofrece quitar (la RPC lo rechazaría)", async () => {
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: [{ ...FILA, quantity: 2 }],
+      count: 1,
+      error: null,
+    });
+    renderPagina("operador");
+
+    expect(await screen.findByText(/Con stock/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quitar" })).not.toBeInTheDocument();
+  });
+
+  it("S4: el registro global se pagina (nada queda truncado en silencio)", async () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({
+      ...OTRO_PRODUCTO,
+      id: 100 + index,
+      name: `Producto ${index + 1}`,
+    }));
+    vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
+      rows: many,
+      count: 30,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const pager = await screen.findByRole("navigation", { name: "Paginación" });
+    await user.click(within(pager).getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() =>
+      expect(productsApi.fetchActiveProductsForCatalog).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 25,
+      }),
+    );
+  });
+
+  it("S5: el Quitar del producto inactivo asignado ejecuta la baja y refresca", async () => {
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: [{ ...FILA, is_active: false, quantity: 0 }],
+      count: 1,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = (
+      await screen.findByRole("heading", { name: "Catálogo de Tienda Centro" })
+    ).closest("section") as HTMLElement;
+    expect(await within(section).findByText("Inactivo")).toBeInTheDocument();
+    await user.click(within(section).getByRole("button", { name: "Quitar" }));
+
+    await waitFor(() =>
+      expect(productsApi.removeStoreCatalogProduct).toHaveBeenCalledWith(7, 1),
+    );
+    expect(await screen.findByText("Producto quitado del catálogo.")).toBeInTheDocument();
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S4: el catálogo de la tienda pagina (página 2 solicitable)", async () => {
+    const many: CatalogEntry[] = Array.from({ length: 25 }, (_, index) => ({
+      ...FILA,
+      id: 100 + index,
+      name: `Producto ${index + 1}`,
+      quantity: 0,
+    }));
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: many,
+      count: 30,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = (
+      await screen.findByRole("heading", { name: "Catálogo de Tienda Centro" })
+    ).closest("section") as HTMLElement;
+    const nav = await within(section).findByRole("navigation", { name: "Paginación" });
+    await user.click(within(nav).getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() =>
+      expect(productsApi.fetchStoreCatalog).toHaveBeenLastCalledWith(7, {
+        page: 1,
+        pageSize: 25,
+      }),
+    );
+  });
+
+  it("S4: el catálogo del distribuidor pagina (página 2 solicitable)", async () => {
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: { stores: [], distributorId: 3 },
+      error: null,
+    });
+    const many: CatalogEntry[] = Array.from({ length: 25 }, (_, index) => ({
+      ...FILA,
+      id: 100 + index,
+      name: `Producto ${index + 1}`,
+      quantity: null,
+    }));
+    vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
+      rows: many,
+      count: 30,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("distribuidor");
+
+    const section = (
+      await screen.findByRole("heading", { name: "Catálogo de mi distribuidora" })
+    ).closest("section") as HTMLElement;
+    const nav = await within(section).findByRole("navigation", { name: "Paginación" });
+    await user.click(within(nav).getByRole("button", { name: "Siguiente" }));
+
+    await waitFor(() =>
+      expect(productsApi.fetchDistributorCatalog).toHaveBeenLastCalledWith({
+        page: 1,
+        pageSize: 25,
+      }),
+    );
   });
 
   it("error del alcance ⇒ banner amigable; el texto crudo NUNCA llega (HARD-1)", async () => {

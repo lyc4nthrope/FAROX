@@ -332,53 +332,66 @@ export async function fetchCatalogContext(): Promise<LoadResult<CatalogContext>>
 }
 
 // Productos asignados a una tienda (stock). La RLS de stock limita al operador
-// a sus tiendas (stock_select, 0018).
-export async function fetchStoreCatalog(storeId: number): Promise<LoadResult<CatalogEntry[]>> {
-  const { data, error } = await supabase
+// a sus tiendas (stock_select, 0018). Paginado como el listado global: sin
+// .range(), PostgREST cortaría en silencio (el catálogo quedaría incompleto).
+export async function fetchStoreCatalog(
+  storeId: number,
+  query: ListQuery,
+): Promise<ListResult<CatalogEntry>> {
+  const { from, to } = pageRange(query);
+  const { data, count, error } = await supabase
     .from("stock")
-    .select(`product_id, quantity, ${CATALOG_PRODUCT_SELECT}`)
+    .select(`product_id, quantity, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" })
     .eq("store_id", storeId)
     .order("product_id")
-    .limit(500);
+    .range(from, to);
   if (error !== null) {
-    return { data: null, error };
+    return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
     normalizeCatalogEntry(raw, normalizeQuantity(raw.quantity)),
   );
-  return { data: rows, error: null };
+  return { rows, count, error: null };
 }
 
 // Productos del catálogo del distribuidor autenticado (RLS por
-// my_distributor_id()).
-export async function fetchDistributorCatalog(): Promise<LoadResult<CatalogEntry[]>> {
-  const { data, error } = await supabase
+// my_distributor_id()). Paginado por el mismo motivo que el de tienda.
+export async function fetchDistributorCatalog(
+  query: ListQuery,
+): Promise<ListResult<CatalogEntry>> {
+  const { from, to } = pageRange(query);
+  const { data, count, error } = await supabase
     .from("distributor_products")
-    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`)
+    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" })
     .order("product_id")
-    .limit(500);
+    .range(from, to);
   if (error !== null) {
-    return { data: null, error };
+    return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
     normalizeCatalogEntry(raw, null),
   );
-  return { data: rows, error: null };
+  return { rows, count, error: null };
 }
 
-// Registro global para elegir qué agregar. Solo productos activos.
-export async function fetchActiveProductsForCatalog(): Promise<LoadResult<ProductListRow[]>> {
-  const { data, error } = await supabase
+// Registro global para elegir qué agregar. Solo productos activos, paginado:
+// el catálogo global no cabe en una sola página y truncarlo escondería
+// productos que la spec S4 exige poder agregar.
+export async function fetchActiveProductsForCatalog(
+  query: ListQuery,
+): Promise<ListResult<ProductListRow>> {
+  const { from, to } = pageRange(query);
+  const { data, count, error } = await supabase
     .from("products")
-    .select(LIST_SELECT)
+    .select(LIST_SELECT, { count: "planned" })
     .eq("is_active", true)
     .order("name")
-    .limit(500);
+    .range(from, to);
   if (error !== null) {
-    return { data: null, error };
+    return { rows: [], count: null, error };
   }
   const rows = Array.isArray(data) ? data.map(normalizeListRow) : [];
-  return { data: rows, error: null };
+  return { rows, count, error: null };
 }
 
 export async function addStoreCatalogProduct(
