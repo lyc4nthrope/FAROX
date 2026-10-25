@@ -62,3 +62,7 @@ Advisories aceptadas sin cambio de alcance: (A1) la DB todavía permite insert/u
 Verificación tras la corrección: `npm test -- --run` → 53 archivos, 460/460 · `lint` · `typecheck` · `check-scope` (§S8 OK). Recheck independiente acotado a B1/B2: **PASS WITH ADVISORIES** — ambos FIXED; los tests nuevos fallan contra la implementación anterior (RED observado), así que no son tautologías. Advisories menores aceptadas: "Agregar" sigue visible para un producto ya presente (upsert idempotente), el buscador filtra la página cargada (el label lo dice), y un alta resetea el catálogo a la página 1.
 
 
+
+### L6 — Revisión nativa (RDD) bloqueada (2026-10-25)
+
+`gentle-ai review assess` (base `bd4eb31`, committed-only) dio `medium/under_budget`; se escaló a `high` por el ítem 2 (seguridad: tabla con RLS + 3 RPCs `SECURITY DEFINER`). El usuario otorgó consentimiento y START congeló el candidato (lineage `review-28cec398bd18fa8b`, target `sha256:900377…`). Los dos slots (`review-risk`, `review-reliability`) recibieron un `provider_task.prompt` que contenía SOLO la línea `GENTLE_AI_REVIEW_BINDING` — sin instrucción, sin schema de resultado y sin árbol congelado — y ambos se negaron con `MISSING_CONTRACT_AND_REVIEW_TREE`. Un nuevo `review status` reofrece los mismos slots con el mismo prompt: el fallo es determinista, así que no se relanzó. **No existe aprobación ni receipt**: el lineage queda en `reviewing`.
