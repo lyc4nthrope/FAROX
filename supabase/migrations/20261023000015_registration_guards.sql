@@ -128,11 +128,11 @@ BEGIN
 END;
 $$;
 
--- (b) F-nota de 0013: deny-by-default (D48). CREATE FUNCTION otorga EXECUTE a
--- PUBLIC por defecto; 0013 sólo hizo GRANT a authenticated/service_role sin
--- revocar PUBLIC, así que `anon` podía invocarla (fallaba por el guard de
--- sesión, pero violaba la superficie mínima y el conteo de H1.3). Determinista
--- e idempotente: se puede re-ejecutar sin efectos.
+-- (b) Defensa en profundidad (D48): 0011:458 ya deja las funciones nuevas sin
+-- EXECUTE para PUBLIC/anon vía ALTER DEFAULT PRIVILEGES FOR ROLE postgres, así
+-- que `anon` no podía invocarla. Se deja explícito igualmente para que la
+-- intención no dependa de un default privilege configurado en otra migración.
+-- Determinista e idempotente: re-ejecutar no tiene efecto.
 REVOKE EXECUTE ON FUNCTION
   public.register_distributor(text, text, text, text, text, public.contact_preference)
 FROM PUBLIC, anon;

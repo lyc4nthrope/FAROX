@@ -153,6 +153,7 @@ Catálogo requerido por `stores.store_type_id NOT NULL`.
 | `location` | **geography(Point,4326) NOT NULL** | NØSEE — PostGIS (decidido); único punto de verdad geográfico (D12) |
 | `website_url` | text | NØSEE |
 | `created_by` | uuid NOT NULL FK → users RESTRICT | mod — **dueño y actor** de la tienda (D33); escrito solo por `create_store()` ⇒ sin suplantación (el DEFAULT de PostgREST no la evitaba: el cliente podía enviar el campo explícito). Backfill al admin del seed en la migración |
+| `link_code` | text NOT NULL UNIQUE, DEFAULT `encode(extensions.gen_random_bytes(9),'hex')` | **FAROX (0017)** — código del QR que vincula un distribuidor con la tienda. Se regenera solo con `regenerate_store_link_code()`. **No se lee por SELECT directo**: 0017 revoca el SELECT de tabla y lo re-otorga columna por columna sin `link_code`, así que un `select('*')` sobre `stores` falla |
 | `is_active` | boolean NOT NULL DEFAULT true | NØSEE |
 | `created_at` / `updated_at` | timestamptz | mod — `updated_at` añadido |
 
@@ -256,7 +257,7 @@ NØSEE: pedido de **consumidor con delivery** (dealer, pin, jsonb…). FAROX: **
 
 ---
 
-## 3. Tablas nuevas FAROX (14)
+## 3. Tablas nuevas FAROX (15)
 
 ### 3.1 `stock` — asignación Producto ↔ Tienda
 
@@ -513,6 +514,19 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 
 ---
 
+### 3.15 `store_distributors` — vínculo tienda ↔ distribuidor (0017)
+
+| Atributo | Tipo | Origen |
+|---|---|---|
+| `store_id` | bigint NOT NULL FK → `stores` CASCADE | PK compuesta (parte 1) |
+| `distributor_id` | bigint NOT NULL FK → `distributors` RESTRICT | PK compuesta (parte 2); índice propio por distribuidor |
+| `created_by` | uuid NOT NULL (sin FK) | quién ejecutó el vínculo (normalmente el propio distribuidor al escanear el QR) |
+| `created_at` | timestamptz NOT NULL DEFAULT `now()` | — |
+
+**Sólo lectura desde el cliente**: `REVOKE ALL … FROM anon, authenticated` + `GRANT SELECT`. Las escrituras pasan únicamente por `link_distributor_to_store()` (el distribuidor se vincula con el código del QR) y `unlink_distributor()` (dueño de la tienda o admin). Policy `store_distributors_select`: admin ve todo · operador ve los vínculos de las tiendas de su alcance · distribuidor ve los propios. `link_distributor_to_store` es idempotente (`ON CONFLICT DO NOTHING`) y exige que la tienda esté activa.
+
+---
+
 ## 4. Funciones RPC (el conjunto completo que hace implementable la matriz SEC-01)
 
 > Corregido: el plan anterior solo definía `register_entry/exit` — con los REVOKE, **ni admin ni operador podían hacer nada** de la matriz de roles (crítica B5). Todas las mutaciones pasan por aquí.
@@ -553,7 +567,12 @@ Estimado corregido: ~60 MB en vez de ~500 MB a 1M movements.
 | `sanitize_distributor_scope()` | trigger (M11) | `BEFORE INSERT OR UPDATE` en `users`: rol `distribuidor` ⇒ `distributor_id NOT NULL`; otro rol ⇒ `NULL` (red de seguridad además de `update_user_role`) |
 | `has_scope()` | auth | `SECURITY DEFINER STABLE SET search_path` → **true** si el usuario tiene alcance: admin · rol `distribuidor` con `distributor_id` · cualquier usuario con ≥1 fila en `user_stores`. Gate de **"todas las acciones"** (D37); exige `is_active` desde 0009 (D50) |
 | `create_store(...)` | auth (cualquier usuario) | **Bootstrap exento del gate**: valida tope de tiendas (1 activa; 3 con `is_premium()`; admin exento — D34), inserta la tienda (`created_by = auth.uid()`) y su fila en `user_stores` — dueño ⇒ alcance sin modelo nuevo (D35). Devuelve el `id` de la tienda |
-| `register_distributor(p_name, p_nit, ...)` | **solo rol `operador`** | **Alta de distribuidor desde el onboarding (0013 + 0015)**: el rol `operador` no tiene INSERT en `distributors`, así que es la única vía. Rechaza: sin sesión · usuario inactivo · rol distinto de `operador` (un admin o un distribuidor **nunca** se auto-degradan) · cuenta con tiendas (`my_store_ids()` o `stores.created_by`) · ya tiene `distributor_id` · ya registró uno (`audit_log`, 1 por usuario) · NIT duplicado. Toma `FOR UPDATE` sobre `users` ⇒ dos llamadas concurrentes no crean dos distribuidores. Whitelist: 32 firmas |
+| `register_distributor(p_name, p_nit, ...)` | **solo rol `operador`** | **Alta de distribuidor desde el onboarding (0013 + 0015)**: el rol `operador` no tiene INSERT en `distributors`, así que es la única vía. Rechaza: sin sesión · usuario inactivo · rol distinto de `operador` (un admin o un distribuidor **nunca** se auto-degradan) · cuenta con tiendas (`my_store_ids()` o `stores.created_by`) · ya tiene `distributor_id` · ya registró uno (`audit_log`, 1 por usuario) · NIT duplicado. Toma `FOR UPDATE` sobre `users` ⇒ dos llamadas concurrentes no crean dos distribuidores. Whitelist: 32 firmas (39 tras 0017/0018) |
+| `get_store_link_code(p_store)` / `regenerate_store_link_code(p_store)` | **dueño de la tienda o admin** | **0017** — leen y regeneran `stores.link_code`. Guard vía `internal_can_manage_store()` (que exige `my_role()` no nulo: un usuario inactivo no pasa). `regenerate` invalida el QR anterior |
+| `link_distributor_to_store(p_code)` | **distribuidor activo** | **0017** — vincula al distribuidor del JWT con la tienda cuyo `link_code` coincide y está activa. Idempotente (`ON CONFLICT DO NOTHING`). Nunca recibe `distributor_id`: se deriva del JWT |
+| `unlink_distributor(p_store, p_distributor)` | **dueño de la tienda o admin** | **0017** — borra el vínculo. No toca pedidos ni rutas existentes |
+| `my_route_ids()` / `routes_with_my_stores()` / `stores_on_my_routes()` | auth | **0018** — helpers que devuelven los ids para las policies de `routes`/`route_stops`/`stock`. Existen porque esas policies se referenciaban en ciclo (`ERROR 42P17: infinite recursion`). La semántica de visibilidad no cambia |
+| `internal_can_manage_store(p_store)` | **sin grant** | **0017** — helper interno (`SECURITY DEFINER`) de los anteriores: dueño de la tienda o admin. Deny-list: nadie lo invoca como cliente, sólo las RPC `DEFINER` |
 | `enforce_store_cap()` | trigger | `BEFORE INSERT ON stores`: respaldo del tope D34 — si `auth.uid()` es NULL (seed/migración) o rol admin, deja pasar. **+ `trg_stores_cap_reactivate` (0009, D34/D53)**: `BEFORE UPDATE ON stores FOR EACH ROW WHEN (OLD.is_active = FALSE AND NEW.is_active = TRUE)` — el tope también aplica al **reactivar** (antes el trigger era INSERT-only: desactivar → crear → reactivar evadía el límite) |
 
 > **D44 — trigger de confirmación de email (resuelto 2026-10-15: DESCARTADO)**:
@@ -909,6 +928,9 @@ END $$;
 ## 9. Pendientes
 
 - [x] **0018 (2026-10-24) — recursión de RLS corregida**: `routes_select` ↔ `route_stops_select` (0009) y `stock_select` (0006) formaban un ciclo (`ERROR 42P17 infinite recursion detected in policy for relation "route_stops"`): todo SELECT de un no-admin sobre `stock`/`routes`/`route_stops` fallaba. Se reemplazaron las subconsultas cruzadas por 3 helpers `SECURITY DEFINER` (`my_route_ids()`, `routes_with_my_stores()`, `stores_on_my_routes()`); la visibilidad por rol no cambia. Whitelist +3 firmas (volver a correr 0012 da FAIL esperado en el conteo exacto). Detectado con `scripts/smoke-local.mjs` (37/37 flujos en verde con 0001–0018).
+- [x] **0017 (2026-10-24) — vínculos tienda ↔ distribuidor**: `stores.link_code` (QR, no legible por SELECT directo) + `store_distributors` (§3.15) + 5 funciones. Whitelist +4 firmas ejecutables (`internal_can_manage_store` es deny-list). El `ALTER DEFAULT PRIVILEGES` de 0011 deja las funciones nuevas sin grant para clientes; cada migración trae el suyo.
+- [ ] **Conteo de `0012` tras 0015/0017/0018**: H1.3 da **43** funciones y **9** extras (`register_distributor` + 5 de 0017 + 3 de 0018). H1.1 y H1.4 dan FAIL por las funciones de **PostGIS** en `public` (`0001:9` crea la extensión sin schema y el rol del SQL editor no es su owner). Para volver a verde hace falta una migración de verificación nueva (B3/pgTAP), **no** editar 0012.
+- [ ] ⛔ **Nunca re-ejecutar 0011 después de 0013/0015/0017/0018**: `0011:467` revoca `EXECUTE` de `authenticated` en **todas** las funciones de `public` y sólo re-otorga 31 firmas ⇒ inventario, rutas, stock y vínculos QR quedan sin permiso. Si hay que re-aplicar 0011, re-otorgar las 9 firmas nuevas después (lista en `supabase/APLICAR-EN-PRODUCCION.md` §6).
 
 - [ ] Checklist del .md **p.6** "Crear la base de datos" → ejecutar §7 (**incluye el hardening 0009→0012: pegar en orden y en UNA sola ventana de mantenimiento** — nota ALTO D50).
 - [ ] Checklist **p.15** → este documento es la especificación base; cambios futuros se anotan aquí primero.
