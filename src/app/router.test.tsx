@@ -54,6 +54,14 @@ vi.mock("../features/products/api", () => ({
   updateProduct: vi.fn(),
   deactivateProduct: vi.fn(),
   deleteProduct: vi.fn(),
+  fetchCatalogContext: vi.fn(),
+  fetchStoreCatalog: vi.fn(),
+  fetchDistributorCatalog: vi.fn(),
+  fetchActiveProductsForCatalog: vi.fn(),
+  addStoreCatalogProduct: vi.fn(),
+  removeStoreCatalogProduct: vi.fn(),
+  addDistributorCatalogProduct: vi.fn(),
+  removeDistributorCatalogProduct: vi.fn(),
 }));
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),

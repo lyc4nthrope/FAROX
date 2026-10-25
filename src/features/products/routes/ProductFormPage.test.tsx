@@ -33,6 +33,14 @@ vi.mock("../api", () => ({
   updateProduct: vi.fn(),
   deactivateProduct: vi.fn(),
   deleteProduct: vi.fn(),
+  fetchCatalogContext: vi.fn(),
+  fetchStoreCatalog: vi.fn(),
+  fetchDistributorCatalog: vi.fn(),
+  fetchActiveProductsForCatalog: vi.fn(),
+  addStoreCatalogProduct: vi.fn(),
+  removeStoreCatalogProduct: vi.fn(),
+  addDistributorCatalogProduct: vi.fn(),
+  removeDistributorCatalogProduct: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -68,8 +76,9 @@ const FILA_NUEVA: ProductListRow = {
 // porque el literal con `code` chocaría con el excess-property check de TS.
 const ERROR_RLS = { code: "42501", message: "permission denied for table products" };
 
-// Las rutas del harness son las MISMAS del router real (B6): /products abierto
-// a todo rol, /products/new con RequireRole, /products/:id legible por todos.
+// Las rutas del harness son las MISMAS del router real (B6 + 0019/S7):
+// /products abierto a todo rol, /products/new SOLO admin (el catálogo global
+// lo administra únicamente el admin), /products/:id legible por todos.
 function renderRutas(entrada: string, role: RoleName) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
@@ -81,7 +90,7 @@ function renderRutas(entrada: string, role: RoleName) {
           <Route
             path="/products/new"
             element={
-              <RequireRole roles={["admin", "operador"]}>
+              <RequireRole roles={["admin"]}>
                 <ProductFormPage />
               </RequireRole>
             }
@@ -180,30 +189,14 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(productsApi.fetchProducts).toHaveBeenCalledTimes(2);
   });
 
-  it("operador con alcance: la creación tiene éxito y la fila aparece (PROD-2)", async () => {
-    // El alcance es de la DB (has_scope, 0006:146-149): acá se prueba el
-    // camino de éxito — el backend no deniega y la UI navega al listado.
-    vi.mocked(productsApi.fetchProducts).mockResolvedValueOnce({
-      rows: [],
-      count: 0,
-      error: null,
-    });
-    vi.mocked(productsApi.fetchProducts).mockResolvedValueOnce({
-      rows: [FILA_NUEVA],
-      count: 1,
-      error: null,
-    });
-    const user = userEvent.setup();
-    renderRutas("/products", "operador");
+  it("operador en /products/new: denegado ANTES de montar — cero llamadas (0019/S7)", async () => {
+    // El catálogo GLOBAL es del admin: el operador agrega productos a SU
+    // tienda desde /products, no crea productos nuevos en el registro.
+    renderRutas("/products/new", "operador");
 
-    expect(await screen.findByText("No hay productos todavía")).toBeInTheDocument();
-    await user.click(await screen.findByRole("link", { name: "Nuevo producto" }));
-
-    await completarAlta(user);
-    await user.click(await screen.findByRole("button", { name: "Crear producto" }));
-
-    expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(productsApi.createProduct).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Acceso denegado")).toBeInTheDocument();
+    expect(productsApi.fetchBrands).not.toHaveBeenCalled();
+    expect(productsApi.createProduct).not.toHaveBeenCalled();
   });
 
   it("campos obligatorios vacíos: errores inline y CERO requests (PROD-3 / idea:198)", async () => {
@@ -236,60 +229,20 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(productsApi.createProduct).not.toHaveBeenCalled();
   });
 
-  it("operador sin alcance (42501): mensaje amigable, nunca un falso éxito (PROD-2)", async () => {
-    // Sin pre-check de has_scope en el cliente (D2): el create se envía igual
-    // y la policy products_insert (0006:146-149) lo deniega con 42501 real.
-    vi.mocked(productsApi.createProduct).mockResolvedValue({ error: ERROR_RLS });
-    const user = userEvent.setup();
-    renderRutas("/products/new", "operador");
-
-    await completarAlta(user);
-    await user.click(await screen.findByRole("button", { name: "Crear producto" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "No tenés permisos para esta operación.",
-    );
-    expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
-    // Sigo en el formulario: no hubo navegación de éxito ni refetch de lista.
-    expect(screen.getByRole("button", { name: "Crear producto" })).toBeInTheDocument();
-    expect(productsApi.fetchProducts).not.toHaveBeenCalled();
-  });
-
-  it("producto ajeno (operador): update denegado ⇒ amigable, sin navegación (PROD-2)", async () => {
-    // El operador abre cualquier producto (lectura con USING true) y el
-    // ownership lo resuelve la policy: update con 0 filas afectadas ⇒
-    // api.ts sintetiza 42501 (nunca un falso éxito) ⇒ mensaje amigable.
-    vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
-    vi.mocked(productsApi.updateProduct).mockResolvedValue({ error: ERROR_RLS });
-    const user = userEvent.setup();
-    renderRutas("/products/1", "operador");
-
-    const botonGuardar = await screen.findByRole("button", { name: "Guardar cambios" });
-    expect(screen.getByDisplayValue("Café molido")).toBeInTheDocument();
-    await user.clear(screen.getByLabelText("Nombre"));
-    await user.type(screen.getByLabelText("Nombre"), "Café especial");
-    await user.click(botonGuardar);
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "No tenés permisos para esta operación.",
-    );
-    expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
-    expect(productsApi.updateProduct).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({ name: "Café especial" }),
-    );
-    // El título del listado ("Productos") nunca aparece: no hubo navegación
-    // (el h1 del formulario es "Producto" — nombres accesibles distintos).
-    expect(screen.queryByRole("heading", { name: "Productos" })).not.toBeInTheDocument();
-  });
-
-  it("operador: datos en modo edición SIN control de eliminar (SEC-01 idea:113 ✘)", async () => {
+  it("operador en /products/:id: solo lectura — datos visibles, cero controles (0019/S7)", async () => {
+    // El operador sigue LEYENDO el registro global (products_select USING
+    // true), pero ya no lo edita: su trabajo vive en el catálogo de su tienda.
     vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
     renderRutas("/products/1", "operador");
 
     expect(await screen.findByDisplayValue("Café molido")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
+    expect(
+      screen.getByText("Vista de solo lectura: no tenés permisos para editar productos."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Desactivar producto" })).not.toBeInTheDocument();
+    expect(productsApi.updateProduct).not.toHaveBeenCalled();
   });
 
   it("admin: desactivar solo hace soft-delete (C0.2) — nunca borra la fila", async () => {

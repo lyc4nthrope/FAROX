@@ -1,7 +1,8 @@
+import type { LoadResult } from "../../shared/hooks/useLoad";
 import { pageRange, type ListQuery, type ListResult } from "../../shared/lib/list";
 import { supabase } from "../../shared/lib/supabase/client";
 import type { ProductFormValues } from "./schemas";
-import type { CatalogRef, ProductListRow, ProductRow } from "./types";
+import type { CatalogContext, CatalogEntry, CatalogRef, ProductListRow, ProductRow, StoreOption } from "./types";
 
 // products tiene CRUD DIRECTO por tabla (T6.1 / PROD-1, spec #483 S5): la
 // tabla NO está en el REVOKE RPC-only (0006:351-357) y no existe RPC propio.
@@ -256,4 +257,167 @@ export async function deleteProduct(
     return { error: RLS_NO_ROWS };
   }
   return { error: null };
+}
+
+// ============================================================================
+// Catálogo por rol (0019) — la vista general es SOLO del admin.
+//
+// · Tienda (operador): su catálogo es la asignación stock (producto ↔ tienda).
+//   El alta usa assign_product_to_store (0011:361-381); la baja usa
+//   unassign_product_from_store (0019), que solo borra con quantity = 0.
+// · Distribuidor: catálogo propio en distributor_products + RPCs de 0019; el
+//   alcance sale del JWT en la DB, nunca de un parámetro del cliente.
+// · El registro global sigue siendo legible por todos (products_select USING
+//   true): por eso la pantalla "agregar" puede listar todos los productos.
+// ============================================================================
+
+// Embed del producto con marca/unidad/categoría en 1 request (sin N+1).
+const CATALOG_PRODUCT_SELECT =
+  "product:products(id, name, is_active, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name))";
+
+function normalizeCatalogEntry(
+  raw: Record<string, unknown>,
+  quantity: number | null,
+): CatalogEntry {
+  const embedded = raw.product;
+  const product =
+    typeof embedded === "object" && embedded !== null
+      ? normalizeListRow(embedded as Record<string, unknown>)
+      : {
+          id: normalizeId(raw.product_id),
+          name: "",
+          is_active: false,
+          brand: null,
+          unit: null,
+          category: null,
+        };
+  return { ...product, quantity };
+}
+
+// Alcance REAL del usuario, no el nombre del rol: sus tiendas (my_store_ids,
+// D16) y su distribuidora (my_distributor_id, D29). Un producto se relaciona
+// con la tienda y con la distribuidora; la vista filtra por esas entidades.
+export async function fetchCatalogContext(): Promise<LoadResult<CatalogContext>> {
+  const [storesResult, distributorResult] = await Promise.all([
+    supabase.rpc("my_store_ids"),
+    supabase.rpc("my_distributor_id"),
+  ]);
+  const error = storesResult.error ?? distributorResult.error;
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const ids = Array.isArray(storesResult.data)
+    ? (storesResult.data as unknown[]).map(normalizeId).filter((id) => id > 0)
+    : [];
+  const distributorId =
+    distributorResult.data === null || distributorResult.data === undefined
+      ? null
+      : normalizeId(distributorResult.data);
+
+  let stores: StoreOption[] = [];
+  if (ids.length > 0) {
+    const { data, error: storesError } = await supabase
+      .from("stores")
+      .select("id,name")
+      .in("id", ids)
+      .eq("is_active", true)
+      .order("name")
+      .limit(200);
+    if (storesError !== null) {
+      return { data: null, error: storesError };
+    }
+    stores = (data ?? []) as StoreOption[];
+  }
+  return { data: { stores, distributorId }, error: null };
+}
+
+// Productos asignados a una tienda (stock). La RLS de stock limita al operador
+// a sus tiendas (stock_select, 0018).
+export async function fetchStoreCatalog(storeId: number): Promise<LoadResult<CatalogEntry[]>> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select(`product_id, quantity, ${CATALOG_PRODUCT_SELECT}`)
+    .eq("store_id", storeId)
+    .order("product_id")
+    .limit(500);
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
+    normalizeCatalogEntry(raw, normalizeQuantity(raw.quantity)),
+  );
+  return { data: rows, error: null };
+}
+
+// Productos del catálogo del distribuidor autenticado (RLS por
+// my_distributor_id()).
+export async function fetchDistributorCatalog(): Promise<LoadResult<CatalogEntry[]>> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`)
+    .order("product_id")
+    .limit(500);
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
+    normalizeCatalogEntry(raw, null),
+  );
+  return { data: rows, error: null };
+}
+
+// Registro global para elegir qué agregar. Solo productos activos.
+export async function fetchActiveProductsForCatalog(): Promise<LoadResult<ProductListRow[]>> {
+  const { data, error } = await supabase
+    .from("products")
+    .select(LIST_SELECT)
+    .eq("is_active", true)
+    .order("name")
+    .limit(500);
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? data.map(normalizeListRow) : [];
+  return { data: rows, error: null };
+}
+
+export async function addStoreCatalogProduct(
+  storeId: number,
+  productId: number,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("assign_product_to_store", {
+    p_product: productId,
+    p_store: storeId,
+    p_threshold: null,
+  });
+  return { error };
+}
+
+export async function removeStoreCatalogProduct(
+  storeId: number,
+  productId: number,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("unassign_product_from_store", {
+    p_product: productId,
+    p_store: storeId,
+  });
+  return { error };
+}
+
+export async function addDistributorCatalogProduct(
+  productId: number,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("add_distributor_product", {
+    p_product: productId,
+  });
+  return { error };
+}
+
+export async function removeDistributorCatalogProduct(
+  productId: number,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("remove_distributor_product", {
+    p_product: productId,
+  });
+  return { error };
 }

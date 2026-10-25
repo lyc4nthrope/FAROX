@@ -1,17 +1,18 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../auth/types";
 import * as authApi from "../../auth/api";
 import * as productsApi from "../api";
-import type { ProductListRow } from "../types";
+import type { CatalogEntry, ProductListRow } from "../types";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { ProductsPage } from "./ProductsPage";
 
-// D7 (componente, api de la feature mockeada COMPLETA): los escenarios de
-// lectura de PROD-1 (spec #483 S5). Cero red, cero supabase (el módulo real
-// importa el cliente, que valida env en el arranque — V0-1).
+// D7 (componente, api de la feature mockeada COMPLETA): /products ya no es la
+// misma vista para todos (0019). El admin conserva el catálogo general; tienda
+// y distribuidor ven SOLO lo relacionado a sus entidades.
 vi.mock("../api", () => ({
   fetchProducts: vi.fn(),
   fetchProduct: vi.fn(),
@@ -22,6 +23,14 @@ vi.mock("../api", () => ({
   updateProduct: vi.fn(),
   deactivateProduct: vi.fn(),
   deleteProduct: vi.fn(),
+  fetchCatalogContext: vi.fn(),
+  fetchStoreCatalog: vi.fn(),
+  fetchDistributorCatalog: vi.fn(),
+  fetchActiveProductsForCatalog: vi.fn(),
+  addStoreCatalogProduct: vi.fn(),
+  removeStoreCatalogProduct: vi.fn(),
+  addDistributorCatalogProduct: vi.fn(),
+  removeDistributorCatalogProduct: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -31,8 +40,6 @@ vi.mock("../../auth/api", () => ({
   fetchPrivileges: vi.fn(),
 }));
 
-// Fila tal como la pinta ProductList con los embeds del listado (marca /
-// unidad / categoría en 1 request — Base:698, sin N+1).
 const FILA: ProductListRow = {
   id: 1,
   name: "Café molido",
@@ -42,9 +49,17 @@ const FILA: ProductListRow = {
   category: { id: 1, name: "Bebidas" },
 };
 
-// Forma REAL de una denegación PostgREST/RLS: SQLSTATE 42501 en `code`
-// (misma forma canónica que mapError.test.ts / useList.test.tsx). Variable
-// porque el literal con `code` chocaría con el excess-property check de TS.
+const ENTRADA_TIENDA: CatalogEntry = { ...FILA, quantity: 0 };
+
+const OTRO_PRODUCTO: ProductListRow = {
+  id: 2,
+  name: "Arroz blanco",
+  is_active: true,
+  brand: { id: 2, name: "Roa" },
+  unit: { id: 1, name: "Kilos" },
+  category: { id: 2, name: "Granos" },
+};
+
 const ERROR_RLS = { code: "42501", message: "permission denied for table products" };
 
 function renderPagina(role: RoleName) {
@@ -61,7 +76,7 @@ function renderPagina(role: RoleName) {
   );
 }
 
-describe("ProductsPage (PROD-1 · §S2 fila /products)", () => {
+describe("ProductsPage (0019 · catálogo por entidad)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
@@ -71,64 +86,112 @@ describe("ProductsPage (PROD-1 · §S2 fila /products)", () => {
       count: 1,
       error: null,
     });
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: { stores: [{ id: 7, name: "Tienda Centro" }], distributorId: null },
+      error: null,
+    });
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      data: [ENTRADA_TIENDA],
+      error: null,
+    });
+    vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
+      data: [{ ...FILA, quantity: null }],
+      error: null,
+    });
+    vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
+      data: [FILA, OTRO_PRODUCTO],
+      error: null,
+    });
+    vi.mocked(productsApi.addStoreCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.removeStoreCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.addDistributorCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.removeDistributorCatalogProduct).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("admin: fila con marca/unidad/categoría y estado + control Nuevo (PROD-1 / SEC-01 idea:113)", async () => {
+  it("admin: vista GENERAL con todos los productos + alta del catálogo global", async () => {
     renderPagina("admin");
 
     expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(screen.getByText("Andina")).toBeInTheDocument();
-    expect(screen.getByText("Gramos")).toBeInTheDocument();
-    expect(screen.getByText("Bebidas")).toBeInTheDocument();
-    expect(screen.getByText("Activo")).toBeInTheDocument();
-    // Control dependiente del rol (admin): la sesión resuelve de forma
-    // asíncrona, así que se espera con findBy.
     expect(await screen.findByRole("link", { name: "Nuevo producto" })).toBeInTheDocument();
-    // 1 sola petición de listado y CERO pedidos de catálogo: los nombres
-    // vienen embebidos (Base:698) — PROD-1 "one request… no N+1".
     expect(productsApi.fetchProducts).toHaveBeenCalledTimes(1);
-    expect(productsApi.fetchBrands).not.toHaveBeenCalled();
-    expect(productsApi.fetchUnitTypes).not.toHaveBeenCalled();
-    expect(productsApi.fetchProductCategories).not.toHaveBeenCalled();
+    expect(productsApi.fetchCatalogContext).not.toHaveBeenCalled();
   });
 
-  it("operador: filas visibles y también puede crear (SEC-01 idea:113 ✔ crear)", async () => {
+  it("tienda (operador): ve el catálogo de SU tienda, no el general", async () => {
     renderPagina("operador");
 
+    expect(await screen.findByText("Catálogo de Tienda Centro")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Nuevo producto" })).toBeInTheDocument();
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledWith(7);
+    expect(productsApi.fetchProducts).not.toHaveBeenCalled();
   });
 
-  it("distribuidor: catálogo legible SIN control de alta (SEC-01 idea:113 solo lectura)", async () => {
+  it("distribuidor: ve el catálogo de SU distribuidora (my_distributor_id)", async () => {
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: { stores: [], distributorId: 3 },
+      error: null,
+    });
     renderPagina("distribuidor");
 
+    expect(await screen.findByText("Catálogo de mi distribuidora")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Nuevo producto" })).not.toBeInTheDocument();
+    expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledTimes(1);
+    expect(productsApi.fetchStoreCatalog).not.toHaveBeenCalled();
   });
 
-  it("lista vacía SIN error ⇒ EmptyState, nunca banner (vacío ≠ error, PROD-1)", async () => {
-    vi.mocked(productsApi.fetchProducts).mockResolvedValue({
-      rows: [],
-      count: 0,
+  it("usuario sin tienda ni distribuidora: estado vacío explícito", async () => {
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: { stores: [], distributorId: null },
       error: null,
     });
     renderPagina("operador");
 
-    expect(await screen.findByText("No hay productos todavía")).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("No tenés una tienda ni una distribuidora asociada."),
+    ).toBeInTheDocument();
   });
 
-  it("error del backend ⇒ banner amigable; el texto crudo NUNCA llega (HARD-1)", async () => {
-    vi.mocked(productsApi.fetchProducts).mockResolvedValue({
-      rows: [],
-      count: null,
+  it("agregar a la tienda: llama la RPC con la tienda y el producto, y recarga", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const boton = await screen.findByRole("button", { name: "Agregar" });
+    await user.click(boton);
+
+    await waitFor(() =>
+      expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2),
+    );
+    expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("quitar del catálogo del distribuidor: RPC sin ids de tienda", async () => {
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: { stores: [], distributorId: 3 },
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("distribuidor");
+
+    const boton = await screen.findByRole("button", { name: "Quitar" });
+    await user.click(boton);
+
+    await waitFor(() =>
+      expect(productsApi.removeDistributorCatalogProduct).toHaveBeenCalledWith(1),
+    );
+    expect(productsApi.removeStoreCatalogProduct).not.toHaveBeenCalled();
+  });
+
+  it("error del alcance ⇒ banner amigable; el texto crudo NUNCA llega (HARD-1)", async () => {
+    vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
+      data: null,
       error: ERROR_RLS,
     });
-    renderPagina("admin");
+    renderPagina("operador");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "No tenés permisos para esta operación.",

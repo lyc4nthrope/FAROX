@@ -22,15 +22,16 @@ import { NotFound } from "./NotFound";
 import { AppShell } from "./shell/AppShell";
 import { HomePage } from "./shell/HomePage";
 
-// Matriz de guards derivada de §S2 (obs #483):
+// Matriz de guards derivada de §S2 (obs #483) + catálogo por entidad (0019):
 // · /products y /profile son legibles por cualquier sesión autenticada (sin
-//   RequireRole): la DB no gatea su lectura y el rol null ya no renderiza
-//   controles privilegiados (V0-3).
-// · /products/:id entra también para distribuidor (§S2 "distribuidor
-//   read-only"; products_select USING true, 0006:144-145): el formulario se
-//   pinta en modo solo lectura y los controles los oculta el feature products
-//   (B6, SEC-01 idea:113); /products/new SÍ lo deniega (PROD-2 escenario
-//   "distribuidor read-only" ⇒ denied en la ruta de alta).
+//   RequireRole): /products decide DENTRO qué mostrar (admin ⇒ catálogo
+//   global; tienda/distribuidor ⇒ catálogo de sus entidades). El rol null ya
+//   no renderiza controles privilegiados (V0-3).
+// · /products/:id entra también para no-admin (products_select USING true,
+//   0006:144-145): el formulario se pinta en modo solo lectura y los
+//   controles los oculta el feature products (B6, SEC-01 idea:113).
+// · /products/new es SOLO admin (0019/S7): el catálogo global no lo editan
+//   las tiendas ni los distribuidores.
 // · /distributors/:id entra para operador (lectura, SEC-01 "read-only"); los
 //   controles de escritura los oculta el feature distributors (B5, idea:119).
 // · /stores (lista y form) exige admin|operador en las TRES rutas (B7): en
@@ -104,14 +105,20 @@ export function AppRoutes() {
               }
             />
             <Route path="/products" element={<ProductsPage />} />
+            {/* Alta del catálogo GLOBAL: solo admin (0019/S7). Operador y
+                distribuidor ya no crean productos globales: eligen del
+                registro existente en su propio catálogo. */}
             <Route
               path="/products/new"
               element={
-                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                <RequireRole roles={ADMIN_ONLY}>
                   <ProductFormPage />
                 </RequireRole>
               }
             />
+            {/* Detalle/edición: legible por cualquier sesión (products_select
+                USING true, 0006:144-145). La escritura la oculta el feature
+                products para no-admin y la enforcea products_update. */}
             <Route path="/products/:id" element={<ProductFormPage />} />
             <Route
               path="/stores"

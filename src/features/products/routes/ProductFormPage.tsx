@@ -51,10 +51,11 @@ export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  // SEC-01 (idea:113): admin y operador escriben; operador "edita solo los
-  // suyos" lo resuelve la policy en el backend (0006:150-155) — acá no se
-  // filtra ownership en el cliente (D2). distribuidor ⇒ readOnly.
-  const canWrite = role === "admin" || role === "operador";
+  // 0019/S7: el catálogo GLOBAL lo administra solo el admin. Tienda y
+  // distribuidor ya no crean ni editan productos: eligen del registro
+  // existente en su propio catálogo. La DB mantiene sus policies (el
+  // enforcement real no vive en la UI — idea:134).
+  const canWrite = role === "admin";
   const isEdit = id !== undefined;
   const productId = id === undefined ? null : Number(id);
 
