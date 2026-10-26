@@ -139,11 +139,17 @@ export function AppRoutes() {
                 USING true, 0006:144-145). La escritura la oculta el feature
                 products para no-admin y la enforcea products_update. */}
             <Route path="/products/:id" element={<ProductFormPage />} />
-            {/* Faltantes: cualquier sesión autenticada. La RPC 0022 resuelve
-                el alcance real (distribuidor → tiendas vinculadas, operador →
-                sus tiendas, admin → todas), así que no hace falta un guard de
-                rol y un usuario sin alcance ve el estado vacío. */}
-            <Route path="/faltantes" element={<ShortagePage />} />
+            {/* Faltantes: solo admin y operador (0023). El distribuidor ya no
+                ve faltantes; recibe el pedido que el operador le crea. La RPC
+                acota al operador a sus tiendas. */}
+            <Route
+              path="/faltantes"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <ShortagePage />
+                </RequireRole>
+              }
+            />
             <Route
               path="/stores"
               element={

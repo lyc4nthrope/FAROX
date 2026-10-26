@@ -44,12 +44,14 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     expect(visibleNavItems("distribuidor").map((item) => item.to)).toEqual([
       "/mi-ruta",
       "/pedidos",
-      "/faltantes",
       "/vincular",
       "/alertas",
       "/dashboard",
       "/products",
     ]);
+    // 0023: los faltantes pasaron a ser del operador; el distribuidor se
+    // entera por el pedido, no por una vista de faltantes.
+    expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/faltantes");
   });
 
   it("sin rol (my_role() NULL): cero controles privilegiados (V0-3)", () => {

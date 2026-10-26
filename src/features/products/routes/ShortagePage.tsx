@@ -26,11 +26,10 @@ function groupByStore(rows: ShortageRow[]): StoreGroup[] {
   return [...groups.values()].sort((a, b) => a.storeName.localeCompare(b.storeName));
 }
 
-// /faltantes (§S7): lo que las tiendas marcaron como faltante, agrupado por
-// tienda para armar el pedido. La RPC list_shortage_products() (0022) resuelve
-// el alcance: el distribuidor ve SOLO las tiendas vinculadas (su RLS de stock
-// no le deja leerlas directo), el operador las suyas y el admin todas. El
-// cliente no filtra nada por su cuenta.
+// /faltantes (0023): lo que las tiendas marcaron como faltante. Lo ve SOLO el
+// operador de esa tienda (el admin, todas). El distribuidor no tiene vista de
+// faltantes: se entera cuando el operador le crea el pedido. La RPC
+// list_shortage_products() resuelve el alcance y el cliente no filtra nada.
 export function ShortagePage() {
   const { data, error, loading } = useLoad(fetchShortageProducts, []);
   const groups = useMemo(() => groupByStore(data ?? []), [data]);
@@ -39,8 +38,8 @@ export function ShortagePage() {
     <section>
       <h1 className="text-xl font-semibold">Faltantes</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-600">
-        Productos que las tiendas marcaron como faltantes. Agrupados por tienda para preparar el
-        pedido.
+        Productos que marcaste como faltantes para reponer. El distribuidor no ve esta lista: le
+        llega cuando le hacés el pedido.
       </p>
 
       <div className="mt-4 space-y-4">
@@ -49,7 +48,7 @@ export function ShortagePage() {
         {!loading && error === null && groups.length === 0 && (
           <EmptyState
             title="No hay faltantes marcados"
-            hint="Cuando una tienda marque un producto como faltante, va a aparecer acá."
+            hint="Cuando marques un producto como faltante, va a aparecer acá."
           />
         )}
 

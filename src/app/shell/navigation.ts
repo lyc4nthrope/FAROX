@@ -38,11 +38,12 @@ const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
 ]);
 
 // Navegación del distribuidor: productos (lectura), su ruta, sus pedidos,
-// sus alertas y el dashboard de lo suyo.
+// sus alertas y el dashboard de lo suyo. Los faltantes NO van acá: el
+// distribuidor solo se entera del faltante cuando el operador le crea un
+// pedido (0023).
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
-  { to: "/faltantes", label: "Faltantes" },
   { to: "/vincular", label: "Vincular tienda" },
   { to: "/alertas", label: "Alertas" },
   { to: "/dashboard", label: "Dashboard" },

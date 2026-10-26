@@ -64,7 +64,8 @@ describe("0022 · catálogo del operador", () => {
     expect(sql).toContain("WHERE product_id = p_product AND store_id = p_store");
   });
 
-  it("el distribuidor solo ve faltantes de tiendas vinculadas", () => {
+  // Histórico: 0023 reemplaza esta función y quita la rama del distribuidor.
+  it("el distribuidor solo ve faltantes de tiendas vinculadas (0022; 0023 lo deroga)", () => {
     const sql = readMigration();
     expect(sql).toContain(
       "CREATE OR REPLACE FUNCTION public.list_shortage_products() RETURNS TABLE (",
