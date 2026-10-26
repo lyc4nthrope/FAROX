@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. El `supabase/seed.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -74,6 +74,11 @@ UNION ALL SELECT '0021 solicitudes tienda ↔ distribuidor',
             WHERE proname = 'create_order'
               AND pronamespace = 'public'::regnamespace
             LIMIT 1), false)::text
+UNION ALL SELECT '0022 catálogo del operador',
+  COALESCE((SELECT count(*) = 4 FROM pg_proc
+            WHERE proname IN ('set_store_product_quantity','remove_store_product',
+                              'set_store_shortage','list_shortage_products')
+              AND pronamespace = 'public'::regnamespace), false)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -100,6 +105,8 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0019 | `20261025000019_catalogo_por_rol.sql` | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla** | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`) |
 | 0020 | `20261025000020_store_link_store_users.sql` | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo** | ✅ (`CREATE OR REPLACE`) |
 | 0021 | `20261025000021_store_distributor_requests.sql` | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto** | ✅ (`CREATE OR REPLACE`) |
+| 0022 | `20261025000022_catalogo_operador.sql` | `0022 … = true` — **sin esta, el operador no puede editar cantidades, marcar faltantes ni ver la vista `/faltantes`** | ✅ (`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE`) |
+| seed | `supabase/seed.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
@@ -148,6 +155,12 @@ SELECT has_table_privilege('authenticated','public.distributor_products','SELECT
 -- 0021: productos solicitables (intersección) y create_order endurecido
 SELECT has_function_privilege('authenticated','public.list_store_distributor_products(bigint,bigint)','EXECUTE'); -- true
 SELECT has_function_privilege('authenticated','public.create_order(bigint,bigint,jsonb,timestamptz,text)','EXECUTE'); -- true
+-- 0022: catálogo del operador (cantidad, baja, faltante y tablero)
+SELECT has_column_privilege('authenticated','public.stock','is_shortage','SELECT');                                        -- true
+SELECT has_function_privilege('authenticated','public.set_store_product_quantity(bigint,bigint,numeric)','EXECUTE');       -- true
+SELECT has_function_privilege('authenticated','public.remove_store_product(bigint,bigint,boolean)','EXECUTE');             -- true
+SELECT has_function_privilege('authenticated','public.set_store_shortage(bigint,bigint,boolean)','EXECUTE');               -- true
+SELECT has_function_privilege('authenticated','public.list_shortage_products()','EXECUTE');                                -- true
 ```
 
 Y después:
@@ -182,7 +195,11 @@ Y después:
     public.add_distributor_product(bigint), public.remove_distributor_product(bigint),
     public.unassign_product_from_store(bigint,bigint),
     public.list_store_distributor_products(bigint,bigint),
-    public.create_order(bigint,bigint,jsonb,timestamptz,text)
+    public.create_order(bigint,bigint,jsonb,timestamptz,text),
+    public.set_store_product_quantity(bigint,bigint,numeric),
+    public.remove_store_product(bigint,bigint,boolean),
+    public.set_store_shortage(bigint,bigint,boolean),
+    public.list_shortage_products()
   TO authenticated, service_role;
   ```
 - **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4. El job `schema-check` los trata como fallos conocidos y aceptados (`ACCEPTED_FAILS` en `scripts/parse-verify-output.mjs`) y sigue fallando ante cualquier otro `[FAIL]` o ante un `RESUMEN` cuyo conteo no cuadre con las líneas del log.

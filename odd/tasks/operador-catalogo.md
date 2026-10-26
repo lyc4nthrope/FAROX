@@ -10,18 +10,18 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 - **S4** — Cada fila del catálogo de tienda permite **editar la cantidad** en stock y guardarla **sin generar ningún movimiento** (“se pueda modificar la cantidad (sin generar ningun movimiento)”). La cantidad no puede ser negativa; el guardado actualiza `stock.quantity` y re-evalúa la alerta de stock, sin insertar en `movements`.
 - **S5** — Se puede **eliminar un producto del catálogo**. Sin existencias pide **una** confirmación. Con existencias pide **doble verificación** (“pueda eliminar un producto del catalog con doble verificacion si tiene stock”): la segunda advierte exactamente cuántas unidades se descartan. El backend exige `p_confirm_stock = true` en ese caso, registra la salida con el motivo `ajuste` (trazabilidad del ledger) y borra la fila de `stock`.
 - **S6** — Cada fila tiene la opción **“Marcar faltante” / “Quitar faltante”** (“los productos tenga la opcion de marcar como faltante”). El estado se guarda en `stock.is_shortage` vía RPC y sobrevive al refetch.
-- **S7** — El distribuidor tiene una vista **`/faltantes`** con selector de tienda vinculada y la lista de productos que esa tienda marcó como faltantes (“cuando vayan a la vista de distribuidores pueda ver que productos deberia pedir (porque marco que le faltaban)”), con nombre, marca, unidad, categoría, cantidad actual y enlace a “Nuevo pedido”. La RPC valida el vínculo tienda ↔ distribuidor; un distribuidor no puede ver faltantes de tiendas no vinculadas.
+- **S7** — El distribuidor tiene una vista **`/faltantes`** con los productos que sus tiendas vinculadas marcaron como faltantes (“cuando vayan a la vista de distribuidores pueda ver que productos deberia pedir (porque marco que le faltaban)”), **agrupados por tienda**, con nombre, marca, unidad, categoría, stock actual contra la base y estado (sin stock / reponer). La RPC valida el vínculo tienda ↔ distribuidor; un distribuidor no puede ver faltantes de tiendas no vinculadas.
 - **S8** — La lista soporta **cientos de productos** (“Que la listo de productos soporte cientos de productos en la vista, sea por paginacion o por scrolling”): se mantiene paginación server-side (25/página, `Pager`) y **todo filtro se aplica en el servidor** con `.range()` + `count: 'planned'`, nunca filtrando solo la página cargada.
 - **S9** — Los errores nuevos se traducen con `mapError` (nunca texto crudo). El administrador conserva el flujo actual. La migración nueva se entrega como archivo para aplicar a mano (el MCP de Supabase está en `read_only`).
 
 ## Tasks
 
-- [ ] T1 (S4, S5, S6, S7) — Migración `20261025000022_catalogo_operador.sql`: columna `stock.is_shortage`, índice parcial, RPCs `set_store_product_quantity`, `remove_store_product`, `set_store_shortage`, `list_store_shortages`, RLS/Grants. Test de contrato SQL. Ruta inline.
-- [ ] T2 (S3, S6, S8) — `useList` con `setQuery` + `ListQuery` extendido; api del catálogo con filtros server-side, `is_shortage` y las RPCs nuevas; tests de contrato. Ruta inline.
-- [ ] T3 (S1, S3, S4, S5, S6, S8) — `MyCatalogPage` + `ProductList`: botón de encabezado, filtros, cantidad editable, baja con doble confirmación, toggle de faltante. Tests de UI. Ruta inline.
-- [ ] T4 (S2) — Alta ágil: búsqueda server-side en el registro global + “Crear producto” inline reutilizando `ProductForm`, con asignación automática. Tests de UI. Ruta inline.
-- [ ] T5 (S7) — Vista `/faltantes` del distribuidor + ruta + navegación + tests. Ruta inline.
-- [ ] T6 (S9) — Gate completo (typecheck, lint, tests, check-scope), `supabase/README.md` y este documento. Ruta inline.
+- [x] T1 (S4, S5, S6, S7) — Migración `20261025000022_catalogo_operador.sql`: columna `stock.is_shortage`, índice parcial, RPCs `set_store_product_quantity`, `remove_store_product`, `set_store_shortage`, `list_shortage_products`, grants. Test de contrato SQL. Ruta inline. Commit `b29cca7`.
+- [x] T2 (S3, S6, S8) — `useList` con `setQuery` + `ListQuery` extendido; api del catálogo con filtros server-side, `is_shortage` y las RPCs nuevas; tests de contrato. Ruta inline. Commit `f8c706f`.
+- [x] T3 (S1, S3, S4, S5, S6, S8) — `MyCatalogPage` + `CatalogBox` + `ProductList`: botón de encabezado, filtros, cantidad editable, baja con doble confirmación, toggle de faltante. Tests de UI. Ruta inline. Commit `f8c706f`.
+- [x] T4 (S2) — Alta ágil: búsqueda server-side en el registro global + “Crear producto” inline reutilizando `ProductForm`, con asignación automática. Tests de UI. Ruta inline. Commit `f8c706f`.
+- [x] T5 (S7) — Vista `/faltantes` agrupada por tienda + ruta + navegación + tests. Ruta inline. Commit `cdff737`.
+- [x] T6 (S9) — Gate completo (typecheck, lint, tests, check-scope), `supabase/APLICAR-EN-PRODUCCION.md` y este documento. Ruta inline.
 
 ## Log
 
@@ -39,3 +39,15 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 - `products_insert` ya permite `operador AND has_scope()` en la DB; el bloqueo de “crear producto” era solo de UI (0019/S7). Se habilita un alta inline en el panel del catálogo, no la ruta `/products/new`.
 - Paginación (no scroll infinito): ya existe `useList` + `Pager` con 25/página y está probado; se extiende con filtros server-side.
 - La migración no se puede aplicar desde el agente (MCP `read_only` + `supabase_execute_sql` denegado): queda como archivo para el SQL Editor, igual que `supabase/seed.sql`.
+
+### L3 — Implementación, decisiones de alcance y evidencia (2026-10-26)
+
+- **S7 sin selector de tienda ni enlace a “Nuevo pedido”.** El agrupamiento por tienda ya cumple el pedido original y evita un selector redundante. El enlace se descartó con evidencia: `/pedidos/nuevo` está detrás de `RequireRole roles={ADMIN_OR_OPERATOR}` en `src/app/router.tsx`, así que un distribuidor que lo abriera chocaría con el guard; y `NewOrderPage` solo prellena `?storeId=` (no productos). Se prefirió no ofrecer un enlace que no puede completar el flujo.
+- **Cantidad sin movimiento**: `set_store_product_quantity` actualiza `stock.quantity` y llama `internal_eval_stock_alert`; no inserta en `movements`. Tradeoff de L2 confirmado.
+- **Filtros en el servidor**: `product:products!inner(...)` — sin `!inner` PostgREST no recorta las filas de `stock` por los filtros del embed y el filtro queda decorativo. La búsqueda escapa `\ % _` para que el término sea literal.
+- **Alta rápida**: `createProduct` ahora devuelve `id` (`.select("id").single()`) para asignar el producto a la tienda en el mismo paso; `ProductFormPage` sigue usando solo `error`.
+- **`useList` genérico**: `setQuery` fusiona filtros y vuelve a página 0; el catálogo no se remonta al agregar (`reloadToken` → `refetch`), así no se pierden búsqueda, filtros ni página.
+- **§S8-4 y los grants**: el test de contrato ya no puede nombrar el rol de servidor (el gate prohíbe ese literal en `src/`), así que valida la forma del `GRANT` (4 firmas, sin `PUBLIC`/`anon`, exactamente 2 roles) y el `REVOKE` a `PUBLIC, anon`.
+- **Evidencia**: `npm run lint` OK · `npm run typecheck` OK · `npm run test` 67 archivos / 552 tests verdes · `npm run check-scope` §S8 OK (235 archivos). Commits: `d8a3c41` (barcode opcional + escaneo), `f8c706f` (filtros, cantidad, baja y faltante), `cdff737` (`/faltantes`), `96769a4` (seed demo), `b29cca7` (0022), `d47aad7` (plan).
+- **Pendiente manual (bloquea la verificación real)**: aplicar `20261025000022_catalogo_operador.sql` y, si se quieren datos demo, `supabase/seed.sql` desde el SQL Editor. Hasta entonces el comportamiento de las 4 RPCs nuevas no está verificado contra una base real; la UI y los contratos SQL están cubiertos por tests.
+- **No verificado en dispositivo real**: el escaneo con cámara (jsdom no decodifica video); los tests cubren estructura y presencia/ausencia del control.
