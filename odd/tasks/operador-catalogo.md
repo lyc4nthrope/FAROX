@@ -22,7 +22,7 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 - [x] T4 (S2) — Alta ágil: búsqueda server-side en el registro global + “Crear producto” inline reutilizando `ProductForm`, con asignación automática. Tests de UI. Ruta inline. Commit `f8c706f`.
 - [x] T5 (S7) — Vista `/faltantes` agrupada por tienda + ruta + navegación + tests. Ruta inline. Commit `cdff737`.
 - [x] T6 (S9) — Gate completo (typecheck, lint, tests, check-scope), `supabase/APLICAR-EN-PRODUCCION.md` y este documento. Ruta inline.
-- [x] T7 (S1, S2) — Alta en **ventana emergente**: `Modal` compartido (rol `dialog`, Escape, fondo, foco al buscador y retorno al disparador, bloqueo de scroll) + `MyCatalogPage` lo usa; tests del primitivo y de la pantalla. Ruta inline. Commit `pendiente`.
+- [x] T7 (S1, S2) — Alta en **ventana emergente**: `Modal` compartido (rol `dialog`, Escape, fondo, foco al buscador y retorno al disparador, bloqueo de scroll) + `MyCatalogPage` lo usa; tests del primitivo y de la pantalla. Ruta inline. Commit `a753e19`.
 
 ## Log
 
