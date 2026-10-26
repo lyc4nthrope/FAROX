@@ -225,6 +225,7 @@ export function InventoryPage() {
 
       <Box title="Stock">
         <Status loading={stock.loading} error={stock.error} />
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
@@ -247,6 +248,7 @@ export function InventoryPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {stock.data?.length === 0 && <p>La tienda no tiene productos asignados.</p>}
       </Box>
 
@@ -302,6 +304,7 @@ export function InventoryPage() {
 
       <Box title="Últimos movimientos">
         <Status loading={movements.loading} error={movements.error} />
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
@@ -341,6 +344,7 @@ export function InventoryPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Box>
 
       <Box title="Precios de la tienda">

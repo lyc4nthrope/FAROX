@@ -56,7 +56,7 @@ export function DataTable<Row>({
 }: DataTableProps<Row>) {
   if (error !== null) {
     return (
-      <div className="mt-4">
+      <div className="mt-4 overflow-x-auto">
         <ErrorBanner message={error} />
       </div>
     );
@@ -66,7 +66,7 @@ export function DataTable<Row>({
   }
   if (rows.length === 0) {
     return (
-      <div className="mt-4">
+      <div className="mt-4 overflow-x-auto">
         <EmptyState title={emptyTitle} hint={emptyHint} />
       </div>
     );
@@ -76,7 +76,7 @@ export function DataTable<Row>({
     (actions ?? []).filter((action) => action.visible?.(row) ?? true);
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-gray-600">

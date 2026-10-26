@@ -90,6 +90,7 @@ export function OrderDetailPage() {
 
       <Box title="Productos">
         <Status loading={items.loading} error={items.error} />
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
@@ -127,6 +128,7 @@ export function OrderDetailPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Box>
 
       {o && open && (

@@ -53,6 +53,7 @@ export function ProductList({
       )}
       {error === null && loading && <p className="text-sm text-gray-600">Cargando…</p>}
       {error === null && !loading && rows.length > 0 && (
+        <div className="overflow-x-auto">
         <table className="w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-gray-600">
@@ -98,6 +99,7 @@ export function ProductList({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

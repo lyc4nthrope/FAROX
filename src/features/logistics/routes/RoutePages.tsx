@@ -70,7 +70,7 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
           </li>
         ))}
       </ol>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {role === "admin" && route.status === "planned" && (
           <button className={buttonClass} type="button" onClick={() => void act(() => updateRouteStatus(route.id, "active"), "Ruta iniciada.")}>
             Iniciar ruta

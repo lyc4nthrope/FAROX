@@ -174,7 +174,7 @@ export function AuditTable({
       emptyHint="Los cambios en usuarios, catálogos y operaciones van a aparecer acá."
       footer={
         rows.length > 0 ? (
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             {hasMore ? (
               <button
                 type="button"

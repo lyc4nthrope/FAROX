@@ -199,7 +199,7 @@ export function NewOrderPage() {
             </p>
           )}
           {lines.map((line, index) => (
-            <div key={index} className="mb-2 flex gap-2">
+            <div key={index} className="mb-2 flex flex-wrap items-end gap-2">
               <select
                 aria-label={`Producto ${index + 1}`}
                 className={inputClass}

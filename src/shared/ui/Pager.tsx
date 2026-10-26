@@ -18,7 +18,7 @@ export function Pager({
   if (page === 0 && !hasNext) return null;
   const total = list.count === null ? null : Math.max(1, Math.ceil(list.count / pageSize));
   return (
-    <nav aria-label="Paginación" className="mt-3 flex items-center gap-2 text-sm">
+    <nav aria-label="Paginación" className="mt-3 flex flex-wrap items-center gap-2 text-sm">
       <button
         type="button"
         className="rounded border border-gray-500 bg-gray-100 px-3 py-1 disabled:opacity-50"

@@ -47,6 +47,7 @@ export function StoreList({ rows, loading, error, canCreate }: StoreListProps) {
       )}
       {error === null && loading && <p className="mt-4 text-sm text-gray-600">Cargando…</p>}
       {error === null && !loading && rows.length > 0 && (
+        <div className="overflow-x-auto">
         <table className="mt-4 w-full border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-gray-600">
@@ -73,6 +74,7 @@ export function StoreList({ rows, loading, error, canCreate }: StoreListProps) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

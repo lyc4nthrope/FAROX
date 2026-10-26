@@ -120,6 +120,7 @@ export function ShortagePage() {
             <h2 className="mb-3 border-b border-gray-100 pb-2 text-base font-semibold text-gray-900">
               {group.storeName}
             </h2>
+        <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="text-xs uppercase tracking-wide text-gray-500">
@@ -153,6 +154,7 @@ export function ShortagePage() {
                 ))}
               </tbody>
             </table>
+        </div>
             {role === "operador" && <ShortageRequest storeId={group.storeId} rows={group.rows} />}
           </section>
         ))}

@@ -49,6 +49,7 @@ export function OrdersPage() {
         </label>
         <Status loading={orders.loading} error={orders.error} />
         {orders.data?.length === 0 && <p>No hay pedidos.</p>}
+        <div className="overflow-x-auto">
         <table className="mt-2 w-full text-left text-sm">
           <thead>
             <tr>
@@ -75,6 +76,7 @@ export function OrdersPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Box>
     </section>
   );

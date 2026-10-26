@@ -107,7 +107,7 @@ export function DashboardPage() {
     <section>
       <h1 className="text-xl font-semibold">Dashboard</h1>
       <Box title="Rango">
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <Field label="Desde">
             <input className={inputClass} type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           </Field>
@@ -125,6 +125,7 @@ export function DashboardPage() {
         </ul>
       </Box>
       <Box title="Por distribuidor">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
@@ -145,8 +146,10 @@ export function DashboardPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Box>
       <Box title="Por día">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
             <tr>
@@ -167,6 +170,7 @@ export function DashboardPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {data.length === 0 && !rows.loading && <p>Sin movimientos en el rango.</p>}
       </Box>
     </section>

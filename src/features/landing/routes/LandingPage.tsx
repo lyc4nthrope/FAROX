@@ -124,7 +124,7 @@ export function LandingPage() {
   return (
     <div className="min-h-dvh bg-white text-gray-900">
       <header className="sticky top-0 z-20 border-b border-gray-200/80 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3">
           <Link
             to="/"
             className="text-lg font-semibold tracking-[0.22em] text-gray-900"
