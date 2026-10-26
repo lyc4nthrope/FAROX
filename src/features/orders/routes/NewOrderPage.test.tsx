@@ -94,7 +94,8 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     const product = screen.getByLabelText("Producto 1");
     const arroz = await screen.findByRole("option", { name: /^Arroz/ });
     expect(arroz).toHaveTextContent("4.500");
-    expect(screen.getByRole("option", { name: "Aceite (sin precio)" })).toBeDisabled();
+    // 0024: sin precio ya no bloquea la solicitud; el distribuidor la cotiza.
+    expect(screen.getByRole("option", { name: "Aceite (sin precio)" })).toBeEnabled();
     expect(product).toHaveValue("");
   });
 
@@ -134,22 +135,31 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     ).toBeInTheDocument();
   });
 
-  // create_order rechaza productos sin precio activo en la tienda (D40); sin
-  // este aviso el selector solo muestra opciones deshabilitadas y parece roto.
-  it("operador con productos sin precio: explica por qué y enlaza al inventario de la tienda", async () => {
+  // 0024: la solicitud nace sin precio y el distribuidor la cotiza después.
+  it("operador: puede pedir un producto sin precio y no ve el aviso de bloqueo", async () => {
+    vi.mocked(ordersApi.createOrder).mockResolvedValue({ data: 42, error: null });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
 
-    const notice = await screen.findByText(
-      /1 producto no tiene precio en esta tienda y no se puede pedir\./,
-    );
-    expect(notice).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Publicá su precio en Inventario" })).toHaveAttribute(
-      "href",
-      "/inventario/3",
+    await user.selectOptions(await screen.findByLabelText("Producto 1"), "11");
+    await user.type(screen.getByLabelText("Cantidad 1"), "3");
+    expect(screen.queryByText(/no tiene precio en esta tienda/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Inventario/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Crear pedido" }));
+
+    await waitFor(() =>
+      expect(ordersApi.createOrder).toHaveBeenCalledWith({
+        storeId: 3,
+        distributorId: 7,
+        items: [{ product_id: 11, quantity: 3 }],
+        expectedAt: null,
+        notes: null,
+      }),
     );
   });
 
-  it("operador sin ningún producto con precio: lo dice en plural", async () => {
+  it("operador con todos los productos sin precio: igual puede solicitar", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [
         { id: 10, name: "Arroz", brand: null, quantity: null, price: null },
@@ -159,21 +169,9 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
 
-    expect(
-      await screen.findByText(/2 productos no tienen precio en esta tienda y no se pueden pedir\./),
-    ).toBeInTheDocument();
-  });
-
-  it("operador con todos los productos con precio: no muestra el aviso", async () => {
-    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
-      data: [{ id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 }],
-      error: null,
-    });
-    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
-
-    await screen.findByRole("option", { name: /^Arroz/ });
-    expect(screen.queryByText(/no tiene precio en esta tienda/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Inventario/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Arroz (sin precio)" })).toBeEnabled();
+    expect(screen.getByRole("option", { name: "Aceite (sin precio)" })).toBeEnabled();
+    expect(screen.queryByText(/no tienen precio en esta tienda/)).not.toBeInTheDocument();
   });
 
   it("cambiar de tienda limpia distribuidor, líneas y vuelve a consultar", async () => {
@@ -203,19 +201,18 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(storeLinksApi.fetchStoreDistributorProducts).not.toHaveBeenCalled();
   });
 
-  // S3: /faltantes llega con los productos elegidos; solo se precargan los
-  // pedibles (con precio) y con cantidad 1 para ajustar.
-  it("operador desde faltantes: precarga los productos pedibles y descarta los que no tienen precio", async () => {
+  // S3: /faltantes llega con los productos elegidos; 0024 ya no descarta los
+  // que no tienen precio: se precargan todos con cantidad 1 para ajustar.
+  it("operador desde faltantes: precarga todos los productos del filtro", async () => {
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7&faltantes=10,11");
 
     await waitFor(() => expect(screen.getByLabelText("Producto 1")).toHaveValue("10"));
     expect(screen.getByLabelText("Cantidad 1")).toHaveValue(1);
+    expect(screen.getByLabelText("Producto 2")).toHaveValue("11");
     expect(
       screen.getByText(
         "Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.",
       ),
     ).toBeInTheDocument();
-    // El 11 venía en la lista pero no tiene precio activo: no se precarga.
-    expect(screen.queryByLabelText("Producto 2")).not.toBeInTheDocument();
   });
 });

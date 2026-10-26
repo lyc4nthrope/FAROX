@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +19,8 @@ vi.mock("../api", () => ({
   },
   fetchOrder: vi.fn(),
   fetchOrderItems: vi.fn(),
+  fetchOrderQuotes: vi.fn(),
+  setOrderPrices: vi.fn(),
   updateOrderStatus: vi.fn(),
   confirmDelivery: vi.fn(),
   createCredit: vi.fn(),
@@ -66,7 +68,9 @@ describe("OrderDetailPage · fiado (0023)", () => {
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({ data: [], error: null });
     vi.mocked(ordersApi.createCredit).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.setOrderPrices).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
@@ -103,5 +107,83 @@ describe("OrderDetailPage · fiado (0023)", () => {
     expect(
       screen.queryByRole("button", { name: "Crear crédito para este pedido" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
+    vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          product_id: 10,
+          product_name: "Arroz",
+          quantity: 2,
+          received_quantity: null,
+          status: "pending",
+          unit_price: null,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(ordersApi.setOrderPrices).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
+      data: [{ product_id: 10, distributor_price: null }],
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("el distribuidor cotiza las líneas de un pedido pendiente", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+
+    const precio = await screen.findByLabelText("Precio de Arroz");
+    await user.type(precio, "2500");
+    await user.click(screen.getByRole("button", { name: "Guardar cotización" }));
+
+    expect(ordersApi.setOrderPrices).toHaveBeenCalledWith(5, [
+      { product_id: 10, distributor_price: 2500 },
+    ]);
+  });
+
+  it("precarga la cotización ya guardada del distribuidor", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
+      data: [{ product_id: 10, distributor_price: 3200 }],
+      error: null,
+    });
+
+    renderPage("distribuidor");
+
+    const input = await screen.findByLabelText("Precio de Arroz");
+    await waitFor(() => expect(input).toHaveValue(3200));
+  });
+
+  it("el operador no cotiza: la caja es del distribuidor", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+
+    renderPage("operador");
+
+    expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
+    expect(screen.queryByText("Cotización del distribuidor")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Precio de Arroz")).not.toBeInTheDocument();
+  });
+
+  it("un pedido ya en ruta no admite cotización", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+
+    renderPage("distribuidor");
+
+    expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
+    expect(screen.queryByText("Cotización del distribuidor")).not.toBeInTheDocument();
   });
 });

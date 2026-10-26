@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -74,9 +74,10 @@ export function NewOrderPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // S3: /faltantes envía los productos ya elegidos. Se precargan UNA vez, solo
-  // los que existen en la intersección y tienen precio; si el operador cambia
-  // de distribuidor, las líneas se reinician y no se vuelven a pisar.
+  // S3: /faltantes envía los productos ya elegidos. Se precargan UNA vez los
+  // que existen en la intersección; si el operador cambia de distribuidor, las
+  // líneas se reinician y no se vuelven a pisar. 0024: el precio ya no es
+  // requisito para solicitar.
   const shortageIds = useMemo(
     () =>
       (params.get("faltantes") ?? "")
@@ -90,11 +91,7 @@ export function NewOrderPage() {
   useEffect(() => {
     if (prefilled.current || shortageIds.length === 0) return;
     if (storeId === "" || distributorId === "" || products.data === null) return;
-    const requestable = new Set(
-      products.data
-        .filter((product) => product.price !== null)
-        .map((product) => String(product.id)),
-    );
+    const requestable = new Set(products.data.map((product) => String(product.id)));
     const wanted = shortageIds.filter((id) => requestable.has(id));
     if (wanted.length === 0) return;
     prefilled.current = true;
@@ -157,10 +154,6 @@ export function NewOrderPage() {
     }
   }
 
-  // create_order exige precio activo en la tienda (D40): sin este conteo el
-  // selector solo muestra opciones deshabilitadas y no explica por qué.
-  const unpricedCount = products.data?.filter((p) => p.price === null).length ?? 0;
-
   const pickerOptions = useMemo<ProductPickerOption[]>(
     () =>
       (products.data ?? []).map((product) => ({
@@ -169,7 +162,6 @@ export function NewOrderPage() {
         brand: product.brand,
         quantity: product.quantity,
         price: product.price,
-        disabled: product.price === null,
       })),
     [products.data],
   );
@@ -179,8 +171,9 @@ export function NewOrderPage() {
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Pedidos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Elegí la tienda, el distribuidor y los productos. Al confirmar, el pedido queda listo para
-        su entrega.
+        {admin
+          ? "Elegí la tienda, el distribuidor y los productos. Al confirmar, el pedido queda listo para su entrega."
+          : "Elegí la tienda, el distribuidor vinculado y los productos. No hace falta precio: el distribuidor recibe la solicitud y la cotiza."}
       </p>
       <Status error={error ?? stores.error ?? distributors.error ?? products.error} />
       <form onSubmit={(e) => void onSubmit(e)}>
@@ -233,19 +226,6 @@ export function NewOrderPage() {
               {lines.length} {lines.length === 1 ? "línea" : "líneas"}
             </span>
           </div>
-          {unpricedCount > 0 && (
-            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              {unpricedCount === 1
-                ? "1 producto no tiene precio en esta tienda y no se puede pedir."
-                : `${unpricedCount} productos no tienen precio en esta tienda y no se pueden pedir.`}{" "}
-              <Link
-                className="font-medium underline underline-offset-4"
-                to={`/inventario/${storeId}`}
-              >
-                Publicá su precio en Inventario
-              </Link>
-            </p>
-          )}
           {shortageIds.length > 0 && (
             <p className="mt-2 text-sm text-gray-600">
               Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.

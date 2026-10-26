@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -91,6 +91,17 @@ UNION ALL SELECT '0023 fiado del operador',
             WHERE proname = 'create_credit'
               AND pronamespace = 'public'::regnamespace
             LIMIT 1), false)::text
+UNION ALL SELECT '0024 solicitud sin precio',
+  COALESCE((SELECT is_nullable = 'YES'
+                   AND EXISTS (SELECT 1 FROM information_schema.columns c
+                               WHERE c.table_schema = 'public' AND c.table_name = 'order_items'
+                                 AND c.column_name = 'distributor_price')
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'order_items'
+              AND column_name = 'unit_price'), false)::text
+UNION ALL SELECT '0024 cotización y umbral',
+  (to_regprocedure('public.set_order_prices(bigint,jsonb)') IS NOT NULL
+   AND to_regprocedure('public.set_stock_threshold(bigint,bigint,numeric)') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -119,6 +130,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0021 | `20261025000021_store_distributor_requests.sql` | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto** | ✅ (`CREATE OR REPLACE`) |
 | 0022 | `20261025000022_catalogo_operador.sql` | `0022 … = true` — **sin esta, el operador no puede editar cantidades, marcar faltantes ni ver la vista `/faltantes`** | ✅ (`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE`) |
 | 0023 | `20261026000023_faltantes_operador_y_fiado.sql` | `0023 … = true` (los dos) — **sin esta, el distribuidor sigue viendo los faltantes de la tienda y el operador no puede crear el fiado** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
+| 0024 | `20261026000024_solicitudes_sin_precio_y_cotizacion.sql` | `0024 … = true` (los dos) — **sin esta, el operador sigue sin poder solicitar sin precio y el inventario no puede limpiar umbrales** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`; el `ALTER` es idempotente) |
 | seed | `supabase/demo-catalog.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
@@ -176,6 +188,11 @@ SELECT has_function_privilege('authenticated','public.set_store_shortage(bigint,
 SELECT has_function_privilege('authenticated','public.list_shortage_products()','EXECUTE');                                -- true
 -- 0023: alcance del tablero y fiado del operador
 SELECT has_function_privilege('authenticated','public.create_credit(bigint,date)','EXECUTE');                                              -- true
+-- 0024: solicitud sin precio, cotización del distribuidor y umbral editable
+SELECT is_nullable FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='order_items' AND column_name='unit_price';                                                   -- YES
+SELECT has_function_privilege('authenticated','public.set_order_prices(bigint,jsonb)','EXECUTE');                                          -- true
+SELECT has_function_privilege('authenticated','public.set_stock_threshold(bigint,bigint,numeric)','EXECUTE');                             -- true
 ```
 
 Y después:
@@ -196,7 +213,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas

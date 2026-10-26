@@ -194,6 +194,44 @@ export async function createOrder(
   return { data: typeof data === "number" ? data : data == null ? null : Number(data), error };
 }
 
+export interface OrderPriceInput {
+  product_id: number;
+  distributor_price: number;
+}
+
+export interface OrderQuoteRow {
+  product_id: number;
+  distributor_price: number | null;
+}
+
+/**
+ * 0024 — cotización del distribuidor. La lectura va por RPC aparte porque
+ * get_order_items nunca expone el precio privado de la tienda (D40/D41).
+ */
+export async function fetchOrderQuotes(orderId: number): Promise<LoadResult<OrderQuoteRow[]>> {
+  const { data, error } = await supabase.rpc("get_order_quotes", { p_order: orderId });
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    product_id: Number(r.product_id),
+    distributor_price: r.distributor_price == null ? null : Number(r.distributor_price),
+  }));
+  return { data: rows, error };
+}
+
+/**
+ * 0024 — el distribuidor del pedido cotiza las líneas mientras sigue
+ * pendiente. El backend valida alcance, estado y pertenencia de cada producto.
+ */
+export async function setOrderPrices(
+  orderId: number,
+  items: OrderPriceInput[],
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("set_order_prices", {
+    p_order: orderId,
+    p_items: items,
+  });
+  return { error };
+}
+
 export async function updateOrderStatus(
   orderId: number,
   status: "in_route" | "cancelled",

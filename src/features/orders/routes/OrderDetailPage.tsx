@@ -20,6 +20,8 @@ import {
   createCredit,
   fetchOrder,
   fetchOrderItems,
+  fetchOrderQuotes,
+  setOrderPrices,
   updateOrderStatus,
 } from "../api";
 
@@ -35,19 +37,28 @@ export function OrderDetailPage() {
   const { role } = useAuth();
   const order = useLoad(() => fetchOrder(orderId), [orderId]);
   const items = useLoad(() => fetchOrderItems(orderId), [orderId]);
+  // 0024: la cotización viaja por su propia RPC; get_order_items sigue sin
+  // exponer el precio privado de la tienda (D40/D41).
+  const quoteRows = useLoad(() => fetchOrderQuotes(orderId), [orderId]);
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
   });
   const [received, setReceived] = useState<Record<number, string>>({});
+  const [quoteDrafts, setQuoteDrafts] = useState<Record<number, string>>({});
   const [dueDate, setDueDate] = useState("");
 
-  // Por defecto, recibido = pedido.
+  // Por defecto, recibido = pedido; la cotización arranca con lo ya guardado.
   useEffect(() => {
     if (items.data) {
       setReceived(Object.fromEntries(items.data.map((i) => [i.product_id, String(i.quantity)])));
     }
   }, [items.data]);
+
+  // Al cambiar de pedido se descartan los borradores del anterior.
+  useEffect(() => {
+    setQuoteDrafts({});
+  }, [orderId]);
 
   async function act(action: () => Promise<{ error: { message: string } | null }>, ok: string) {
     const error = await runAction(action);
@@ -55,6 +66,7 @@ export function OrderDetailPage() {
     if (error === null) {
       order.reload();
       items.reload();
+      quoteRows.reload();
     }
   }
 
@@ -90,6 +102,49 @@ export function OrderDetailPage() {
         : o?.status === "in_route"
           ? "blue"
           : "amber";
+
+  // 0024: el distribuidor cotiza lo que le cobra a la tienda mientras el
+  // pedido sigue pendiente. El admin puede corregir la cotización.
+  const canQuote =
+    o !== null && o.status === "pending" && (role === "admin" || role === "distribuidor");
+
+  // La cotización guardada es el valor por defecto; el borrador local gana
+  // mientras el usuario edita (no hay carrera con el fetch).
+  const savedQuotes = new Map(
+    (quoteRows.data ?? []).map((row) => [row.product_id, row.distributor_price]),
+  );
+  const quoteValue = (productId: number): string => {
+    const draft = quoteDrafts[productId];
+    if (draft !== undefined) return draft;
+    const saved = savedQuotes.get(productId);
+    return saved === null || saved === undefined ? "" : String(saved);
+  };
+
+  function onQuote() {
+    const priced = (items.data ?? [])
+      .map((item) => ({ productId: item.product_id, value: quoteValue(item.product_id) }))
+      .filter((entry) => entry.value.trim() !== "");
+    if (priced.length === 0) {
+      setMsg({ error: "Ingresá al menos un precio para cotizar.", ok: null });
+      return;
+    }
+    const payload = priced.map((entry) => ({
+      product_id: entry.productId,
+      distributor_price: Number(entry.value),
+    }));
+    if (
+      payload.some((p) => !Number.isFinite(p.distributor_price) || p.distributor_price <= 0)
+    ) {
+      setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
+      return;
+    }
+    void act(() => setOrderPrices(orderId, payload), "Cotización guardada.");
+  }
+
+  const quotedTotal = (items.data ?? []).reduce((total, item) => {
+    const value = Number(quoteValue(item.product_id));
+    return Number.isFinite(value) && value > 0 ? total + value * item.quantity : total;
+  }, 0);
 
   return (
     <section>
@@ -228,6 +283,54 @@ export function OrderDetailPage() {
           <p className="mt-3 text-sm text-gray-500">Este pedido no tiene líneas.</p>
         )}
       </Box>
+
+      {canQuote && (
+        <Box title="Cotización del distribuidor">
+          <p className="text-sm text-gray-600">
+            Definí cuánto le cobrás a la tienda por cada producto. Podés dejar líneas sin precio y
+            completarlas después, mientras el pedido siga pendiente.
+          </p>
+          <div className="mt-3 space-y-2">
+            {items.data?.map((item) => (
+              <div
+                key={item.product_id}
+                className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-end"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{item.product_name}</p>
+                  <p className="text-xs text-gray-500">
+                    Cantidad pedida: <span className="tabular-nums">{item.quantity}</span>
+                  </p>
+                </div>
+                <Field label={`Precio de ${item.product_name}`}>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Sin precio"
+                    value={quoteValue(item.product_id)}
+                    onChange={(event) =>
+                      setQuoteDrafts({ ...quoteDrafts, [item.product_id]: event.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              Total cotizado:{" "}
+              <span className="font-semibold tabular-nums text-gray-900">
+                {formatCOP(quotedTotal)}
+              </span>
+            </p>
+            <button className={buttonClass} type="button" onClick={onQuote}>
+              Guardar cotización
+            </button>
+          </div>
+        </Box>
+      )}
 
       {o && open && (
         <Box title="Acciones">
