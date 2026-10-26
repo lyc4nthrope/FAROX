@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { Badge, Box, Field, Status, TwoColumns, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
-import { PremiumLock } from "../../../shared/ui";
+import { EmptyState, PremiumLock } from "../../../shared/ui";
 import { formatCOP, formatQty } from "../../../shared/lib/format";
 import {
   assignProduct,
@@ -304,6 +304,12 @@ export function InventoryPage() {
 
       <Box title="Últimos movimientos">
         <Status loading={movements.loading} error={movements.error} />
+        {movements.data?.length === 0 ? (
+          <EmptyState
+            title="Todavía no hay movimientos en esta tienda"
+            hint="Las entradas y salidas que registres van a aparecer acá."
+          />
+        ) : (
         <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
@@ -345,6 +351,7 @@ export function InventoryPage() {
           </tbody>
         </table>
         </div>
+        )}
       </Box>
 
       <Box title="Precios de la tienda">
