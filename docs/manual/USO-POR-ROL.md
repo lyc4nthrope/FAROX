@@ -43,7 +43,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados |
 | Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |
 | Vincular un distribuidor | Distribuidores → Vincular otro distribuidor | Compartí el QR o dictá el código; el distribuidor lo escanea o lo escribe |
-| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza. Los **faltantes de la tienda** se agregan con un clic desde el mismo formulario |
+| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → buscá por nombre o marca: un solo buscador y los productos se acumulan abajo. La cantidad se ajusta con − / +. El **stock mínimo** es un filtro opcional dentro de «Filtros». No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza. Los **faltantes de la tienda** se agregan con un clic |
 | Seguir el pedido | Pedidos → pedido | El distribuidor lo marca en ruta y confirma la entrega; vos ves el estado y la fecha prometida |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |

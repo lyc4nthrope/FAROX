@@ -3,8 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatQty } from "../../../shared/lib/format";
-import { mapError } from "../../../shared/lib/errors/mapError";
+import { formatCOP, formatQty } from "../../../shared/lib/format";import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   Box,
   Field,
@@ -13,8 +12,8 @@ import {
   inputClass,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
-import { ProductPicker, type ProductPickerOption } from "../../../shared/ui";
 import { fetchShortageProducts } from "../../products/api";
+import type { ShortageRow } from "../../products/types";
 import {
   fetchStoreDistributorProducts,
   fetchLinkedDistributorOptions,
@@ -26,6 +25,7 @@ import {
   fetchStoreProducts,
   type Option,
 } from "../api";
+import { QuantityStepper } from "../components/QuantityStepper";
 
 interface Line {
   productId: string;
@@ -38,11 +38,20 @@ type ProductOption = Option & {
   price?: number | null;
 };
 
+const MAX_RESULTS = 12;
+
 function idParam(value: string | null): string {
   return value !== null && /^\d+$/.test(value) && Number(value) > 0 ? value : "";
 }
 
-/** /pedidos/nuevo — tienda → distribuidor → líneas → create_order. */
+function normalizeText(value: string): string {
+  return value
+    .toLocaleLowerCase("es")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+/** /pedidos/nuevo — tienda → distribuidor → buscador de productos → create_order. */
 export function NewOrderPage() {
   const { role } = useAuth();
   const navigate = useNavigate();
@@ -85,7 +94,14 @@ export function NewOrderPage() {
     () => new Set((products.data ?? []).map((product) => product.id)),
     [products.data],
   );
-  const [lines, setLines] = useState<Line[]>([{ productId: "", quantity: "" }]);
+  const productById = useMemo(
+    () => new Map((products.data ?? []).map((product) => [product.id, product])),
+    [products.data],
+  );
+  const [lines, setLines] = useState<Line[]>([]);
+  const [search, setSearch] = useState("");
+  const [minQuantity, setMinQuantity] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [expectedAt, setExpectedAt] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -121,35 +137,61 @@ export function NewOrderPage() {
     if (admin || distributors.data === null || distributorId === "") return;
     if (distributors.data.some((d) => String(d.id) === distributorId)) return;
     setDistributorId("");
-    setLines([{ productId: "", quantity: "" }]);
+    setLines([]);
   }, [admin, distributorId, distributors.data]);
+
+  // Un solo buscador: el término y el filtro de stock viven en la pantalla,
+  // no en cada línea. Los resultados se filtran en cliente (el catálogo de la
+  // tienda ya viene acotado por la API).
+  const allMatches = useMemo(() => {
+    const term = normalizeText(search.trim());
+    if (term === "") return [];
+    const min = minQuantity.trim() === "" ? null : Number(minQuantity);
+    return (products.data ?? []).filter((product) => {
+      const matchesText =
+        normalizeText(product.name).includes(term) ||
+        normalizeText(product.brand ?? "").includes(term);
+      const matchesQuantity =
+        min === null ||
+        (!Number.isNaN(min) &&
+          product.quantity !== null &&
+          product.quantity >= min);
+      return matchesText && matchesQuantity;
+    });
+  }, [products.data, search, minQuantity]);
+  const searchResults = allMatches.slice(0, MAX_RESULTS);
+  const addedIds = useMemo(() => new Set(lines.map((line) => line.productId)), [lines]);
 
   function changeStore(value: string) {
     setStoreId(value);
     setDistributorId("");
-    setLines([{ productId: "", quantity: "" }]);
+    setLines([]);
   }
 
   function changeDistributor(value: string) {
     setDistributorId(value);
-    setLines([{ productId: "", quantity: "" }]);
+    setLines([]);
   }
 
-  function updateLine(index: number, patch: Partial<Line>) {
-    setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  function updateQuantity(index: number, quantity: string): void {
+    setLines((current) =>
+      current.map((line, i) => (i === index ? { ...line, quantity } : line)),
+    );
   }
 
-  // S9: agrega un faltante sin duplicar la línea ni pisar las cantidades ya
-  // escritas. Descarta las líneas vacías (no se envían igual).
-  function addShortage(productId: number): void {
+  function removeLine(index: number): void {
+    setLines((current) => current.filter((_, i) => i !== index));
+  }
+
+  // Un solo camino de alta: buscador, faltantes y /faltantes agregan acá.
+  function addProduct(productId: number): void {
     const id = String(productId);
-    setLines((current) => {
-      if (current.some((line) => line.productId === id)) return current;
-      return [
-        ...current.filter((line) => line.productId !== ""),
-        { productId: id, quantity: "1" },
-      ];
-    });
+    setLines((current) =>
+      current.some((line) => line.productId === id)
+        ? current
+        : [...current, { productId: id, quantity: "1" }],
+    );
+    setSearch("");
   }
 
   function addAllShortages(): void {
@@ -157,26 +199,25 @@ export function NewOrderPage() {
       .map((row) => row.product_id)
       .filter((id) => requestableIds.has(id));
     setLines((current) => {
-      const existing = new Set(
-        current.map((line) => line.productId).filter((value) => value !== ""),
-      );
+      const existing = new Set(current.map((line) => line.productId));
       const additions = ids
         .filter((id) => !existing.has(String(id)))
         .map((id) => ({ productId: String(id), quantity: "1" }));
       if (additions.length === 0) return current;
-      return [...current.filter((line) => line.productId !== ""), ...additions];
+      return [...current, ...additions];
     });
   }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const items = lines
-      .filter((l) => l.productId !== "")
-      .map((l) => ({ product_id: Number(l.productId), quantity: Number(l.quantity) }));
-    const ids = items.map((i) => i.product_id);
+    const items = lines.map((line) => ({
+      product_id: Number(line.productId),
+      quantity: Number(line.quantity),
+    }));
+    const ids = items.map((item) => item.product_id);
     if (storeId === "" || distributorId === "") return setError("Elegí tienda y distribuidor.");
     if (items.length === 0) return setError("Agregá al menos un producto.");
-    if (items.some((i) => !(i.quantity > 0)))
+    if (items.some((item) => !(item.quantity > 0)))
       return setError("Las cantidades deben ser mayores que 0.");
     if (new Set(ids).size !== ids.length) return setError("Hay un producto repetido en la lista.");
     setSaving(true);
@@ -200,17 +241,30 @@ export function NewOrderPage() {
     }
   }
 
-  const pickerOptions = useMemo<ProductPickerOption[]>(
-    () =>
-      (products.data ?? []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        brand: product.brand,
-        quantity: product.quantity,
-        price: product.price,
-      })),
-    [products.data],
-  );
+  function productMeta(product: ProductOption | undefined): string {
+    if (product === undefined) return "Producto del catálogo";
+    const parts: string[] = [];
+    if (product.brand !== null && product.brand !== "") parts.push(product.brand);
+    parts.push(
+      product.quantity === null
+        ? "Stock: —"
+        : `Stock: ${formatQty(product.quantity)}`,
+    );
+    if (product.price === null) parts.push("sin precio");
+    else if (product.price !== undefined) parts.push(formatCOP(product.price));
+    return parts.join(" · ");
+  }
+
+  const emptySearchMessage =
+    products.loading
+      ? "Cargando productos…"
+      : storeId === ""
+        ? "Elegí una tienda para buscar productos."
+        : distributors.data !== null && !admin && distributorId === ""
+          ? "Elegí un distribuidor para buscar productos."
+          : minQuantity.trim() !== ""
+            ? "Ningún producto coincide con la búsqueda y el stock mínimo."
+            : "Ningún producto coincide con la búsqueda.";
 
   return (
     <section>
@@ -271,7 +325,7 @@ export function NewOrderPage() {
                 : "Productos (en la tienda y en el catálogo del distribuidor)"}
             </p>
             <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
-              {lines.length} {lines.length === 1 ? "línea" : "líneas"}
+              {lines.length} {lines.length === 1 ? "producto" : "productos"}
             </span>
           </div>
           {shortageIds.length > 0 && (
@@ -279,67 +333,141 @@ export function NewOrderPage() {
               Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.
             </p>
           )}
-          <div className="mt-3 space-y-2">
-            {lines.map((line, index) => (
-              <div
-                key={index}
-                className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end"
-              >
-                <ProductPicker
-                  key={`${storeId}:${distributorId}:${index}`}
-                  compact
-                  label={`Producto ${index + 1}`}
-                  searchLabel={`Buscar producto ${index + 1}`}
-                  quantityLabel={`Cantidad mínima de producto ${index + 1}`}
-                  value={line.productId}
-                  onChange={(value) => updateLine(index, { productId: value })}
-                  options={pickerOptions}
-                  loading={products.loading}
-                  showQuantityFilter
-                  emptyHint={
-                    products.error === null
-                      ? "No hay productos disponibles para esta tienda y distribuidor."
-                      : undefined
-                  }
-                />
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-xs font-semibold tracking-wide text-gray-600">
+                Buscar producto
+              </span>
+              <input
+                className={inputClass}
+                type="search"
+                placeholder="Nombre o marca…"
+                autoFocus
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <button
+              className={secondaryButtonClass}
+              type="button"
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              Filtros
+              {minQuantity.trim() !== "" ? ` · stock ≥ ${minQuantity}` : ""}
+            </button>
+          </div>
+
+          {showFilters && (
+            <div className="mt-2 flex flex-wrap items-end gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="text-xs font-semibold tracking-wide text-gray-600">
+                  Stock mínimo
+                </span>
                 <input
-                  aria-label={`Cantidad ${index + 1}`}
-                  className={inputClass}
+                  className={`${inputClass} max-w-32`}
                   type="number"
                   min="0"
                   step="0.001"
-                  placeholder="Cantidad"
-                  value={line.quantity}
-                  onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                  placeholder="0"
+                  value={minQuantity}
+                  onChange={(event) => setMinQuantity(event.target.value)}
                 />
-                <button
-                  className={`${secondaryButtonClass} h-9 px-2.5 text-xs`}
-                  type="button"
-                  onClick={() => setLines(lines.filter((_, i) => i !== index))}
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
+              </label>
+              <button
+                className={secondaryButtonClass}
+                type="button"
+                onClick={() => setMinQuantity("")}
+              >
+                Limpiar filtro
+              </button>
+            </div>
+          )}
+
+          {search.trim() !== "" && (
+            <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-gray-100">
+              {searchResults.length > 0 && (
+                <ul className="divide-y divide-gray-100">
+                  {searchResults.map((product) => {
+                    const added = addedIds.has(String(product.id));
+                    return (
+                      <li
+                        key={product.id}
+                        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {product.name}
+                          </p>
+                          <p className="truncate text-xs text-gray-500">{productMeta(product)}</p>
+                        </div>
+                        <button
+                          className={`${secondaryButtonClass} px-2.5 py-1.5 text-xs`}
+                          type="button"
+                          aria-label={`Agregar ${product.name}`}
+                          disabled={added}
+                          onClick={() => addProduct(product.id)}
+                        >
+                          {added ? "Agregado" : "Agregar"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {searchResults.length === 0 && (
+                <p className="px-3 py-3 text-sm text-gray-500">{emptySearchMessage}</p>
+              )}
+              {allMatches.length > searchResults.length && (
+                <p className="px-3 py-2 text-xs text-gray-500">
+                  Mostrando {searchResults.length} de {allMatches.length}. Afiná la búsqueda.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold text-gray-900">Productos solicitados</h3>
+            {lines.length === 0 ? (
+              <p className="mt-1 text-sm text-gray-500">
+                Buscá un producto arriba o agregá un faltante para empezar la solicitud.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {lines.map((line, index) => {
+                  const product = productById.get(Number(line.productId));
+                  const name = product?.name ?? `Producto #${line.productId}`;
+                  return (
+                    <li
+                      key={line.productId}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white p-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-gray-900">{name}</p>
+                        <p className="truncate text-xs text-gray-500">{productMeta(product)}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <QuantityStepper
+                          label={name}
+                          value={line.quantity}
+                          onChange={(value) => updateQuantity(index, value)}
+                        />
+                        <button
+                          className={`${secondaryButtonClass} px-2.5 py-1.5 text-xs`}
+                          type="button"
+                          aria-label={`Quitar ${name}`}
+                          onClick={() => removeLine(index)}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          <button
-            className={`${secondaryButtonClass} mt-3`}
-            type="button"
-            onClick={() => setLines([...lines, { productId: "", quantity: "" }])}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Agregar producto
-          </button>
 
           {storeId !== "" && storeShortages.length > 0 && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
@@ -364,21 +492,13 @@ export function NewOrderPage() {
               <ul className="mt-3 space-y-1.5">
                 {storeShortages.map((row) => {
                   const requestable = requestableIds.has(row.product_id);
-                  const added = lines.some((line) => line.productId === String(row.product_id));
+                  const added = addedIds.has(String(row.product_id));
                   return (
                     <li
                       key={row.product_id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-sm"
                     >
-                      <span className="min-w-0">
-                        <span className="font-medium text-gray-900">{row.name}</span>
-                        {row.brand !== null && (
-                          <span className="text-gray-500"> · {row.brand}</span>
-                        )}
-                        <span className="ml-2 text-xs text-gray-500">
-                          Stock: {formatQty(row.quantity)}
-                        </span>
-                      </span>
+                      <ShortageLabel row={row} />
                       <span className="flex flex-wrap items-center gap-2">
                         {!requestable && (
                           <span className="text-xs text-gray-500">
@@ -388,8 +508,9 @@ export function NewOrderPage() {
                         <button
                           className={secondaryButtonClass}
                           type="button"
+                          aria-label={`Agregar faltante ${row.name}`}
                           disabled={!requestable || added}
-                          onClick={() => addShortage(row.product_id)}
+                          onClick={() => addProduct(row.product_id)}
                         >
                           {added ? "Agregado" : "Agregar"}
                         </button>
@@ -426,5 +547,15 @@ export function NewOrderPage() {
         </Box>
       </form>
     </section>
+  );
+}
+
+function ShortageLabel({ row }: { row: ShortageRow }) {
+  return (
+    <span className="min-w-0">
+      <span className="font-medium text-gray-900">{row.name}</span>
+      {row.brand !== null && <span className="text-gray-500"> · {row.brand}</span>}
+      <span className="ml-2 text-xs text-gray-500">Stock: {formatQty(row.quantity)}</span>
+    </span>
   );
 }
