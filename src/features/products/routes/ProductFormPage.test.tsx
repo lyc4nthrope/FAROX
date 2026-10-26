@@ -140,9 +140,9 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
       error: null,
     });
     vi.mocked(productsApi.createProduct).mockResolvedValue({ error: null, id: 1 });
-    vi.mocked(productsApi.updateProduct).mockResolvedValue({ error: null, id: 1 });
-    vi.mocked(productsApi.deactivateProduct).mockResolvedValue({ error: null, id: 1 });
-    vi.mocked(productsApi.deleteProduct).mockResolvedValue({ error: null, id: 1 });
+    vi.mocked(productsApi.updateProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.deactivateProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.deleteProduct).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {

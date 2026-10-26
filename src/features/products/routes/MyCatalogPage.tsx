@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { Field, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
+import { Modal } from "../../../shared/ui/Modal";
 import { fetchCatalogContext, fetchProductCategories } from "../api";
 import { AddProductsPanel } from "../components/AddProductsPanel";
 import { CatalogBox } from "../components/CatalogBox";
@@ -61,9 +62,9 @@ export function MyCatalogPage() {
           <button
             className={buttonClass}
             type="button"
-            onClick={() => setAdding((open) => !open)}
+            onClick={() => setAdding(true)}
           >
-            {adding ? "Cerrar alta" : "Agregar producto"}
+            Agregar producto
           </button>
         )}
       </div>
@@ -103,11 +104,13 @@ export function MyCatalogPage() {
             />
           </div>
           {adding && (
-            <AddProductsPanel
-              target={target}
-              categories={categories.data ?? []}
-              onAdded={() => setVersion((value) => value + 1)}
-            />
+            <Modal title="Agregar productos a mi catálogo" onClose={() => setAdding(false)}>
+              <AddProductsPanel
+                target={target}
+                categories={categories.data ?? []}
+                onAdded={() => setVersion((value) => value + 1)}
+              />
+            </Modal>
           )}
         </>
       )}

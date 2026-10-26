@@ -5,7 +5,6 @@ import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import {
-  Box,
   Status,
   buttonClass,
   inputClass,
@@ -208,8 +207,9 @@ export function AddProductsPanel({
     setBusyId(null);
   }
 
+  // Sin marco propio: lo envuelve el <Modal> de la pantalla.
   return (
-    <Box title="Agregar productos a mi catálogo">
+    <>
       <Status error={msg.error} ok={msg.ok} />
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
@@ -222,6 +222,7 @@ export function AddProductsPanel({
             className={`mt-1 w-full ${inputClass}`}
             type="search"
             placeholder="Nombre del producto…"
+            autoFocus
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -288,6 +289,6 @@ export function AddProductsPanel({
         )}
       />
       <Pager list={list} />
-    </Box>
+    </>
   );
 }

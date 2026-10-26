@@ -4,8 +4,8 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 
 ## Specs
 
-- **S1** — En `/products` (vista del operador: `MyCatalogPage`), el botón **“Agregar producto”** queda a la derecha del título `Productos`, alineado con él (“al lado derecho de la pagina al nivel del titulo de productos este el boton agregar”). Al tocarlo, abre/enfoca el panel de alta.
-- **S2** — En el panel de alta se puede **buscar en el registro global en el servidor** (por nombre, no solo la página cargada) y hay una opción **“Crear producto”** en el mismo panel (“para agregar se pueda buscar o este la opcion de crear producto cerca para mayor agilidad”). El producto creado se asigna automáticamente al catálogo actual y aparece en él.
+- **S1** — En `/products` (vista del operador: `MyCatalogPage`), el botón **“Agregar producto”** queda a la derecha del título `Productos`, alineado con él (“al lado derecho de la pagina al nivel del titulo de productos este el boton agregar”). Al tocarlo, **abre una ventana emergente (modal)** con el alta; Escape, “Cerrar” o el clic en el fondo la cierran.
+- **S2** — En la ventana de alta se puede **buscar en el registro global en el servidor** (por nombre, no solo la página cargada) y hay una opción **“Crear producto”** en la misma ventana (“para agregar se pueda buscar o este la opcion de crear producto cerca para mayor agilidad”). El producto creado se asigna automáticamente al catálogo actual y aparece en él.
 - **S3** — El catálogo propio se puede **filtrar** (“se pueda filtrar los productos que se tienen en el catologo”): búsqueda por nombre en el servidor, filtro por categoría y filtro “Solo faltantes”. Cambiar un filtro vuelve a la página 0.
 - **S4** — Cada fila del catálogo de tienda permite **editar la cantidad** en stock y guardarla **sin generar ningún movimiento** (“se pueda modificar la cantidad (sin generar ningun movimiento)”). La cantidad no puede ser negativa; el guardado actualiza `stock.quantity` y re-evalúa la alerta de stock, sin insertar en `movements`.
 - **S5** — Se puede **eliminar un producto del catálogo**. Sin existencias pide **una** confirmación. Con existencias pide **doble verificación** (“pueda eliminar un producto del catalog con doble verificacion si tiene stock”): la segunda advierte exactamente cuántas unidades se descartan. El backend exige `p_confirm_stock = true` en ese caso, registra la salida con el motivo `ajuste` (trazabilidad del ledger) y borra la fila de `stock`.
@@ -22,6 +22,7 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 - [x] T4 (S2) — Alta ágil: búsqueda server-side en el registro global + “Crear producto” inline reutilizando `ProductForm`, con asignación automática. Tests de UI. Ruta inline. Commit `f8c706f`.
 - [x] T5 (S7) — Vista `/faltantes` agrupada por tienda + ruta + navegación + tests. Ruta inline. Commit `cdff737`.
 - [x] T6 (S9) — Gate completo (typecheck, lint, tests, check-scope), `supabase/APLICAR-EN-PRODUCCION.md` y este documento. Ruta inline.
+- [x] T7 (S1, S2) — Alta en **ventana emergente**: `Modal` compartido (rol `dialog`, Escape, fondo, foco al buscador y retorno al disparador, bloqueo de scroll) + `MyCatalogPage` lo usa; tests del primitivo y de la pantalla. Ruta inline. Commit `pendiente`.
 
 ## Log
 
@@ -51,3 +52,13 @@ Rama: `feat/operador-catalogo` · Entrega: commits por unidad en la rama (push a
 - **Evidencia**: `npm run lint` OK · `npm run typecheck` OK · `npm run test` 67 archivos / 552 tests verdes · `npm run check-scope` §S8 OK (235 archivos). Commits: `d8a3c41` (barcode opcional + escaneo), `f8c706f` (filtros, cantidad, baja y faltante), `cdff737` (`/faltantes`), `96769a4` (seed demo), `b29cca7` (0022), `d47aad7` (plan).
 - **Pendiente manual (bloquea la verificación real)**: aplicar `20261025000022_catalogo_operador.sql` y, si se quieren datos demo, `supabase/seed.sql` desde el SQL Editor. Hasta entonces el comportamiento de las 4 RPCs nuevas no está verificado contra una base real; la UI y los contratos SQL están cubiertos por tests.
 - **No verificado en dispositivo real**: el escaneo con cámara (jsdom no decodifica video); los tests cubren estructura y presencia/ausencia del control.
+
+### L4 — Alta como ventana emergente (2026-10-26)
+
+> Cuando se presiona agregar que lo dirija hacia abajo o que sea una ventana emergente.
+
+- Se eligió **ventana emergente**: no alarga la página ni obliga a scrollear con cientos de productos, y el buscador queda enfocado al abrir.
+- `src/shared/ui/Modal.tsx` es un primitivo reutilizable: `role="dialog"` + `aria-modal`, Escape y clic en el fondo cierran, botón “Cerrar”, bloquea el scroll del `body` y devuelve el foco al disparador.
+- Trampa encontrada: el foco previo se capturaba en un `useEffect`, pero `autoFocus` del buscador ya había movido el foco al montar, así que al cerrar se intentaba enfocar el input eliminado. Se captura en el render (`useRef` inicializado) y el efecto solo enfoca el contenedor si el contenido no se autoenfocó.
+- `AddProductsPanel` perdió su marco propio (`<Box>`); ahora lo aporta `Modal`. Se removió el toggle de etiqueta del botón de encabezado: siempre dice “Agregar producto”.
+- **Evidencia**: `npm run lint` OK · `npm run typecheck` OK · `npm run test` 68 archivos / 558 tests verdes · `npm run check-scope` §S8 OK (237 archivos).

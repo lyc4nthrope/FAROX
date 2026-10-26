@@ -198,15 +198,40 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     expect(productsApi.fetchActiveProductsForCatalog).not.toHaveBeenCalled();
     await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
 
-    const panel = (
-      await screen.findByRole("heading", { name: "Agregar productos a mi catálogo" })
-    ).closest("section") as HTMLElement;
-    await user.click(await within(panel).findByRole("button", { name: "Agregar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    await user.click(await within(dialog).findByRole("button", { name: "Agregar" }));
 
     await waitFor(() => expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2));
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
     // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S2: el alta es una ventana emergente y Escape la cierra", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    // El foco entra en el buscador del registro.
+    expect(within(dialog).getByLabelText("Buscar en el registro")).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // El foco vuelve al botón que la abrió.
+    expect(screen.getByRole("button", { name: "Agregar producto" })).toHaveFocus();
+  });
+
+  it("S2: el botón Cerrar de la ventana también la cierra", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    await user.click(within(dialog).getByRole("button", { name: "Cerrar" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("quitar del catálogo del distribuidor: RPC sin ids de tienda", async () => {
@@ -394,10 +419,8 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     renderPagina("operador");
 
     await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
-    const panel = (
-      await screen.findByRole("heading", { name: "Agregar productos a mi catálogo" })
-    ).closest("section") as HTMLElement;
-    const pager = await within(panel).findByRole("navigation", { name: "Paginación" });
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    const pager = await within(dialog).findByRole("navigation", { name: "Paginación" });
     await user.click(within(pager).getByRole("button", { name: "Siguiente" }));
 
     await waitFor(() =>
