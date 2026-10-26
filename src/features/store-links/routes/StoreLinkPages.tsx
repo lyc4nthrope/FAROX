@@ -52,13 +52,20 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
     }
   }
 
+  // Sin vínculos el código es la acción principal; con vínculos queda plegado
+  // detrás de “Vincular otro distribuidor”.
+  const hasLinks = links.data !== null && links.data.length > 0;
+
   return (
     <>
       <Status error={msg.error ?? code.error ?? links.error} ok={msg.ok} />
       <Box title="Distribuidores vinculados">
         <Status loading={links.loading} />
         {links.data?.length === 0 && (
-          <p className="text-sm">Todavía no tenés distribuidores vinculados a esta tienda.</p>
+          <p className="text-sm">
+            Todavía no vinculaste ningún distribuidor. Generá el código de abajo y compartilo: en
+            cuanto lo escanee, aparece en esta lista.
+          </p>
         )}
         {links.data !== null && links.data.length > 0 && (
           <ul className="divide-y divide-gray-100 text-sm">
@@ -102,10 +109,19 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
         )}
       </Box>
       {showCode && (
-        <Box title="Código para vincular un distribuidor">
-          <p className="text-sm">
-            El distribuidor escanea este QR con el botón “Escanear QR” de su vista, o escribe el
-            código en “Vincular tienda”. El vínculo queda activo al instante.
+        <Box title={hasLinks ? "Código para vincular otro distribuidor" : "Vinculá algún distribuidor"}>
+          <p className="text-sm">Así funciona el vínculo, en tres pasos:</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm text-gray-700">
+            <li>Generá el código de tu tienda (abajo ya hay uno listo para usar).</li>
+            <li>Compartí el QR o el código con el distribuidor.</li>
+            <li>
+              El distribuidor lo escanea desde “Vincular tienda” o escribe el código, y queda
+              vinculado al instante.
+            </li>
+          </ol>
+          <p className="mt-1 text-sm text-gray-700">
+            Si generás un código nuevo, el anterior deja de servir: los ya vinculados siguen
+            vinculados.
           </p>
           <Status loading={code.loading} />
           {image && <img src={image} alt="Código QR de vínculo de la tienda" width={280} height={280} />}
@@ -114,7 +130,7 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
               {code.data}
             </p>
           )}
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <button className={buttonClass} type="button" onClick={() => window.print()}>
               Imprimir
             </button>
@@ -122,11 +138,18 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
               className={buttonClass}
               type="button"
               onClick={() => {
-                if (window.confirm("¿Generar un código nuevo? El QR anterior dejará de servir."))
-                  void act(() => regenerateLinkCode(storeId), "Código regenerado.");
+                if (
+                  !hasLinks ||
+                  window.confirm("¿Generar un código nuevo? El QR anterior dejará de servir.")
+                ) {
+                  void act(
+                    () => regenerateLinkCode(storeId),
+                    hasLinks ? "Código regenerado." : "Código generado.",
+                  );
+                }
               }}
             >
-              Regenerar código
+              {hasLinks ? "Generar código nuevo" : "Generar código"}
             </button>
           </div>
         </Box>

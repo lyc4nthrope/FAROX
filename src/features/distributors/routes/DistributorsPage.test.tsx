@@ -116,13 +116,15 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     expect(distributorsApi.fetchDistributors).toHaveBeenCalledTimes(1);
   });
 
-  it("operador sin vínculos: ve el código/QR para vincular y NO la lista global", async () => {
+  it("operador sin vínculos: el QR aparece de entrada con “Vinculá algún distribuidor”, el botón de generar y la explicación", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPagina("operador");
 
     expect(await screen.findByRole("heading", { name: "Distribuidores" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Tienda")).toHaveValue("3");
     expect(
-      await screen.findByText("Todavía no tenés distribuidores vinculados a esta tienda."),
+      await screen.findByText(/Todavía no vinculaste ningún distribuidor/),
     ).toBeInTheDocument();
     expect(await screen.findByLabelText("Código de vínculo")).toHaveTextContent(
       "0123456789abcdef01",
@@ -130,8 +132,19 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     expect(
       await screen.findByRole("img", { name: "Código QR de vínculo de la tienda" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Regenerar código" })).toBeInTheDocument();
+
+    // Sin vínculos el bloque se rotula como invitación y explica el flujo.
+    const box = (await screen.findByRole("heading", { name: "Vinculá algún distribuidor" }))
+      .closest("section") as HTMLElement;
+    expect(within(box).getByText("Así funciona el vínculo, en tres pasos:")).toBeInTheDocument();
+    expect(within(box).getAllByRole("listitem")).toHaveLength(3);
+
+    // El código no rota solo: se genera a demanda y sin confirmación (no hay QR previo que invalidar).
+    await user.click(within(box).getByRole("button", { name: "Generar código" }));
+    expect(storeLinksApi.regenerateLinkCode).toHaveBeenCalledWith(3);
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(distributorsApi.fetchDistributors).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it("operador con vínculos: lista sus distribuidores y puede pedir productos", async () => {
@@ -158,6 +171,8 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     expect(screen.queryByLabelText("Código de vínculo")).not.toBeInTheDocument();
     await userEvent.setup().click(toggle);
     expect(await screen.findByLabelText("Código de vínculo")).toBeInTheDocument();
+    // Con vínculos, generar un código nuevo sí pide confirmación.
+    expect(screen.getByRole("button", { name: "Generar código nuevo" })).toBeInTheDocument();
     expect(distributorsApi.fetchDistributors).not.toHaveBeenCalled();
   });
 
@@ -212,7 +227,7 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
   it("T-E2: operador ⇒ vista de vínculos, SIN columna y CERO query de usuarios", async () => {
     renderPagina("operador");
 
-    expect(await screen.findByText("Todavía no tenés distribuidores vinculados a esta tienda.")).toBeInTheDocument();
+    expect(await screen.findByText(/Todavía no vinculaste ningún distribuidor/)).toBeInTheDocument();
     expect(
       screen.queryByRole("columnheader", { name: "Usuarios asignados" }),
     ).toBeNull();
