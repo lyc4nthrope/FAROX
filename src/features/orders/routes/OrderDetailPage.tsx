@@ -162,7 +162,9 @@ export function OrderDetailPage() {
         </Box>
       )}
 
-      {o && o.status === "delivered" && role === "admin" && (
+      {/* 0023: el fiado lo puede crear el admin o el operador de la tienda del
+          pedido; la RPC create_credit valida el alcance. */}
+      {o && o.status === "delivered" && (role === "admin" || role === "operador") && (
         <Box title="Fiado">
           <Field label="Vencimiento del fiado (opcional)">
             <input className={inputClass} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
