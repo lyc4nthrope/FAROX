@@ -11,6 +11,10 @@
 # estado esperado documentado en supabase/APLICAR-EN-PRODUCCION.md §4. El parser acepta SOLO
 # esos tres códigos (ACCEPTED_FAILS) y sigue fallando ante cualquier otro [FAIL] o conteo
 # inconsistente — el self-test prove-by-break lo verifica con fixtures.
+#
+# db lint: plpgsql_check cubre también las funciones de PostGIS (extensión en `public`), así que
+# el paso deriva de pg_depend la superficie de extensiones y la excluye; los issues de código
+# propio siguen siendo rojos (scripts/check-db-lint.mjs, fijado con fixtures en el self-test).
 
 name: Schema Check
 
@@ -56,7 +60,13 @@ jobs:
             echo "::error::self-test: el parser aceptó un RESUMEN con conteo inconsistente — parser roto (D7)"
             exit 1
           fi
-          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0, known-fails=0, known+new!=0, count-mismatch!=0"
+          # db lint: el ruido de PostGIS (extensión en public) se excluye, un issue de la app NO.
+          node scripts/check-db-lint.mjs scripts/fixtures/db-lint-postgis-noise.json scripts/fixtures/db-lint-extension-functions.txt
+          if node scripts/check-db-lint.mjs scripts/fixtures/db-lint-app-regression.json scripts/fixtures/db-lint-extension-functions.txt; then
+            echo "::error::self-test: check-db-lint aceptó un issue de una función de la app — filtro roto (regresión tapada)"
+            exit 1
+          fi
+          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0, known-fails=0, known+new!=0, count-mismatch!=0, db-lint-noise=0, db-lint-app!=0"
 
       - name: "supabase init — gap de config.toml (#506); condicional por T4.2 (se commitea después)"
         run: |
@@ -89,7 +99,20 @@ jobs:
           set -euo pipefail
           node scripts/parse-verify-output.mjs --expect=apply db-start.log
 
-      - name: "supabase db lint --fail-on=warning (design §2.6; objetivo local por defecto — docs db-lint)"
+      - name: "supabase db lint — solo superficie de la app (PostGIS excluida: extensión en public, 0001:9)"
         run: |
           set -euo pipefail
-          supabase db lint --fail-on=warning
+          # plpgsql_check lintea TODAS las funciones de `public`, y PostGIS vive ahí (0001:9):
+          # sus funciones reportan errores y warnings propios que no son código de la app.
+          # Se derivan de pg_depend las funciones de extensión y se excluyen; el resto sí falla.
+          command -v psql >/dev/null 2>&1 || { echo "::error::psql ausente en el runner — no se puede derivar la superficie de extensiones (fail-closed)"; exit 1; }
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -tAc "
+            SELECT DISTINCT p.proname
+            FROM pg_proc p
+            JOIN pg_depend d ON d.objid = p.oid AND d.deptype = 'e'
+            JOIN pg_extension e ON e.oid = d.refobjid
+            WHERE e.extname = 'postgis'
+          " > extension-functions.txt
+          test -s extension-functions.txt || { echo "::error::lista de funciones de PostGIS vacía — fail-closed (¿cambió el nombre de la extensión?)"; exit 1; }
+          supabase db lint --level=warning > db-lint.json
+          node scripts/check-db-lint.mjs db-lint.json extension-functions.txt

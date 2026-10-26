@@ -1,0 +1,24 @@
+[
+  {
+    "function": "public.postgis_full_version",
+    "issues": [
+      {
+        "level": "error",
+        "message": "function public.postgis_gdal_version() does not exist",
+        "sqlState": "42883"
+      }
+    ]
+  },
+  {
+    "function": "public.confirm_delivery",
+    "issues": [
+      { "level": "warning extra", "message": "never read variable \"v_st\"", "sqlState": "00000" }
+    ]
+  },
+  {
+    "function": "public.set_price",
+    "issues": [
+      { "level": "warning", "message": "unused variable \"v_currency\"", "sqlState": "00000" }
+    ]
+  }
+]

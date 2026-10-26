@@ -1,0 +1,12 @@
+postgis_full_version
+st_findextent
+populate_geometry_columns
+addgeometrycolumn
+dropgeometrycolumn
+dropgeometrytable
+updategeometrysrid
+lockrow
+addauth
+enablelongtransactions
+longtransactionsenabled
+st_letters
