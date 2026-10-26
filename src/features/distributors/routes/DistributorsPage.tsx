@@ -6,13 +6,22 @@ import { fetchDistributorUserCounts, fetchDistributors } from "../api";
 import { DistributorList } from "../components/DistributorList";
 import type { DistributorListRow, DistributorUserCounts } from "../types";
 import { Pager } from "../../../shared/ui/Pager";
+import { MyDistributorsPage } from "./MyDistributorsPage";
+
+// El operador (dueño de tienda) ve SUS distribuidores vinculados y el QR para
+// vincular uno nuevo; el admin conserva la lista global con CRUD.
+export function DistributorsPage() {
+  const { role } = useAuth();
+  if (role === "operador") return <MyDistributorsPage />;
+  return <AdminDistributorsPage />;
+}
 
 // Contenedor de /distributors (§S2 fila Distributor list · DIST-01, spec #483
 // S4 · idea:218): lista paginada vía useList (D4 — refetch al re-entrar la
 // ruta tras una mutación, HARD-3; cero realtime §S8-4) con los controles
 // SEC-01 por rol (idea:119: admin escribe · operador solo lectura ·
 // distribuidor nunca llega acá: RequireRole lo deniega antes de montar).
-export function DistributorsPage() {
+function AdminDistributorsPage() {
   const { role } = useAuth();
   const list = useList<DistributorListRow>(fetchDistributors);
 

@@ -149,3 +149,26 @@ describe("mapError · sdd/admin-console T-B1 (23503, 23505, «usuario inexistent
     ).toBe("Ya existe un registro con ese nombre.");
   });
 });
+
+describe("mapError — solicitudes tienda ↔ distribuidor (0021)", () => {
+  it("vínculo ausente y catálogos que no se cruzan", () => {
+    expect(
+      mapError({ message: "create_order: el distribuidor 7 no está vinculado a la tienda 3" }),
+    ).toBe("Ese distribuidor no está vinculado a la tienda.");
+    expect(
+      mapError({ message: "create_order: producto 10 no está en el catálogo del distribuidor 7" }),
+    ).toBe("Ese producto no está disponible en el catálogo del distribuidor.");
+    expect(
+      mapError({ message: "create_order: producto 10 no está en el catálogo de la tienda 3" }),
+    ).toBe("Ese producto no está disponible en la tienda.");
+  });
+
+  it("tienda/distribuidor obligatorios y lista sin items válidos", () => {
+    expect(
+      mapError({ message: "list_store_distributor_products: tienda y distribuidor son obligatorios" }),
+    ).toBe("Elegí tienda y distribuidor.");
+    expect(mapError({ message: "create_order: ningún item válido" })).toBe(
+      "Agregá al menos un producto.",
+    );
+  });
+});

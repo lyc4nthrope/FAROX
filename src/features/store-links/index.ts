@@ -1,1 +1,1 @@
-export { LinkStorePage, StoreQrPage } from "./routes/StoreLinkPages";
+export { LinkStorePage, StoreLinkPanel, StoreQrPage } from "./routes/StoreLinkPages";

@@ -1,10 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../auth/types";
 import * as authApi from "../../auth/api";
 import * as distributorsApi from "../api";
+import * as storeLinksApi from "../../store-links/api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { RequireRole } from "../../../app/guards/RequireRole";
 import { DistributorsPage } from "./DistributorsPage";
@@ -20,6 +22,19 @@ vi.mock("../api", () => ({
   updateDistributor: vi.fn(),
   deactivateDistributor: vi.fn(),
   deleteDistributor: vi.fn(),
+}));
+vi.mock("../../store-links/api", () => ({
+  fetchMyStoreOptions: vi.fn(),
+  fetchLinkedDistributors: vi.fn(),
+  getLinkCode: vi.fn(),
+  regenerateLinkCode: vi.fn(),
+  unlinkDistributor: vi.fn(),
+  linkUrl: (code: string) => `http://localhost/vincular/${code}`,
+}));
+vi.mock("qrcode", () => ({
+  default: {
+    toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,qr"),
+  },
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -71,6 +86,18 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
       counts: { 1: 3 },
       error: null,
     });
+    vi.mocked(storeLinksApi.fetchMyStoreOptions).mockResolvedValue({
+      data: [{ id: 3, name: "Tienda Centro" }],
+      error: null,
+    });
+    vi.mocked(storeLinksApi.getLinkCode).mockResolvedValue({
+      data: "0123456789abcdef01",
+      error: null,
+    });
+    vi.mocked(storeLinksApi.fetchLinkedDistributors).mockResolvedValue({
+      data: [],
+      error: null,
+    });
   });
 
   afterEach(() => {
@@ -89,11 +116,49 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     expect(distributorsApi.fetchDistributors).toHaveBeenCalledTimes(1);
   });
 
-  it("operador: lista visible pero sin controles de escritura (DIST-1 read-only)", async () => {
+  it("operador sin vínculos: ve el código/QR para vincular y NO la lista global", async () => {
     renderPagina("operador");
 
-    expect(await screen.findByRole("link", { name: "Distribuidora Andes" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Nuevo distribuidor" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Distribuidores" })).toBeInTheDocument();
+    expect(await screen.findByLabelText("Tienda")).toHaveValue("3");
+    expect(
+      await screen.findByText("Todavía no tenés distribuidores vinculados a esta tienda."),
+    ).toBeInTheDocument();
+    expect(await screen.findByLabelText("Código de vínculo")).toHaveTextContent(
+      "0123456789abcdef01",
+    );
+    expect(
+      await screen.findByRole("img", { name: "Código QR de vínculo de la tienda" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerar código" })).toBeInTheDocument();
+    expect(distributorsApi.fetchDistributors).not.toHaveBeenCalled();
+  });
+
+  it("operador con vínculos: lista sus distribuidores y puede pedir productos", async () => {
+    vi.mocked(storeLinksApi.fetchLinkedDistributors).mockResolvedValue({
+      data: [
+        {
+          distributor_id: 7,
+          name: "Distribuidora Andes",
+          created_at: "2026-10-25T12:00:00Z",
+        },
+      ],
+      error: null,
+    });
+
+    renderPagina("operador");
+
+    expect(await screen.findByText("Distribuidora Andes")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Solicitar productos" })).toHaveAttribute(
+      "href",
+      "/pedidos/nuevo?storeId=3&distributorId=7",
+    );
+    // Con vínculos, el código queda plegado detrás de la acción.
+    const toggle = await screen.findByRole("button", { name: "Vincular otro distribuidor" });
+    expect(screen.queryByLabelText("Código de vínculo")).not.toBeInTheDocument();
+    await userEvent.setup().click(toggle);
+    expect(await screen.findByLabelText("Código de vínculo")).toBeInTheDocument();
+    expect(distributorsApi.fetchDistributors).not.toHaveBeenCalled();
   });
 
   it("lista vacía SIN error ⇒ EmptyState, nunca banner (vacío ≠ error, D4)", async () => {
@@ -144,10 +209,10 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     expect(distributorsApi.fetchDistributors).toHaveBeenCalledTimes(1);
   });
 
-  it("T-E2: operador ⇒ SIN columna y CERO query de usuarios (no puede leer users)", async () => {
+  it("T-E2: operador ⇒ vista de vínculos, SIN columna y CERO query de usuarios", async () => {
     renderPagina("operador");
 
-    expect(await screen.findByRole("link", { name: "Distribuidora Andes" })).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no tenés distribuidores vinculados a esta tienda.")).toBeInTheDocument();
     expect(
       screen.queryByRole("columnheader", { name: "Usuarios asignados" }),
     ).toBeNull();

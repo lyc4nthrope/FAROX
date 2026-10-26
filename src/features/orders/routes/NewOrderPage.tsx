@@ -1,15 +1,18 @@
-import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
+import { formatCOP } from "../../../shared/lib/format";
 import { Box, Field, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
+import { fetchStoreDistributorProducts, fetchLinkedDistributorOptions } from "../../store-links/api";
 import {
   createOrder,
   fetchDistributorOptions,
   fetchStoreOptions,
   fetchStoreProducts,
+  type Option,
 } from "../api";
 
 interface Line {
@@ -17,23 +20,74 @@ interface Line {
   quantity: string;
 }
 
+type ProductOption = Option & { price?: number | null };
+
+function productLabel(product: ProductOption): string {
+  if (product.price === null) return `${product.name} (sin precio)`;
+  if (product.price === undefined) return product.name;
+  return `${product.name} — ${formatCOP(product.price)}`;
+}
+
+function idParam(value: string | null): string {
+  return value !== null && /^\d+$/.test(value) && Number(value) > 0 ? value : "";
+}
+
 /** /pedidos/nuevo — tienda → distribuidor → líneas → create_order. */
 export function NewOrderPage() {
   const { role } = useAuth();
   const navigate = useNavigate();
-  const stores = useLoad(() => fetchStoreOptions(role === "admin"), [role]);
-  const distributors = useLoad(() => fetchDistributorOptions(), []);
-  const [storeId, setStoreId] = useState("");
-  const products = useLoad(
-    () => (storeId === "" ? Promise.resolve({ data: [], error: null }) : fetchStoreProducts(Number(storeId))),
-    [storeId],
+  const [params] = useSearchParams();
+  const admin = role === "admin";
+  const [storeId, setStoreId] = useState(() => idParam(params.get("storeId")));
+  const [distributorId, setDistributorId] = useState(() => idParam(params.get("distributorId")));
+  const stores = useLoad(() => fetchStoreOptions(admin), [admin]);
+  // El operador solo puede pedirle a un distribuidor vinculado a la tienda;
+  // el admin conserva la lista global.
+  const distributors = useLoad(
+    () =>
+      admin
+        ? fetchDistributorOptions()
+        : storeId === ""
+          ? Promise.resolve({ data: [], error: null })
+          : fetchLinkedDistributorOptions(Number(storeId)),
+    [admin, storeId],
   );
-  const [distributorId, setDistributorId] = useState("");
+  // El operador pide la intersección stock × distribuidor; el admin mantiene
+  // el comportamiento previo (productos de la tienda).
+  const products = useLoad<ProductOption[]>(
+    () => {
+      if (storeId === "") return Promise.resolve({ data: [], error: null });
+      if (admin) return fetchStoreProducts(Number(storeId));
+      if (distributorId === "") return Promise.resolve({ data: [], error: null });
+      return fetchStoreDistributorProducts(Number(storeId), Number(distributorId));
+    },
+    [admin, storeId, distributorId],
+  );
   const [lines, setLines] = useState<Line[]>([{ productId: "", quantity: "" }]);
   const [expectedAt, setExpectedAt] = useState("");
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Un distribuidor que no está vinculado (p. ej. link viejo) no puede quedar
+  // seleccionado: se limpia la selección y las líneas.
+  useEffect(() => {
+    if (admin || distributors.data === null || distributorId === "") return;
+    if (distributors.data.some((d) => String(d.id) === distributorId)) return;
+    setDistributorId("");
+    setLines([{ productId: "", quantity: "" }]);
+  }, [admin, distributorId, distributors.data]);
+
+  function changeStore(value: string) {
+    setStoreId(value);
+    setDistributorId("");
+    setLines([{ productId: "", quantity: "" }]);
+  }
+
+  function changeDistributor(value: string) {
+    setDistributorId(value);
+    setLines([{ productId: "", quantity: "" }]);
+  }
 
   function updateLine(index: number, patch: Partial<Line>) {
     setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
@@ -77,7 +131,11 @@ export function NewOrderPage() {
       <Box title="Datos del pedido">
         <form onSubmit={(e) => void onSubmit(e)}>
           <Field label="Tienda">
-            <select className={inputClass} value={storeId} onChange={(e) => setStoreId(e.target.value)}>
+            <select
+              className={inputClass}
+              value={storeId}
+              onChange={(e) => changeStore(e.target.value)}
+            >
               <option value="">— elegir —</option>
               {stores.data?.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -90,7 +148,7 @@ export function NewOrderPage() {
             <select
               className={inputClass}
               value={distributorId}
-              onChange={(e) => setDistributorId(e.target.value)}
+              onChange={(e) => changeDistributor(e.target.value)}
             >
               <option value="">— elegir —</option>
               {distributors.data?.map((d) => (
@@ -100,7 +158,16 @@ export function NewOrderPage() {
               ))}
             </select>
           </Field>
-          <p className="text-sm font-medium">Productos (solo los asignados a la tienda)</p>
+          {!admin && storeId !== "" && distributors.data?.length === 0 && (
+            <p className="text-sm">
+              Esta tienda no tiene distribuidores vinculados. Vinculá uno desde “Distribuidores”.
+            </p>
+          )}
+          <p className="text-sm font-medium">
+            {admin
+              ? "Productos (solo los asignados a la tienda)"
+              : "Productos (en la tienda y en el catálogo del distribuidor)"}
+          </p>
           {lines.map((line, index) => (
             <div key={index} className="mb-2 flex gap-2">
               <select
@@ -111,8 +178,8 @@ export function NewOrderPage() {
               >
                 <option value="">— producto —</option>
                 {products.data?.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                  <option key={p.id} value={p.id} disabled={p.price === null}>
+                    {productLabel(p)}
                   </option>
                 ))}
               </select>
