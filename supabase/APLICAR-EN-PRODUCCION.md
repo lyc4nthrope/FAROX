@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -68,6 +68,12 @@ UNION ALL SELECT '0020 vínculo para operador con alcance',
             WHERE proname = 'internal_can_manage_store'
               AND pronamespace = 'public'::regnamespace
             LIMIT 1), false)::text
+UNION ALL SELECT '0021 solicitudes tienda ↔ distribuidor',
+  COALESCE((SELECT position('no está vinculado a la tienda' in prosrc) > 0
+            FROM pg_proc
+            WHERE proname = 'create_order'
+              AND pronamespace = 'public'::regnamespace
+            LIMIT 1), false)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -93,6 +99,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0018 | `20261024000018_fix_routes_rls_recursion.sql` | `0018 … = true` — **sin esta, inventario y rutas fallan para no-admin** | ✅ |
 | 0019 | `20261025000019_catalogo_por_rol.sql` | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla** | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`) |
 | 0020 | `20261025000020_store_link_store_users.sql` | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo** | ✅ (`CREATE OR REPLACE`) |
+| 0021 | `20261025000021_store_distributor_requests.sql` | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto** | ✅ (`CREATE OR REPLACE`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
@@ -138,6 +145,9 @@ SELECT has_function_privilege('authenticated','public.add_distributor_product(bi
 SELECT has_function_privilege('authenticated','public.remove_distributor_product(bigint)','EXECUTE');        -- true
 SELECT has_function_privilege('authenticated','public.unassign_product_from_store(bigint,bigint)','EXECUTE'); -- true
 SELECT has_table_privilege('authenticated','public.distributor_products','SELECT');                          -- true
+-- 0021: productos solicitables (intersección) y create_order endurecido
+SELECT has_function_privilege('authenticated','public.list_store_distributor_products(bigint,bigint)','EXECUTE'); -- true
+SELECT has_function_privilege('authenticated','public.create_order(bigint,bigint,jsonb,timestamptz,text)','EXECUTE'); -- true
 ```
 
 Y después:
@@ -158,7 +168,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas
@@ -170,7 +180,9 @@ Y después:
     public.link_distributor_to_store(text), public.unlink_distributor(bigint,bigint),
     public.my_route_ids(), public.routes_with_my_stores(), public.stores_on_my_routes(),
     public.add_distributor_product(bigint), public.remove_distributor_product(bigint),
-    public.unassign_product_from_store(bigint,bigint)
+    public.unassign_product_from_store(bigint,bigint),
+    public.list_store_distributor_products(bigint,bigint),
+    public.create_order(bigint,bigint,jsonb,timestamptz,text)
   TO authenticated, service_role;
   ```
 - **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4. El job `schema-check` los trata como fallos conocidos y aceptados (`ACCEPTED_FAILS` en `scripts/parse-verify-output.mjs`) y sigue fallando ante cualquier otro `[FAIL]` o ante un `RESUMEN` cuyo conteo no cuadre con las líneas del log.

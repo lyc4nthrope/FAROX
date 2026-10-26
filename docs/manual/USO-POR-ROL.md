@@ -38,18 +38,20 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Agregar un producto a mi tienda | Inventario → Asignar producto | Umbral opcional para recibir alertas |
 | Registrar una venta o una compra | Inventario → Registrar entrada o salida | Tipo, producto, cantidad, motivo (y vencimiento en entradas). **Requiere Premium** |
 | Ver qué se está agotando | Alertas | Marcar leída cuando la revise |
-| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor → productos y cantidades. Cada producto necesita precio (lo pone el admin) |
+| Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |
+| Vincular un distribuidor | Distribuidores → Vincular otro distribuidor | Compartí el QR o dictá el código; el distribuidor lo escanea o lo escribe |
+| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. Cada producto necesita precio activo (lo pone el admin); si no lo tiene, aparece deshabilitado |
 | Mandar el pedido a ruta | Pedidos → pedido → Marcar en ruta | |
 | Recibir un pedido | Pedidos → pedido → Confirmar entrega | Cantidad recibida por producto (puede ser parcial); el stock sube solo |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
-| Que un distribuidor se vincule | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código |
+| Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |
 | Ver entradas y salidas | Dashboard | **Requiere Premium** |
 
 ## Distribuidor (sus pedidos y su ruta)
 
 | Quiero… | Dónde | Cómo |
 |---|---|---|
-| Vincularme a una tienda | Vincular tienda | Escanear el QR con la cámara del celular o escribir el código |
+| Vincularme a una tienda | Vincular tienda | Tocá “Escanear QR” y permití la cámara, o escribí el código manualmente. Si la cámara falla, el código sigue disponible |
 | Ver mi ruta de hoy | Mi ruta | Paradas en orden y "Abrir recorrido en Google Maps" |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
@@ -62,7 +64,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 2. **Operador:** crea su tienda en el mapa → Inventario → asigna el producto con umbral 10.
 3. **Admin:** le da Premium al operador y le pone precio al producto en esa tienda.
 4. **Operador:** entrada 20 → salida 12 → aparece la alerta "Stock bajo" → salida 9 → "No hay stock suficiente".
-5. **Operador:** QR de vínculo → **Distribuidor:** Vincular tienda con el código.
+5. **Operador:** Distribuidores → código/QR de la tienda → **Distribuidor:** Vincular tienda → “Escanear QR” (o escribir el código).
 6. **Operador:** Nuevo pedido de 24 → Marcar en ruta. **Admin:** planifica la ruta de hoy e "Iniciar ruta".
 7. **Distribuidor:** Mi ruta → Llegué → confirma la entrega de 20 de 24 → el stock sube 20.
 8. **Operador Premium:** Dashboard → se ve la entrada del distribuidor.
@@ -71,5 +73,6 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 
 - Sin chatbot (CHAT-01/02).
 - Sin actualización en tiempo real: las alertas y el dashboard se ven al recargar.
-- Asignar tiendas a un trabajador todavía no tiene pantalla (hoy por SQL). Una vez asignada, ese operador ya puede generar el QR de vínculo (migración 0020).
+- Asignar tiendas a un trabajador todavía no tiene pantalla (hoy por SQL). Una vez asignada, ese operador ya puede generar el QR de vínculo (migración 0020) y ver sus distribuidores.
+- El escaneo con cámara requiere HTTPS (o `localhost`) y permiso del navegador; sin cámara, el código se escribe a mano.
 - Interfaz funcional, no final.
