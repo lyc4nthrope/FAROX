@@ -163,6 +163,19 @@ BEGIN
   IF v_count = 0 THEN
     RAISE EXCEPTION 'create_order: ningún item válido';
   END IF;
+  -- 0024: el LEFT JOIN no debe convertir la validación del admin en un falso
+  -- éxito si el precio activo desaparece entre el check y el INSERT.
+  IF v_role = 'admin' THEN
+    SELECT x.product_id INTO v_pid
+    FROM jsonb_to_recordset(p_items) AS x(product_id bigint, quantity numeric(12,3))
+    JOIN public.order_items oi
+      ON oi.order_id = v_order AND oi.product_id = x.product_id
+    WHERE oi.unit_price IS NULL
+    LIMIT 1;
+    IF FOUND THEN
+      RAISE EXCEPTION 'sin precio activo para producto % en tienda %; use set_price() primero', v_pid, p_store;
+    END IF;
+  END IF;
   RETURN v_order;
 END;
 $$;
@@ -484,11 +497,15 @@ GRANT EXECUTE ON FUNCTION
 
 -- INVERSE (inerte; descomentar a mano en UNA transacción para revertir):
 --   Restaurar create_order desde 0021; create_credit desde 0023;
---   confirm_delivery desde 0009.
+--   confirm_delivery desde 0010.
 --   DROP FUNCTION IF EXISTS public.get_order_quotes(bigint);
 --   DROP FUNCTION IF EXISTS public.set_order_prices(bigint, jsonb);
 --   DROP FUNCTION IF EXISTS public.set_stock_threshold(bigint, bigint, numeric);
---   DELETE FROM public.order_items WHERE unit_price IS NULL;  -- decidir antes
+--   ⚠️ ANTES de volver a NOT NULL hay que decidir qué hacer con las líneas sin
+--   precio de tienda. NO ejecutar a ciegas:
+--     SELECT count(*) FROM public.order_items WHERE unit_price IS NULL;
+--   (un DELETE borraría las líneas de cada solicitud; lo correcto suele ser
+--   asignarles un precio desde price_publications o cancelar el pedido).
 --   ALTER TABLE public.order_items DROP COLUMN IF EXISTS distributor_price;
 --   ALTER TABLE public.order_items DROP CONSTRAINT IF EXISTS order_items_unit_price_check;
 --   ALTER TABLE public.order_items

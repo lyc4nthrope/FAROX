@@ -101,6 +101,7 @@ UNION ALL SELECT '0024 solicitud sin precio',
               AND column_name = 'unit_price'), false)::text
 UNION ALL SELECT '0024 cotización y umbral',
   (to_regprocedure('public.set_order_prices(bigint,jsonb)') IS NOT NULL
+   AND to_regprocedure('public.get_order_quotes(bigint)') IS NOT NULL
    AND to_regprocedure('public.set_stock_threshold(bigint,bigint,numeric)') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id

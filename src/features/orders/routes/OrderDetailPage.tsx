@@ -146,6 +146,16 @@ export function OrderDetailPage() {
     return Number.isFinite(value) && value > 0 ? total + value * item.quantity : total;
   }, 0);
 
+  // Lectura para quien no cotiza (operador Premium): muestra lo ya cotizado
+  // sin ofrecer el formulario. get_order_quotes devuelve cero filas si no
+  // tiene permiso (no-premium).
+  const savedQuoteTotal = (items.data ?? []).reduce((total, item) => {
+    const saved = savedQuotes.get(item.product_id);
+    return saved == null ? total : total + saved * item.quantity;
+  }, 0);
+  const showQuoteReadOnly =
+    !canQuote && (quoteRows.data ?? []).some((row) => row.distributor_price !== null);
+
   return (
     <section>
       <Link
@@ -235,6 +245,7 @@ export function OrderDetailPage() {
                 <th>Recibido</th>
                 <th>Estado línea</th>
                 {showPrice && <th>Precio unitario</th>}
+                {showQuoteReadOnly && <th>Cotización</th>}
                 {open && role !== "admin" && <th>Recibir</th>}
               </tr>
             </thead>
@@ -258,6 +269,13 @@ export function OrderDetailPage() {
                     </Badge>
                   </td>
                   {showPrice && <td>{i.unit_price === null ? "—" : formatCOP(i.unit_price)}</td>}
+                  {showQuoteReadOnly && (
+                    <td>
+                      {savedQuotes.get(i.product_id) == null
+                        ? "—"
+                        : formatCOP(savedQuotes.get(i.product_id) as number)}
+                    </td>
+                  )}
                   {open && role !== "admin" && (
                     <td>
                       <input
@@ -281,6 +299,14 @@ export function OrderDetailPage() {
         </div>
         {items.data?.length === 0 && !items.loading && (
           <p className="mt-3 text-sm text-gray-500">Este pedido no tiene líneas.</p>
+        )}
+        {showQuoteReadOnly && (
+          <p className="mt-3 text-sm text-gray-600">
+            Total cotizado por el distribuidor:{" "}
+            <span className="font-semibold tabular-nums text-gray-900">
+              {formatCOP(savedQuoteTotal)}
+            </span>
+          </p>
         )}
       </Box>
 

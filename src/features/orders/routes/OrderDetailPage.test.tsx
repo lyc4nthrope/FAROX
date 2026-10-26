@@ -33,9 +33,9 @@ vi.mock("../../auth/api", () => ({
   fetchPrivileges: vi.fn(),
 }));
 
-function renderPage(role: RoleName) {
+function renderPage(role: RoleName, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
-  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium });
   return render(
     <MemoryRouter initialEntries={["/pedidos/5"]}>
       <AuthProvider>
@@ -175,6 +175,23 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
 
     expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
     expect(screen.queryByText("Cotización del distribuidor")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Precio de Arroz")).not.toBeInTheDocument();
+  });
+
+  it("el operador Premium ve la cotización guardada, sin formulario", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
+      data: [{ product_id: 10, distributor_price: 2500 }],
+      error: null,
+    });
+
+    renderPage("operador", true);
+
+    expect(await screen.findByText(/2\.500/)).toBeInTheDocument();
+    expect(screen.getByText("Total cotizado por el distribuidor:")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Guardar cotización" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Precio de Arroz")).not.toBeInTheDocument();
   });
 
