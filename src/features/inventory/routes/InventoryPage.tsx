@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { Badge, Box, Field, Status, TwoColumns, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { PremiumLock } from "../../../shared/ui";
 import { formatCOP, formatQty } from "../../../shared/lib/format";
 import {
   assignProduct,
@@ -137,6 +138,76 @@ export function InventoryPage() {
   const motiveOptions =
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
 
+  const movementForm = (
+    <>
+          <form onSubmit={onMovement}>
+            <Field label="Tipo">
+              <select
+                className={inputClass}
+                value={mov.type}
+                onChange={(e) =>
+                  setMov({ ...mov, type: e.target.value as "entry" | "exit", motiveId: "" })
+                }
+              >
+                <option value="entry">Entrada</option>
+                <option value="exit">Salida</option>
+              </select>
+            </Field>
+            <Field label="Producto">
+              <select
+                className={inputClass}
+                value={mov.productId}
+                onChange={(e) => setMov({ ...mov, productId: e.target.value })}
+              >
+                <option value="">— elegir —</option>
+                {stock.data?.map((r) => (
+                  <option key={r.product_id} value={r.product_id}>
+                    {r.product_name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Cantidad">
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                step="0.001"
+                value={mov.quantity}
+                onChange={(e) => setMov({ ...mov, quantity: e.target.value })}
+              />
+            </Field>
+            <Field label="Motivo">
+              <select
+                className={inputClass}
+                value={mov.motiveId}
+                onChange={(e) => setMov({ ...mov, motiveId: e.target.value })}
+              >
+                <option value="">— elegir —</option>
+                {motiveOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {mov.type === "entry" && (
+              <Field label="Fecha de vencimiento (opcional)">
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={mov.expiry}
+                  onChange={(e) => setMov({ ...mov, expiry: e.target.value })}
+                />
+              </Field>
+            )}
+            <button className={buttonClass} type="submit" disabled={!premium}>
+              Registrar
+            </button>
+          </form>
+    </>
+  );
+
   return (
     <section>
       <p>
@@ -212,74 +283,20 @@ export function InventoryPage() {
         </form>
       </Box>
 
-      <Box title="Registrar entrada o salida">
-        {!premium && <p className="text-amber-700">Registrar movimientos manuales requiere Premium.</p>}
-        <form onSubmit={onMovement}>
-          <Field label="Tipo">
-            <select
-              className={inputClass}
-              value={mov.type}
-              onChange={(e) =>
-                setMov({ ...mov, type: e.target.value as "entry" | "exit", motiveId: "" })
-              }
-            >
-              <option value="entry">Entrada</option>
-              <option value="exit">Salida</option>
-            </select>
-          </Field>
-          <Field label="Producto">
-            <select
-              className={inputClass}
-              value={mov.productId}
-              onChange={(e) => setMov({ ...mov, productId: e.target.value })}
-            >
-              <option value="">— elegir —</option>
-              {stock.data?.map((r) => (
-                <option key={r.product_id} value={r.product_id}>
-                  {r.product_name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Cantidad">
-            <input
-              className={inputClass}
-              type="number"
-              min="0"
-              step="0.001"
-              value={mov.quantity}
-              onChange={(e) => setMov({ ...mov, quantity: e.target.value })}
-            />
-          </Field>
-          <Field label="Motivo">
-            <select
-              className={inputClass}
-              value={mov.motiveId}
-              onChange={(e) => setMov({ ...mov, motiveId: e.target.value })}
-            >
-              <option value="">— elegir —</option>
-              {motiveOptions.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          {mov.type === "entry" && (
-            <Field label="Fecha de vencimiento (opcional)">
-              <input
-                className={inputClass}
-                type="date"
-                value={mov.expiry}
-                onChange={(e) => setMov({ ...mov, expiry: e.target.value })}
-              />
-            </Field>
-          )}
-          <button className={buttonClass} type="submit" disabled={!premium}>
-            Registrar
-          </button>
-        </form>
-      </Box>
+      {premium ? (
+        <Box title="Registrar entrada o salida">{movementForm}</Box>
+      ) : (
+        <PremiumLock
+          title="Registrar entrada o salida"
+          benefits={[
+            "Registrar entradas y salidas manuales, con motivo y vencimiento.",
+            "Dashboard analítico con totales y valores del rango que elijas.",
+            "Precios por producto en los pedidos y QR de vínculo masivo.",
+          ]}
+        >
+          {movementForm}
+        </PremiumLock>
+      )}
 
       </TwoColumns>
 

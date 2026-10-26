@@ -7,3 +7,5 @@ export { ErrorBanner } from "./ErrorBanner";
 export { ExampleDashboard } from "./ExampleDashboard";
 export type { ExampleDashboardProps, ExampleDashboardStat } from "./ExampleDashboard";
 export { PasswordInput } from "./PasswordInput";
+export { PremiumLock } from "./PremiumLock";
+export type { PremiumLockProps } from "./PremiumLock";

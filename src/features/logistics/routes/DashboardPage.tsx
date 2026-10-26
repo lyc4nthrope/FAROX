@@ -4,6 +4,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { supabase } from "../../../shared/lib/supabase/client";
 import { Box, Field, Status, inputClass } from "../../../shared/ui/Box";
+import { ExampleDashboard, PremiumLock } from "../../../shared/ui";
 import { formatCOP } from "../../../shared/lib/format";
 
 interface DashboardRow {
@@ -60,7 +61,23 @@ export function DashboardPage() {
     return (
       <section>
         <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="mt-2 text-amber-700">El dashboard analítico requiere una cuenta Premium.</p>
+        <PremiumLock
+          title="Dashboard analítico"
+          benefits={[
+            "Entradas y salidas por día y por distribuidor.",
+            "Totales y valores en pesos del rango que elijas.",
+            "Compará el movimiento de cada distribuidor en el mismo período.",
+          ]}
+          preview={
+            <ExampleDashboard
+              stats={[
+                { label: "Entradas del rango", value: "128", hint: "valor $1.240.000" },
+                { label: "Salidas del rango", value: "94", hint: "valor $860.000" },
+              ]}
+              stops={["Sin distribuidor (manual)", "Distribuidora Norte", "Distribuidora Sur"]}
+            />
+          }
+        />
       </section>
     );
   }
