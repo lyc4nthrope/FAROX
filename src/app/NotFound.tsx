@@ -7,7 +7,7 @@ export function NotFound() {
       <h1 className="text-xl font-semibold">Página no encontrada</h1>
       <p className="mt-2 text-sm text-gray-600">
         La ruta que pediste no existe.{" "}
-        <Link to="/" className="text-gray-900 underline">
+        <Link to="/inicio" className="text-gray-900 underline">
           Volver al inicio
         </Link>
       </p>

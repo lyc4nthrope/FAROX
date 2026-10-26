@@ -42,7 +42,7 @@ function renderRuta(entrada: string) {
         <Routes>
           <Route element={<RequireAuth />}>
             <Route element={<OnboardingGate />}>
-              <Route path="/" element={<p>contenido de la app</p>} />
+              <Route path="/inicio" element={<p>contenido de la app</p>} />
               <Route path="/onboarding" element={<p>pantalla de onboarding</p>} />
             </Route>
           </Route>
@@ -72,8 +72,8 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     cleanup();
   });
 
-  it("sin señal: llegando a CUALQUIER ruta autenticada (p. ej. '/') intercepta a /onboarding", async () => {
-    renderRuta("/");
+  it("sin señal: llegando a CUALQUIER ruta autenticada (p. ej. /inicio) intercepta a /onboarding", async () => {
+    renderRuta("/inicio");
 
     expect(await screen.findByText("pantalla de onboarding")).toBeInTheDocument();
     expect(screen.queryByText("contenido de la app")).not.toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
       error: null,
     });
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     expect(await screen.findByText("contenido de la app")).toBeInTheDocument();
     expect(screen.queryByText("pantalla de onboarding")).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     });
     const user = userEvent.setup();
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     const alerta = await screen.findByRole("alert");
     expect(alerta).toHaveTextContent("No tenés permisos para esta operación.");
@@ -140,7 +140,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
   it("mientras la detección resuelve: estado de carga, sin redirección", async () => {
     vi.mocked(onboardingApi.fetchOnboardingSignals).mockReturnValue(new Promise(() => {}));
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     // findBy: la sesión se resuelve en un tick previo (RequireAuth) — el
     // estado "Cargando tu perfil…" del gate persiste porque la promesa de
@@ -161,7 +161,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     // hidrató desde la caché sin esperar la red.
     vi.mocked(onboardingApi.fetchOnboardingSignals).mockReturnValue(new Promise(() => {}));
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     expect(await screen.findByText("contenido de la app")).toBeInTheDocument();
     expect(screen.queryByText("Cargando tu perfil…")).not.toBeInTheDocument();
@@ -174,7 +174,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     writeCachedOnboardingSignals("u1", SIN_SENAL);
     vi.mocked(onboardingApi.fetchOnboardingSignals).mockReturnValue(new Promise(() => {}));
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     expect(await screen.findByText("pantalla de onboarding")).toBeInTheDocument();
     expect(screen.queryByText("Cargando tu perfil…")).not.toBeInTheDocument();
@@ -184,7 +184,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     writeCachedOnboardingSignals("u-distinto", CON_TIENDA);
     vi.mocked(onboardingApi.fetchOnboardingSignals).mockReturnValue(new Promise(() => {}));
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     expect(await screen.findByText("Cargando tu perfil…")).toBeInTheDocument();
     expect(screen.queryByText("contenido de la app")).not.toBeInTheDocument();
@@ -197,7 +197,7 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
       error: { code: "42501", message: "permission denied raw" },
     });
 
-    renderRuta("/");
+    renderRuta("/inicio");
 
     expect(await screen.findByText("contenido de la app")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();

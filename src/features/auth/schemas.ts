@@ -20,22 +20,31 @@ export type LoginInput = z.infer<typeof loginSchema>;
 // · Mínimo 6 = por defecto de Supabase Auth (GoTrue PASSWORD_MIN_LENGTH,
 //   default 6 — supabase/supabase docker/CONFIG.md): la DB es la autoridad y
 //   rechaza cortas con weak_password; el cliente solo adelanta ese fallo.
+// · confirm_password debe coincidir con password: se valida ANTES de cualquier
+//   request (mismo contrato "input inválido ⇒ CERO llamadas"). No se envía a
+//   Supabase: es una comprobación local del formulario.
 // · privacy_policy_accepted es un literal true: un checkbox sin marcar rompe
 //   el parse ANTES de cualquier request (mismo contrato "input inválido ⇒
 //   CERO llamadas" que el resto del form). El consentimiento es REQUISITO
 //   legal para el tratamiento de datos (Ley 1581 de 2012) y se versiona con
 //   PRIVACY_VERSION (slice legal, definido en shared/lib/legal).
-export const registerSchema = z.object({
-  full_name: z.string().trim().min(1, "Ingresá tu nombre completo"),
-  email: z.string().trim().min(1, "Ingresá tu email").email("Ingresá un email válido"),
-  password: z
-    .string()
-    .min(1, "Ingresá tu contraseña")
-    .min(6, "La contraseña debe tener al menos 6 caracteres"),
-  privacy_policy_accepted: z.literal(true, {
-    error: "Debés aceptar la Política de Privacidad para crear tu cuenta",
-  }),
-});
+export const registerSchema = z
+  .object({
+    full_name: z.string().trim().min(1, "Ingresá tu nombre completo"),
+    email: z.string().trim().min(1, "Ingresá tu email").email("Ingresá un email válido"),
+    password: z
+      .string()
+      .min(1, "Ingresá tu contraseña")
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirm_password: z.string().min(1, "Repetí tu contraseña"),
+    privacy_policy_accepted: z.literal(true, {
+      error: "Debés aceptar la Política de Privacidad para crear tu cuenta",
+    }),
+  })
+  .refine((values) => values.password === values.confirm_password, {
+    error: "Las contraseñas no coinciden",
+    path: ["confirm_password"],
+  });
 
 // Tipo del formulario ya VALIDADO (parsed.data): el consentimiento es true.
 export type RegisterInput = z.infer<typeof registerSchema>;
@@ -46,3 +55,29 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type RegisterFormValues = Omit<RegisterInput, "privacy_policy_accepted"> & {
   privacy_policy_accepted: boolean;
 };
+
+// ── Recuperación de contraseña por email ────────────────────────────────────
+// Pedir el link: solo email. El trim evita que un espacio al pegar la dirección
+// se convierta en un fallo de GoTrue; la validación corta ANTES de la request.
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().min(1, "Ingresá tu email").email("Ingresá un email válido"),
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+// Elegir la nueva contraseña: mismo mínimo que el registro (6 = default de
+// Supabase Auth) y confirmación local; el backend sigue siendo la autoridad.
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(1, "Ingresá tu nueva contraseña")
+      .min(6, "La contraseña debe tener al menos 6 caracteres"),
+    confirm_password: z.string().min(1, "Repetí tu contraseña"),
+  })
+  .refine((values) => values.password === values.confirm_password, {
+    error: "Las contraseñas no coinciden",
+    path: ["confirm_password"],
+  });
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

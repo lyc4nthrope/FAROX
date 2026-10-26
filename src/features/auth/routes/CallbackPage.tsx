@@ -7,7 +7,7 @@ import { confirmEmailConfirmationCode } from "../api";
 
 // Contenedor de /auth/callback (D2 — ruta PÚBLICA: el usuario llega del link
 // de confirmación de email a MITAD de la autenticación, sin sesión todavía).
-// Máquina de estados mínima: processing → (success ⇒ Navigate "/" con el
+// Máquina de estados mínima: processing → (success ⇒ Navigate "/inicio" con el
 // código ya canjeado) | error (mensaje mapeado + salida al login).
 type CallbackPhase = "processing" | "error";
 
@@ -75,10 +75,10 @@ export function CallbackPage() {
   // onboarding es DERIVADO (diseño #538 §8): D3 detecta "sesión autenticada
   // sin tienda ni distribuidor" y muestra la pregunta SIN importar cómo llegó
   // el usuario (post-confirmación de email o login normal). Por eso el
-  // destino es "/" (el shell de la app) y NO una ruta de onboarding
+  // destino es "/inicio" (el shell de la app) y NO una ruta de onboarding
   // hardcodeada — que además no existe todavía.
   if (granted) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/inicio" replace />;
   }
 
   if (phase === "error") {

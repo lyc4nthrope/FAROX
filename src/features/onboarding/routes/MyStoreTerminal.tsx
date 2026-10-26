@@ -27,7 +27,7 @@ const EMPTY_VALUES: MyStoreValues = {
 // (best-effort — si Nominatim falla, NULL y el alta NO se bloquea).
 // Éxito ⇒ create_store auto-asocia al dueño en user_stores (D35,
 // 0004:661-663) ⇒ refresh() re-deriva la señal my_store_ids() y el guard
-// deja de preguntar antes de navegar a "/" (S-D3.B AC).
+// deja de preguntar antes de navegar a "/inicio" (S-D3.B AC).
 export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
   const navigate = useNavigate();
   const { refresh } = useOnboarding();
@@ -104,7 +104,7 @@ export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
           return;
         }
         await refresh();
-        navigate("/");
+        navigate("/inicio");
       } catch (thrown) {
         setFormError(mapError(thrown));
       } finally {

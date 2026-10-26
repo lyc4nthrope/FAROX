@@ -15,6 +15,7 @@ const EMPTY_VALUES: RegisterFormValues = {
   full_name: "",
   email: "",
   password: "",
+  confirm_password: "",
   privacy_policy_accepted: false,
 };
 
@@ -72,6 +73,7 @@ export function RegisterPage() {
         full_name: issues.fieldErrors.full_name?.[0],
         email: issues.fieldErrors.email?.[0],
         password: issues.fieldErrors.password?.[0],
+        confirm_password: issues.fieldErrors.confirm_password?.[0],
         privacy_policy_accepted: issues.fieldErrors.privacy_policy_accepted?.[0],
       });
       setFormError(null);
@@ -142,7 +144,7 @@ export function RegisterPage() {
   // Sesión activa en /register (signIn con Confirm email OFF, u otro cliente
   // logueado en esta pestaña): fuera del formulario, igual que LoginPage.
   if (granted || status === "authenticated") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/inicio" replace />;
   }
 
   if (phase === "confirmation-pending") {
@@ -151,7 +153,8 @@ export function RegisterPage() {
         <h1 className="text-xl font-semibold">Revisá tu email</h1>
         <p className="mt-1 text-sm text-gray-600">
           Revisá tu email para confirmar tu cuenta. Te enviamos el link de confirmación
-          a <span className="font-medium">{pendingEmail}</span>.
+          a <span className="font-medium">{pendingEmail}</span>. Sin confirmar tu email no
+          vas a poder iniciar sesión.
         </p>
         {resend.message !== null && resend.status === "sent" && (
           <p

@@ -1,10 +1,11 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { CallbackPage, LoginPage, RegisterPage } from "../features/auth";
+import { CallbackPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../features/auth";
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
 import { AlertsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
+import { LandingPage } from "../features/landing";
 import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
 import { LinkStorePage, StoreQrPage } from "../features/store-links";
@@ -18,7 +19,9 @@ import { UserDetailPage, UsersPage } from "../features/users";
 import type { RoleName } from "../features/auth/types";
 import { RequireAuth } from "./guards/RequireAuth";
 import { RequireRole } from "./guards/RequireRole";
+import { SessionLoading } from "./guards/SessionLoading";
 import { NotFound } from "./NotFound";
+import { useAuth } from "./providers/AuthProvider";
 import { AppShell } from "./shell/AppShell";
 import { HomePage } from "./shell/HomePage";
 
@@ -44,10 +47,26 @@ const ADMIN_ONLY: readonly RoleName[] = ["admin"];
 const ADMIN_OR_OPERATOR: readonly RoleName[] = ["admin", "operador"];
 const DISTRIBUTOR_ONLY: readonly RoleName[] = ["distribuidor"];
 
+// La landing es la primera impresión y vive en la raíz PÚBLICA. Una sesión ya
+// activa no ve marketing: vuelve al inicio de la app, el mismo destino al que
+// llegan login, registro y el callback de confirmación de email.
+function LandingRoute() {
+  const { status } = useAuth();
+  if (status === "loading") return <SessionLoading />;
+  if (status === "authenticated") return <Navigate to="/inicio" replace />;
+  return <LandingPage />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/" element={<LandingRoute />} />
       <Route path="/login" element={<LoginPage />} />
+      {/* Recuperación de contraseña: públicas, fuera de RequireAuth/AppShell.
+          /recuperar pide el email; /restablecer canjea el link y elige la
+          nueva contraseña. */}
+      <Route path="/recuperar" element={<ForgotPasswordPage />} />
+      <Route path="/restablecer" element={<ResetPasswordPage />} />
       {/* /register: ruta PÚBLICA (D1) — el registro no exige sesión; queda
           FUERA del layout RequireAuth/AppShell como /login. */}
       <Route path="/register" element={<RegisterPage />} />
@@ -66,7 +85,7 @@ export function AppRoutes() {
             tienda NI distributor (señales my_store_ids/my_distributor_id +
             stores.created_by), cualquier ruta autenticada intercepta hacia
             /onboarding; con señal presente, la pregunta jamás aparece
-            (S-D3.0). D2 llega de /auth/callback a "/" y el guard intercepta
+            (S-D3.0). D2 llega de /auth/callback a /inicio y el guard intercepta
             acá (design #538 §8). */}
         <Route element={<OnboardingGate />}>
           {/* /onboarding: pantalla full-screen SIN chrome de app — hermana
@@ -74,12 +93,12 @@ export function AppRoutes() {
               necesite onboarding el guard solo deja pasar esta ruta (cualquier
               otra redirige acá), así que header (Perfil/Salir) y nav de
               entidades NUNCA montan; con señal, el propio gate rebota
-              /onboarding a "/" (S-D3.0). React Router la resuelve limpia:
+              /onboarding a /inicio (S-D3.0). React Router la resuelve limpia:
               el segmento estático "/onboarding" rankea por encima del
               splat "*" que vive dentro del AppShell. */}
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route element={<AppShell />}>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/inicio" element={<HomePage />} />
             <Route
               path="/distributors"
               element={

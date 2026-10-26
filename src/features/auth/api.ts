@@ -158,6 +158,40 @@ export async function confirmEmailConfirmationCode(): Promise<ConfirmEmailOutcom
   return { status: "error", error };
 }
 
+// ── Recuperación de contraseña por email ────────────────────────────────────
+// resetPasswordForEmail SOLO envía el link; el cambio real ocurre en
+// /restablecer con updateUser. redirectTo debe estar allowlisteado en Supabase.
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ error: AuthOperationError | null }> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/restablecer`,
+  });
+  return { error };
+}
+
+export async function updatePassword(
+  password: string,
+): Promise<{ error: AuthOperationError | null }> {
+  const { error } = await supabase.auth.updateUser({ password });
+  return { error };
+}
+
+export type RecoverySessionOutcome =
+  | { status: "ready" }
+  | { status: "missing" }
+  | { status: "error"; error: AuthOperationError };
+
+// El link de recuperación llega con el mismo contrato que el de confirmación:
+// ?code= (PKCE) o #access_token (implícito, ya canjeado por el SDK). Se
+// reutiliza el helper para no duplicar el canje ni el fallback de auto-canje.
+export async function establishRecoverySession(): Promise<RecoverySessionOutcome> {
+  const outcome = await confirmEmailConfirmationCode();
+  if (outcome.status === "ok") return { status: "ready" };
+  if (outcome.status === "missing-code") return { status: "missing" };
+  return { status: "error", error: outcome.error };
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error !== null) {

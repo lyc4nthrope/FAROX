@@ -2,7 +2,14 @@ import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import { confirmEmailConfirmationCode, resendConfirmationEmail, signUp } from "./api";
+import {
+  confirmEmailConfirmationCode,
+  establishRecoverySession,
+  requestPasswordReset,
+  resendConfirmationEmail,
+  signUp,
+  updatePassword,
+} from "./api";
 
 // Capa api contra el cliente supabase MOCKEADO (mismo aislamiento que el
 // resto de la suite: el cliente real valida el env al importar, V0-1). Acá se
@@ -16,6 +23,8 @@ vi.mock("../../shared/lib/supabase/client", () => ({
       resend: vi.fn(),
       exchangeCodeForSession: vi.fn(),
       getSession: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
+      updateUser: vi.fn(),
     },
   },
 }));
@@ -24,6 +33,8 @@ const signUpMock = vi.mocked(supabase.auth.signUp);
 const resendMock = vi.mocked(supabase.auth.resend);
 const exchangeMock = vi.mocked(supabase.auth.exchangeCodeForSession);
 const authGetSessionMock = vi.mocked(supabase.auth.getSession);
+const resetPasswordMock = vi.mocked(supabase.auth.resetPasswordForEmail);
+const updateUserMock = vi.mocked(supabase.auth.updateUser);
 
 // User mínimo para AuthTokenResponse (data exige user y session juntos, no
 // mixtos — unión de auth-js) y para el getSession de dominio, que lee
@@ -124,7 +135,6 @@ describe("auth api · confirmEmailConfirmationCode (D2 · canje PKCE)", () => {
     // jsdom: history.replaceState fija window.location.search que lee el helper.
     window.history.replaceState({}, "", "/auth/callback");
   });
-
   it("leyó el code de la URL y lo canjeó con exchangeCodeForSession", async () => {
     window.history.replaceState({}, "", "/auth/callback?code=abc123");
     exchangeMock.mockResolvedValue({
@@ -176,5 +186,73 @@ describe("auth api · confirmEmailConfirmationCode (D2 · canje PKCE)", () => {
     const outcome = await confirmEmailConfirmationCode();
 
     expect(outcome).toEqual({ status: "ok" });
+  });
+});
+
+describe("auth api · recuperación de contraseña", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.replaceState({}, "", "/restablecer");
+  });
+
+  it("pide el email con redirectTo a /restablecer", async () => {
+    resetPasswordMock.mockResolvedValue({ data: {}, error: null });
+
+    const result = await requestPasswordReset("demo@farox.app");
+
+    expect(resetPasswordMock).toHaveBeenCalledWith("demo@farox.app", {
+      redirectTo: `${window.location.origin}/restablecer`,
+    });
+    expect(result).toEqual({ error: null });
+  });
+
+  it("propaga el error del pedido con { message }", async () => {
+    const error = { message: "For security purposes, you can only request this after 60 seconds" } as AuthError;
+    resetPasswordMock.mockResolvedValue({ data: null, error });
+
+    const result = await requestPasswordReset("demo@farox.app");
+
+    expect(result.error).toBe(error);
+  });
+
+  it("cambia la contraseña con updateUser({ password })", async () => {
+    updateUserMock.mockResolvedValue({ data: { user: FAKE_USER }, error: null });
+
+    const result = await updatePassword("nueva123");
+
+    expect(updateUserMock).toHaveBeenCalledWith({ password: "nueva123" });
+    expect(result).toEqual({ error: null });
+  });
+
+  it("establece la sesión de recuperación canjeando el code (PKCE)", async () => {
+    window.history.replaceState({}, "", "/restablecer?code=rec123");
+    exchangeMock.mockResolvedValue({
+      data: { user: FAKE_USER, session: FAKE_SESSION },
+      error: null,
+    });
+
+    const outcome = await establishRecoverySession();
+
+    expect(exchangeMock).toHaveBeenCalledWith("rec123");
+    expect(outcome).toEqual({ status: "ready" });
+  });
+
+  it("sin code y sin sesión: missing", async () => {
+    authGetSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+
+    const outcome = await establishRecoverySession();
+
+    expect(outcome).toEqual({ status: "missing" });
+  });
+
+  it("code inválido y sin sesión: error de Auth", async () => {
+    window.history.replaceState({}, "", "/restablecer?code=viejo");
+    const authError = { message: "oauth code has expired" } as AuthError;
+    exchangeMock.mockResolvedValue({ data: { user: null, session: null }, error: authError });
+    authGetSessionMock.mockResolvedValue({ data: { session: null }, error: null });
+
+    const outcome = await establishRecoverySession();
+
+    expect(outcome).toEqual({ status: "error", error: authError });
   });
 });

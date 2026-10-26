@@ -1,3 +1,4 @@
+import { PasswordInput } from "../../../shared/ui";
 import type { LoginInput } from "../schemas";
 
 export interface LoginFormErrors {
@@ -61,26 +62,15 @@ export function LoginForm({
           </p>
         )}
       </div>
-      <div>
-        <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-          Contraseña
-        </label>
-        <input
-          id="login-password"
-          type="password"
-          autoComplete="current-password"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          value={values.password}
-          aria-invalid={errors.password !== undefined}
-          aria-describedby={errors.password === undefined ? undefined : "login-password-error"}
-          onChange={(event) => onChange({ ...values, password: event.target.value })}
-        />
-        {errors.password !== undefined && (
-          <p id="login-password-error" className="mt-1 text-xs text-red-600">
-            {errors.password}
-          </p>
-        )}
-      </div>
+      <PasswordInput
+        id="login-password"
+        label="Contraseña"
+        autoComplete="current-password"
+        value={values.password}
+        onChange={(password) => onChange({ ...values, password })}
+        revealName="contraseña"
+        error={errors.password}
+      />
       <button
         type="submit"
         disabled={pending}

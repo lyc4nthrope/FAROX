@@ -5,6 +5,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 ## Antes de empezar
 
 - **Registro:** `/register` → aceptar la política de privacidad → confirmar el email.
+- **Olvidé mi contraseña:** en `/login` → “¿Olvidaste tu contraseña?” → escribí tu email → abrí el link → elegí una nueva (mínimo 6 caracteres).
 - **Primera vez (pregunta "¿Qué sos?"):**
   - **Distribuidor**: registra su empresa (nombre + NIT) y queda con rol distribuidor.
   - **Mi tienda**: crea su tienda eligiendo la ubicación en el mapa y queda como operador de esa tienda.
@@ -41,7 +42,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Mandar el pedido a ruta | Pedidos → pedido → Marcar en ruta | |
 | Recibir un pedido | Pedidos → pedido → Confirmar entrega | Cantidad recibida por producto (puede ser parcial); el stock sube solo |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
-| Que un distribuidor se vincule | Inventario → mi tienda → QR de vínculo | Imprimir el QR o dictar el código |
+| Que un distribuidor se vincule | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código |
 | Ver entradas y salidas | Dashboard | **Requiere Premium** |
 
 ## Distribuidor (sus pedidos y su ruta)
@@ -70,5 +71,5 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 
 - Sin chatbot (CHAT-01/02).
 - Sin actualización en tiempo real: las alertas y el dashboard se ven al recargar.
-- Asignar tiendas a un trabajador todavía no tiene pantalla.
+- Asignar tiendas a un trabajador todavía no tiene pantalla (hoy por SQL). Una vez asignada, ese operador ya puede generar el QR de vínculo (migración 0020).
 - Interfaz funcional, no final.

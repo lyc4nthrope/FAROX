@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -62,6 +62,12 @@ UNION ALL SELECT '0019 RPCs de catálogo',
   (to_regprocedure('public.add_distributor_product(bigint)') IS NOT NULL
    AND to_regprocedure('public.remove_distributor_product(bigint)') IS NOT NULL
    AND to_regprocedure('public.unassign_product_from_store(bigint,bigint)') IS NOT NULL)::text
+UNION ALL SELECT '0020 vínculo para operador con alcance',
+  COALESCE((SELECT position('p_store = ANY (public.my_store_ids())' in prosrc) > 0
+            FROM pg_proc
+            WHERE proname = 'internal_can_manage_store'
+              AND pronamespace = 'public'::regnamespace
+            LIMIT 1), false)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -86,6 +92,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0017 | `20261024000017_store_links.sql` | `0017 … = true` (los tres) | ✅ |
 | 0018 | `20261024000018_fix_routes_rls_recursion.sql` | `0018 … = true` — **sin esta, inventario y rutas fallan para no-admin** | ✅ |
 | 0019 | `20261025000019_catalogo_por_rol.sql` | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla** | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`) |
+| 0020 | `20261025000020_store_link_store_users.sql` | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo** | ✅ (`CREATE OR REPLACE`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
@@ -136,9 +143,11 @@ SELECT has_table_privilege('authenticated','public.distributor_products','SELECT
 Y después:
 
 1. Repetir el diagnóstico del paso 1: todo `true` y al menos 1 admin activo.
-2. Supabase → Authentication → URL Configuration: Site URL y Redirect URLs con `https://<dominio>/auth/callback`.
-3. Probar en la app con un **operador** (no admin): inventario, rutas y stock deben cargar (esto valida 0018).
-4. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
+2. Supabase → Authentication → URL Configuration: Site URL y Redirect URLs con `https://<dominio>/auth/callback` y `https://<dominio>/restablecer`. Sin la segunda, el link de recuperación vuelve al Site URL y no abre la pantalla de nueva contraseña. En local, agregar también `http://localhost:5173/restablecer`.
+3. Supabase → Authentication → Email Templates → **Reset Password**: mantener el link de confirmación (`{{ .ConfirmationURL }}`, el template por defecto). Ese link es el que verifica el token y redirige a `/restablecer`; si se reemplaza por un link propio, el flujo de recuperación deja de funcionar.
+4. Probar el flujo de recuperación con un usuario real: `/login` → “¿Olvidaste tu contraseña?” → email → abrir el link → elegir una nueva contraseña.
+5. Probar en la app con un **operador** (no admin): inventario, rutas y stock deben cargar (esto valida 0018).
+6. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
 
 ## 5. Opción C — que lo haga un agente con MCP
 
@@ -149,7 +158,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas

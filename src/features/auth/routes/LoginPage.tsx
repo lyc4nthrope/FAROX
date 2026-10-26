@@ -15,6 +15,12 @@ function loginErrorMessage(message: string): string {
   if (message.includes("Invalid login credentials")) {
     return "Email o contraseña incorrectos.";
   }
+  // Con "Confirm email" activo, GoTrue rechaza el login hasta que el usuario
+  // abra el link del email de verificación (D44): mensaje accionable en vez
+  // del fallback genérico.
+  if (message.toLowerCase().includes("email not confirmed")) {
+    return "Confirmá tu email antes de iniciar sesión. Revisá tu bandeja de entrada y abrí el link de verificación.";
+  }
   if (message.toLowerCase().includes("network") || message.toLowerCase().includes("fetch")) {
     return "No se pudo conectar, revisá tu conexión.";
   }
@@ -60,7 +66,7 @@ export function LoginPage() {
   }
 
   if (status === "authenticated") {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/inicio" replace />;
   }
 
   return (
@@ -80,7 +86,12 @@ export function LoginPage() {
         />
       </div>
       {/* Cross-link Login ↔ Register (D1): /register es ruta pública. */}
-      <p className="mt-4 text-sm text-gray-600">
+      <p className="mt-3 text-sm text-gray-600">
+        <Link to="/recuperar" className="font-medium text-gray-900 underline">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
+      <p className="mt-2 text-sm text-gray-600">
         <Link to="/register" className="font-medium text-gray-900 underline">
           ¿No tenés cuenta? Registrate
         </Link>

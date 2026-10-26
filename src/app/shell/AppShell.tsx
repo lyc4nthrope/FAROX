@@ -22,7 +22,7 @@ export function AppShell() {
     <div className="min-h-dvh bg-white text-gray-900">
       <header className="border-b border-gray-200">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <Link to="/" className="text-lg font-semibold">
+          <Link to="/inicio" className="text-lg font-semibold">
             FAROX
           </Link>
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { ExampleDashboard, type ExampleDashboardStat } from "../../shared/ui";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -22,6 +23,15 @@ const DESCRIPTIONS: Record<string, string> = {
   "/vincular": "Escaneá el QR de una tienda para vincularte.",
 };
 
+// Vista de ejemplo del distribuidor: mismo panel visual que la landing, con
+// pedidos y paradas en lugar de stock. No consulta datos reales.
+const DISTRIBUTOR_PREVIEW_STATS: readonly [ExampleDashboardStat, ExampleDashboardStat] = [
+  { label: "Pedidos", value: "12", hint: "3 en ruta" },
+  { label: "Paradas", value: "3", hint: "2 pendientes" },
+];
+
+const DISTRIBUTOR_PREVIEW_STOPS = ["Tienda Central", "Mercado Norte", "Esquina Sur"] as const;
+
 export function HomePage() {
   const { role, email, premium } = useAuth();
   const items = visibleNavItems(role);
@@ -39,6 +49,21 @@ export function HomePage() {
           Inventario, pedidos y rutas de tiendas y distribuidores en un solo lugar.
         </p>
       </div>
+      {role === "distribuidor" && (
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold">Tu día, de un vistazo</h2>
+          <p className="mt-1 max-w-xl text-sm text-gray-600">
+            Esta es una vista de ejemplo. Cuando tengas pedidos y ruta, vas a ver tus datos
+            reales acá.
+          </p>
+          <div className="mt-4 max-w-sm">
+            <ExampleDashboard
+              stats={DISTRIBUTOR_PREVIEW_STATS}
+              stops={DISTRIBUTOR_PREVIEW_STOPS}
+            />
+          </div>
+        </div>
+      )}
       <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item) => (
           <li key={item.to}>

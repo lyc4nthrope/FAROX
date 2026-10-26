@@ -16,7 +16,7 @@ export function WorkerTerminal() {
     <WorkerConfirmation
       onAck={() => {
         acknowledge();
-        navigate("/");
+        navigate("/inicio");
       }}
     />
   );

@@ -29,6 +29,11 @@ vi.mock("../features/auth/api", () => ({
   resendConfirmationEmail: vi.fn(),
   // D2: /auth/callback canjea el código PKCE — mismo motivo que arriba.
   confirmEmailConfirmationCode: vi.fn(),
+  // Recuperación de contraseña: /recuperar y /restablecer importan estas
+  // funciones del mismo api, así que el mock las exporta completo.
+  requestPasswordReset: vi.fn(),
+  updatePassword: vi.fn(),
+  establishRecoverySession: vi.fn(),
 }));
 // B5 (T5.2): /distributors ya no es placeholder — el api de la feature se
 // mockea COMPLETO como en el resto de los tests: sin esto, el módulo real
@@ -282,6 +287,31 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
   });
 
+  it("anónimo en /recuperar: pide el email — ruta PÚBLICA sin RequireAuth", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    renderRuta("/recuperar");
+    expect(
+      await screen.findByRole("heading", { name: "Recuperar contraseña" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
+    expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
+  });
+
+  it("anónimo en /restablecer: monta la pantalla del link sin sesión (PÚBLICA)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue(null);
+    vi.mocked(authApi.establishRecoverySession).mockResolvedValue({ status: "missing" });
+    renderRuta("/restablecer");
+    expect(
+      await screen.findByRole("heading", { name: "El link no es válido" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pedir un link nuevo" })).toHaveAttribute(
+      "href",
+      "/recuperar",
+    );
+    expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
+  });
+
   it("anónimo en /privacidad: la política se lee sin sesión — ruta PÚBLICA sin RequireAuth", async () => {
     vi.mocked(authApi.getSession).mockResolvedValue(null);
     renderRuta("/privacidad");
@@ -313,6 +343,7 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
   it("cada ruta §S2 resuelve pantalla o placeholder explícito, nunca en blanco (V0-4)", async () => {
     const rutas = [
       "/",
+      "/inicio",
       "/distributors",
       "/distributors/new",
       "/distributors/1",
@@ -615,10 +646,26 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     expect(screen.queryByRole("heading", { name: "Bienvenido a FAROX" })).not.toBeInTheDocument();
   });
 
-  it("D3: anónimo ⇒ CERO llamadas de detección (el gate vive tras RequireAuth)", async () => {
+  it("anónimo en /: landing pública con accesos a registro y login (primera impresión)", async () => {
     vi.mocked(authApi.getSession).mockResolvedValue(null);
     renderRuta("/");
-    expect(await screen.findByRole("heading", { name: "Iniciar sesión" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Todo tu negocio, en orden." }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Empezar ahora" })).toHaveAttribute(
+      "href",
+      "/register",
+    );
+    expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
     expect(onboardingApi.fetchOnboardingSignals).not.toHaveBeenCalled();
+  });
+
+  it("sesionado en /: la landing redirige al inicio de la app, no se muestra el marketing", async () => {
+    renderRuta("/");
+    const main = await screen.findByRole("main");
+    expect(main).toHaveTextContent("Sesión iniciada como Administrador");
+    expect(
+      screen.queryByRole("heading", { level: 1, name: "Todo tu negocio, en orden." }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -28,7 +28,7 @@ function renderRegister() {
       <AuthProvider>
         <Routes>
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={<p>inicio</p>} />
+          <Route path="/inicio" element={<p>inicio</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -39,6 +39,7 @@ async function completarFormulario(user: ReturnType<typeof userEvent.setup>): Pr
   await user.type(screen.getByLabelText("Nombre completo"), "Ada Lovelace");
   await user.type(screen.getByLabelText("Email"), "demo@farox.app");
   await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+  await user.type(screen.getByLabelText("Confirmar contraseña"), "secreto123");
 }
 
 // El consentimiento es OBLIGATORIO: sin marcar, el schema rompe el parse y
@@ -70,11 +71,13 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     cleanup();
   });
 
-  it("renderiza los tres campos, el submit y el cross-link al login", () => {
+  it("renderiza los campos, la ayuda de contraseña, el submit y el cross-link al login", () => {
     renderRegister();
     expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Contraseña")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirmar contraseña")).toBeInTheDocument();
+    expect(screen.getByText("Mínimo 6 caracteres.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Crear cuenta" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "¿Ya tenés cuenta? Iniciá sesión" }),
@@ -89,6 +92,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     expect(await screen.findByText("Ingresá tu nombre completo")).toBeInTheDocument();
     expect(screen.getByText("Ingresá tu email")).toBeInTheDocument();
     expect(screen.getByText("Ingresá tu contraseña")).toBeInTheDocument();
+    expect(screen.getByText("Repetí tu contraseña")).toBeInTheDocument();
     expect(authApi.signUp).not.toHaveBeenCalled();
   });
 
@@ -98,6 +102,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     await user.type(screen.getByLabelText("Nombre completo"), "Ada Lovelace");
     await user.type(screen.getByLabelText("Email"), "no-es-email");
     await user.type(screen.getByLabelText("Contraseña"), "abc");
+    await user.type(screen.getByLabelText("Confirmar contraseña"), "abc");
     await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
 
     expect(await screen.findByText("Ingresá un email válido")).toBeInTheDocument();
@@ -105,6 +110,41 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
       screen.getByText("La contraseña debe tener al menos 6 caracteres"),
     ).toBeInTheDocument();
     expect(authApi.signUp).not.toHaveBeenCalled();
+  });
+
+  it("contraseñas distintas: error inline y CERO llamadas a la api", async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    await user.type(screen.getByLabelText("Nombre completo"), "Ada Lovelace");
+    await user.type(screen.getByLabelText("Email"), "demo@farox.app");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+    await user.type(screen.getByLabelText("Confirmar contraseña"), "secreto124");
+    await user.click(screen.getByRole("checkbox", { name: /Política de Privacidad/ }));
+    await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
+
+    expect(await screen.findByText("Las contraseñas no coinciden")).toBeInTheDocument();
+    expect(authApi.signUp).not.toHaveBeenCalled();
+  });
+
+  it("permite ver y ocultar ambas contraseñas", async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    const password = screen.getByLabelText("Contraseña");
+    const confirmation = screen.getByLabelText("Confirmar contraseña");
+    expect(password).toHaveAttribute("type", "password");
+    expect(confirmation).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Mostrar contraseña" }));
+    expect(password).toHaveAttribute("type", "text");
+    expect(confirmation).toHaveAttribute("type", "password");
+
+    await user.click(
+      screen.getByRole("button", { name: "Mostrar confirmación de contraseña" }),
+    );
+    expect(confirmation).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Ocultar contraseña" }));
+    expect(password).toHaveAttribute("type", "password");
   });
 
   it("éxito: pantalla de confirmación y signUp con email, password y full_name", async () => {

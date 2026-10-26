@@ -11,7 +11,7 @@ import { WorkerTerminal } from "./WorkerTerminal";
 // pasos de la pregunta de 2 niveles y sus 3 terminales. El paso "role" es el
 // nivel 1; "store" el nivel 2 (solo tras elegir Tienda + Seleccionar); y los
 // 3 pasos terminales son las pantallas de alta/confirmación. Cada terminal
-// navega a "/" por su cuenta tras producir su señal (o su ack de sesión);
+// navega a "/inicio" por su cuenta tras producir su señal (o su ack de sesión);
 // el guard derivado (OnboardingGate) es el que impide que la pregunta vuelva.
 // Sin chrome de app: la ruta /onboarding vive FUERA del AppShell, así que
 // este componente es la página completa (pantallas full-screen propias).

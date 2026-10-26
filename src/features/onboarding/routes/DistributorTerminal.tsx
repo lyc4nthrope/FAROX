@@ -65,7 +65,7 @@ export function DistributorTerminal({ onBack }: { onBack: () => void }) {
         // AuthProvider relee my_role()/is_premium antes de entrar al app.
         await refreshPrivileges();
         await refresh();
-        navigate("/");
+        navigate("/inicio");
       } catch (thrown) {
         setFormError(mapError(thrown));
       } finally {

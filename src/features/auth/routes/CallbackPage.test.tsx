@@ -27,7 +27,7 @@ function renderCallback() {
       <AuthProvider>
         <Routes>
           <Route path="/auth/callback" element={<CallbackPage />} />
-          <Route path="/" element={<p>inicio</p>} />
+          <Route path="/inicio" element={<p>inicio</p>} />
           <Route path="/login" element={<p>pantalla-login</p>} />
         </Routes>
       </AuthProvider>

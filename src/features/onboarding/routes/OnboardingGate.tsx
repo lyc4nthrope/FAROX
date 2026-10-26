@@ -22,7 +22,7 @@ import type { OnboardingSignals } from "../types";
 // RequireAuth/RequireRole quedan INTACTOS — este layout solo se monta
 // DESPUÉS de que la sesión esté resuelta y intercepta cualquier ruta
 // autenticada (también la llegada post-confirmación de D2, que redirige a
-// "/"). Si el usuario no tiene tienda NI distributor ⇒ /onboarding; si ya
+// /inicio). Si el usuario no tiene tienda NI distributor ⇒ /onboarding; si ya
 // tiene alguna señal ⇒ la pregunta jamás aparece (idempotente, S-D3.0).
 // El estado vive en React Context (R-D3.5): se deriva 1 vez por sesión y las
 // terminales lo refrescan con éxito en vez de re-preguntar.
@@ -105,7 +105,7 @@ function OnboardingProvider({ children }: { children: ReactNode }) {
   }, [userId, attempt]);
 
   // Las terminales con éxito (register_distributor / create_store) la llaman
-  // ANTES de navegar a "/" para que el guard evalúe la señal ya presente en
+  // ANTES de navegar a "/inicio" para que el guard evalúe la señal ya presente en
   // el server (my_distributor_id / my_store_ids — S-D3.A/S-D3.B AC).
   const refresh = useCallback(async (): Promise<void> => {
     if (userId === null) return;
@@ -183,7 +183,7 @@ function OnboardingGuard() {
   if (!needsOnboarding && location.pathname === "/onboarding") {
     // Señal ya presente (o ack de sesión): la pregunta NO reaparece
     // (S-D3.0 "nunca vuelve").
-    return <Navigate to="/" replace />;
+    return <Navigate to="/inicio" replace />;
   }
   return <Outlet />;
 }

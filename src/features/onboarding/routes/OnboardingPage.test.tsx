@@ -90,8 +90,8 @@ function renderOnboarding() {
         <Routes>
           <Route element={<RequireAuth />}>
             <Route element={<OnboardingGate />}>
-              {/* Stubs de destino: los terminales navegan a "/" tras su señal. */}
-              <Route path="/" element={<p>llegaste al inicio</p>} />
+              {/* Stubs de destino: los terminales navegan a "/inicio" tras su señal. */}
+              <Route path="/inicio" element={<p>llegaste al inicio</p>} />
               <Route path="/onboarding" element={<OnboardingPage />} />
             </Route>
           </Route>

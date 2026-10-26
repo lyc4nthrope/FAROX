@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 
-import { ErrorBanner } from "../../../shared/ui";
+import { ErrorBanner, PasswordInput } from "../../../shared/ui";
 import type { RegisterFormValues } from "../schemas";
 
 export interface RegisterFormErrors {
   full_name?: string;
   email?: string;
   password?: string;
+  confirm_password?: string;
   privacy_policy_accepted?: string;
 }
 
@@ -86,31 +87,25 @@ export function RegisterForm({
           </p>
         )}
       </div>
-      <div>
-        <label
-          htmlFor="register-password"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Contraseña
-        </label>
-        <input
-          id="register-password"
-          type="password"
-          autoComplete="new-password"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          value={values.password}
-          aria-invalid={errors.password !== undefined}
-          aria-describedby={
-            errors.password === undefined ? undefined : "register-password-error"
-          }
-          onChange={(event) => onChange({ ...values, password: event.target.value })}
-        />
-        {errors.password !== undefined && (
-          <p id="register-password-error" className="mt-1 text-xs text-red-600">
-            {errors.password}
-          </p>
-        )}
-      </div>
+      <PasswordInput
+        id="register-password"
+        label="Contraseña"
+        autoComplete="new-password"
+        value={values.password}
+        onChange={(password) => onChange({ ...values, password })}
+        revealName="contraseña"
+        hint="Mínimo 6 caracteres."
+        error={errors.password}
+      />
+      <PasswordInput
+        id="register-password-confirmation"
+        label="Confirmar contraseña"
+        autoComplete="new-password"
+        value={values.confirm_password}
+        onChange={(confirm_password) => onChange({ ...values, confirm_password })}
+        revealName="confirmación de contraseña"
+        error={errors.confirm_password}
+      />
       <div>
         {/* Consentimiento de privacidad OBLIGATORIO (Ley 1581 de 2012):
             checked controlado desde values (desmarcado por defecto) y validado

@@ -21,7 +21,7 @@ function renderLogin() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<p>inicio</p>} />
+          <Route path="/inicio" element={<p>inicio</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -79,6 +79,46 @@ describe("LoginPage (§S2 fila /login)", () => {
     expect(
       screen.getByRole("link", { name: "¿No tenés cuenta? Registrate" }),
     ).toHaveAttribute("href", "/register");
+  });
+
+  it("enlace de recuperación: Link a la ruta pública /recuperar", () => {
+    renderLogin();
+    expect(screen.getByRole("link", { name: "¿Olvidaste tu contraseña?" })).toHaveAttribute(
+      "href",
+      "/recuperar",
+    );
+  });
+
+  it("email sin confirmar: pide confirmar el email antes de iniciar sesión", async () => {
+    vi.mocked(authApi.signInWithPassword).mockResolvedValue({
+      error: { message: "Email not confirmed" },
+    });
+    const user = userEvent.setup();
+    renderLogin();
+    await user.type(screen.getByLabelText("Email"), "demo@farox.app");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto123");
+    await user.click(screen.getByRole("button", { name: "Ingresar" }));
+
+    expect(
+      await screen.findByText(
+        "Confirmá tu email antes de iniciar sesión. Revisá tu bandeja de entrada y abrí el link de verificación.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("permite mostrar y ocultar la contraseña sin alterar lo tipeado", async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    const password = screen.getByLabelText("Contraseña");
+    await user.type(password, "secreto123");
+    expect(password).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Mostrar contraseña" }));
+    expect(password).toHaveAttribute("type", "text");
+    expect(password).toHaveValue("secreto123");
+
+    await user.click(screen.getByRole("button", { name: "Ocultar contraseña" }));
+    expect(password).toHaveAttribute("type", "password");
   });
 
   it("datos válidos: llama a signInWithPassword con el formulario", async () => {

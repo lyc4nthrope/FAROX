@@ -3,3 +3,5 @@
 export { LoginPage } from "./routes/LoginPage";
 export { RegisterPage } from "./routes/RegisterPage";
 export { CallbackPage } from "./routes/CallbackPage";
+export { ForgotPasswordPage } from "./routes/ForgotPasswordPage";
+export { ResetPasswordPage } from "./routes/ResetPasswordPage";
