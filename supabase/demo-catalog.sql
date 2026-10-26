@@ -6,6 +6,8 @@
 --   Supabase Dashboard → SQL Editor → pegar todo el archivo → Run.
 --   No es una migración: no se aplica con `supabase db push` ni en un
 --   `db reset` remoto. Es opt-in y manual a propósito (son datos de demo).
+--   NO se llama `seed.sql`: la CLI de Supabase ejecuta ese nombre sola en
+--   `db start`/`db reset` y rompería el schema-check del CI.
 --
 -- Qué crea
 --   · 26 categorías nuevas (11 raíz + 15 subcategorías; reutiliza "Bebidas"
