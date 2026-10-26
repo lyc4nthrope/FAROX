@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -130,12 +130,17 @@ describe("ShortagePage (0023 · faltantes del operador)", () => {
 
     renderPage("operador");
 
-    // El distribuidor se autoselecciona cuando llega la lista.
-    expect(await screen.findByRole("combobox")).toHaveValue("9");
-    expect(screen.getByRole("link", { name: "Solicitar faltantes" })).toHaveAttribute(
-      "href",
-      "/pedidos/nuevo?storeId=7&distributorId=9&faltantes=1,4",
+    // El distribuidor se autoselecciona cuando llega la lista. El <select> sin
+    // opción vacía reporta el primer valor del DOM antes de que React aplique
+    // el estado, así que el href es la fuente de verdad.
+    const link = await screen.findByRole("link", { name: "Solicitar faltantes" });
+    await waitFor(() =>
+      expect(link).toHaveAttribute(
+        "href",
+        "/pedidos/nuevo?storeId=7&distributorId=9&faltantes=1,4",
+      ),
     );
+    expect(screen.getByRole("combobox")).toHaveValue("9");
     expect(storeLinksApi.fetchLinkedDistributorOptions).toHaveBeenCalledWith(7);
   });
 
