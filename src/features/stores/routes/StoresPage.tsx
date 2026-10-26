@@ -33,7 +33,12 @@ export function StoresPage() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Tiendas</h1>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Red</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tiendas</h1>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+        Tus tiendas, su ubicación y el estado de cada una. Desde acá entrás al inventario y al QR de
+        vínculo.
+      </p>
       {sujetaAlTope && (
         <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-b from-amber-50/70 to-white p-3.5 shadow-sm">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200">

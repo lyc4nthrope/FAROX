@@ -5,8 +5,18 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { formatCOP } from "../../../shared/lib/format";
-import { Box, Field, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
-import { fetchStoreDistributorProducts, fetchLinkedDistributorOptions } from "../../store-links/api";
+import {
+  Box,
+  Field,
+  Status,
+  buttonClass,
+  inputClass,
+  secondaryButtonClass,
+} from "../../../shared/ui/Box";
+import {
+  fetchStoreDistributorProducts,
+  fetchLinkedDistributorOptions,
+} from "../../store-links/api";
 import {
   createOrder,
   fetchDistributorOptions,
@@ -54,15 +64,12 @@ export function NewOrderPage() {
   );
   // El operador pide la intersección stock × distribuidor; el admin mantiene
   // el comportamiento previo (productos de la tienda).
-  const products = useLoad<ProductOption[]>(
-    () => {
-      if (storeId === "") return Promise.resolve({ data: [], error: null });
-      if (admin) return fetchStoreProducts(Number(storeId));
-      if (distributorId === "") return Promise.resolve({ data: [], error: null });
-      return fetchStoreDistributorProducts(Number(storeId), Number(distributorId));
-    },
-    [admin, storeId, distributorId],
-  );
+  const products = useLoad<ProductOption[]>(() => {
+    if (storeId === "") return Promise.resolve({ data: [], error: null });
+    if (admin) return fetchStoreProducts(Number(storeId));
+    if (distributorId === "") return Promise.resolve({ data: [], error: null });
+    return fetchStoreDistributorProducts(Number(storeId), Number(distributorId));
+  }, [admin, storeId, distributorId]);
   const [lines, setLines] = useState<Line[]>([{ productId: "", quantity: "" }]);
   const [expectedAt, setExpectedAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -86,7 +93,9 @@ export function NewOrderPage() {
     if (prefilled.current || shortageIds.length === 0) return;
     if (storeId === "" || distributorId === "" || products.data === null) return;
     const requestable = new Set(
-      products.data.filter((product) => product.price !== null).map((product) => String(product.id)),
+      products.data
+        .filter((product) => product.price !== null)
+        .map((product) => String(product.id)),
     );
     const wanted = shortageIds.filter((id) => requestable.has(id));
     if (wanted.length === 0) return;
@@ -126,7 +135,8 @@ export function NewOrderPage() {
     const ids = items.map((i) => i.product_id);
     if (storeId === "" || distributorId === "") return setError("Elegí tienda y distribuidor.");
     if (items.length === 0) return setError("Agregá al menos un producto.");
-    if (items.some((i) => !(i.quantity > 0))) return setError("Las cantidades deben ser mayores que 0.");
+    if (items.some((i) => !(i.quantity > 0)))
+      return setError("Las cantidades deben ser mayores que 0.");
     if (new Set(ids).size !== ids.length) return setError("Hay un producto repetido en la lista.");
     setSaving(true);
     try {
@@ -155,119 +165,163 @@ export function NewOrderPage() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Pedidos</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+        Elegí la tienda, el distribuidor y los productos. Al confirmar, el pedido queda listo para
+        su entrega.
+      </p>
       <Status error={error ?? stores.error ?? distributors.error ?? products.error} />
-      <Box title="Datos del pedido">
-        <form onSubmit={(e) => void onSubmit(e)}>
-          <Field label="Tienda">
-            <select
-              className={inputClass}
-              value={storeId}
-              onChange={(e) => changeStore(e.target.value)}
-            >
-              <option value="">— elegir —</option>
-              {stores.data?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Distribuidor">
-            <select
-              className={inputClass}
-              value={distributorId}
-              onChange={(e) => changeDistributor(e.target.value)}
-            >
-              <option value="">— elegir —</option>
-              {distributors.data?.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+      <form onSubmit={(e) => void onSubmit(e)}>
+        <Box title="Origen y destino">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Tienda">
+              <select
+                className={inputClass}
+                value={storeId}
+                onChange={(e) => changeStore(e.target.value)}
+              >
+                <option value="">— elegir —</option>
+                {stores.data?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Distribuidor">
+              <select
+                className={inputClass}
+                value={distributorId}
+                onChange={(e) => changeDistributor(e.target.value)}
+              >
+                <option value="">— elegir —</option>
+                {distributors.data?.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
           {!admin && storeId !== "" && distributors.data?.length === 0 && (
-            <p className="text-sm">
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Esta tienda no tiene distribuidores vinculados. Vinculá uno desde “Distribuidores”.
             </p>
           )}
-          <p className="text-sm font-medium">
-            {admin
-              ? "Productos (solo los asignados a la tienda)"
-              : "Productos (en la tienda y en el catálogo del distribuidor)"}
-          </p>
+        </Box>
+
+        <Box title="Productos">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-gray-700">
+              {admin
+                ? "Productos (solo los asignados a la tienda)"
+                : "Productos (en la tienda y en el catálogo del distribuidor)"}
+            </p>
+            <span className="rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
+              {lines.length} {lines.length === 1 ? "línea" : "líneas"}
+            </span>
+          </div>
           {unpricedCount > 0 && (
-            <p className="text-sm">
+            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {unpricedCount === 1
                 ? "1 producto no tiene precio en esta tienda y no se puede pedir."
                 : `${unpricedCount} productos no tienen precio en esta tienda y no se pueden pedir.`}{" "}
-              <Link className="underline" to={`/inventario/${storeId}`}>
+              <Link
+                className="font-medium underline underline-offset-4"
+                to={`/inventario/${storeId}`}
+              >
                 Publicá su precio en Inventario
               </Link>
             </p>
           )}
           {shortageIds.length > 0 && (
-            <p className="text-sm text-gray-600">
+            <p className="mt-2 text-sm text-gray-600">
               Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.
             </p>
           )}
-          {lines.map((line, index) => (
-            <div key={index} className="mb-2 flex flex-wrap items-end gap-2">
-              <select
-                aria-label={`Producto ${index + 1}`}
-                className={inputClass}
-                value={line.productId}
-                onChange={(e) => updateLine(index, { productId: e.target.value })}
+          <div className="mt-3 space-y-2">
+            {lines.map((line, index) => (
+              <div
+                key={index}
+                className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end"
               >
-                <option value="">— producto —</option>
-                {products.data?.map((p) => (
-                  <option key={p.id} value={p.id} disabled={p.price === null}>
-                    {productLabel(p)}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label={`Cantidad ${index + 1}`}
-                className={inputClass}
-                type="number"
-                min="0"
-                step="0.001"
-                value={line.quantity}
-                onChange={(e) => updateLine(index, { quantity: e.target.value })}
-              />
-              <button
-                className={buttonClass}
-                type="button"
-                onClick={() => setLines(lines.filter((_, i) => i !== index))}
-              >
-                Quitar
-              </button>
-            </div>
-          ))}
+                <select
+                  aria-label={`Producto ${index + 1}`}
+                  className={inputClass}
+                  value={line.productId}
+                  onChange={(e) => updateLine(index, { productId: e.target.value })}
+                >
+                  <option value="">— producto —</option>
+                  {products.data?.map((p) => (
+                    <option key={p.id} value={p.id} disabled={p.price === null}>
+                      {productLabel(p)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label={`Cantidad ${index + 1}`}
+                  className={inputClass}
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  placeholder="Cantidad"
+                  value={line.quantity}
+                  onChange={(e) => updateLine(index, { quantity: e.target.value })}
+                />
+                <button
+                  className={`${secondaryButtonClass} h-9 px-2.5 text-xs`}
+                  type="button"
+                  onClick={() => setLines(lines.filter((_, i) => i !== index))}
+                >
+                  Quitar
+                </button>
+              </div>
+            ))}
+          </div>
           <button
-            className={buttonClass}
+            className={`${secondaryButtonClass} mt-3`}
             type="button"
             onClick={() => setLines([...lines, { productId: "", quantity: "" }])}
           >
-            + Agregar producto
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Agregar producto
           </button>
-          <Field label="Fecha prometida (opcional)">
-            <input
-              className={inputClass}
-              type="date"
-              value={expectedAt}
-              onChange={(e) => setExpectedAt(e.target.value)}
-            />
-          </Field>
-          <Field label="Notas (opcional)">
-            <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </Field>
+        </Box>
+
+        <Box title="Entrega">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Fecha prometida (opcional)">
+              <input
+                className={inputClass}
+                type="date"
+                value={expectedAt}
+                onChange={(e) => setExpectedAt(e.target.value)}
+              />
+            </Field>
+            <Field label="Notas (opcional)">
+              <input
+                className={inputClass}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </Field>
+          </div>
           <button className={buttonClass} type="submit" disabled={saving}>
             Crear pedido
           </button>
-        </form>
-      </Box>
+        </Box>
+      </form>
     </section>
   );
 }

@@ -40,9 +40,20 @@ export function RolesPage() {
 
   return (
     <section>
-      <div className="flex items-center justify-between">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+        Administración
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
+        {!loading && (
+          <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500">
+            {rows.length} {rows.length === 1 ? "rol" : "roles"}
+          </span>
+        )}
       </div>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+        Los roles del sistema son fijos; podés revisar su descripción y editar los roles propios.
+      </p>
       <RoleTable rows={rows} loading={loading} error={error} />
     </section>
   );

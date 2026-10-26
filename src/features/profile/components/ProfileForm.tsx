@@ -1,5 +1,6 @@
 import type { ProfileFormValues } from "../schemas";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../types";
+import { buttonClass, inputClass } from "../../../shared/ui/Box";
 
 export interface ProfileFormErrors {
   full_name?: string;
@@ -46,7 +47,7 @@ export function ProfileForm({
       {formError !== null && (
         <p
           role="alert"
-          className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-xl border border-red-200 border-l-4 border-l-red-500 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
           {formError}
         </p>
@@ -54,20 +55,23 @@ export function ProfileForm({
       {notice !== null && (
         <p
           role="status"
-          className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+          className="rounded-xl border border-emerald-200 border-l-4 border-l-emerald-500 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
         >
           {notice}
         </p>
       )}
       <div>
-        <label htmlFor="profile-full-name" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="profile-full-name"
+          className="block text-xs font-semibold tracking-wide text-gray-600"
+        >
           Nombre completo
         </label>
         <input
           id="profile-full-name"
           type="text"
           autoComplete="name"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className={`${inputClass} mt-1 w-full`}
           value={values.full_name}
           aria-invalid={errors.full_name !== undefined}
           aria-describedby={errors.full_name === undefined ? undefined : "profile-full-name-error"}
@@ -80,14 +84,17 @@ export function ProfileForm({
         )}
       </div>
       <div>
-        <label htmlFor="profile-phone" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="profile-phone"
+          className="block text-xs font-semibold tracking-wide text-gray-600"
+        >
           Teléfono
         </label>
         <input
           id="profile-phone"
           type="tel"
           autoComplete="tel"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className={`${inputClass} mt-1 w-full`}
           value={values.phone_number}
           aria-invalid={errors.phone_number !== undefined}
           aria-describedby={errors.phone_number === undefined ? undefined : "profile-phone-error"}
@@ -100,12 +107,15 @@ export function ProfileForm({
         )}
       </div>
       <div>
-        <label htmlFor="profile-preference" className="block text-sm font-medium text-gray-700">
+        <label
+          htmlFor="profile-preference"
+          className="block text-xs font-semibold tracking-wide text-gray-600"
+        >
           Preferencia de contacto
         </label>
         <select
           id="profile-preference"
-          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+          className={`${inputClass} mt-1 w-full`}
           value={values.contact_preference}
           onChange={(event) =>
             onChange({
@@ -121,11 +131,7 @@ export function ProfileForm({
           ))}
         </select>
       </div>
-      <button
-        type="submit"
-        disabled={saving}
-        className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
-      >
+      <button type="submit" disabled={saving} className={buttonClass}>
         {saving ? "Guardando…" : "Guardar cambios"}
       </button>
     </form>

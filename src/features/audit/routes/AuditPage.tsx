@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { inputClass } from "../../../shared/ui/Box";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { fetchAuditPage } from "../api";
 import { AUDITED_TABLES, type AuditedTable } from "../schemas";
@@ -35,10 +36,11 @@ export function AuditPage() {
     setError(null);
     void (async () => {
       try {
-        const { rows: datos, hasMore: hayMas, error: fallo } = await fetchAuditPage(
-          null,
-          tabla === "" ? undefined : tabla,
-        );
+        const {
+          rows: datos,
+          hasMore: hayMas,
+          error: fallo,
+        } = await fetchAuditPage(null, tabla === "" ? undefined : tabla);
         if (cancelled) return;
         setRows(datos);
         setHasMore(hayMas);
@@ -64,10 +66,11 @@ export function AuditPage() {
     if (ultima === undefined) return;
     setCargandoMas(true);
     try {
-      const { rows: datos, hasMore: hayMas, error: fallo } = await fetchAuditPage(
-        ultima.id,
-        tabla === "" ? undefined : tabla,
-      );
+      const {
+        rows: datos,
+        hasMore: hayMas,
+        error: fallo,
+      } = await fetchAuditPage(ultima.id, tabla === "" ? undefined : tabla);
       if (fallo !== null) {
         // El error reemplaza la tabla (contrato DataTable): al re-entrar la
         // ruta se pide la página 1 de nuevo (HARD-3, sin estado persistido).
@@ -90,14 +93,21 @@ export function AuditPage() {
 
   return (
     <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Auditoría</h1>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Control</p>
+      <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Auditoría</h1>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            Quién cambió qué y cuándo. Un historial legible para resolver dudas sin depender de la
+            memoria.
+          </p>
+        </div>
+        <label className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-500">
           Filtrar por tabla
           <select
             value={tabla}
             onChange={(event) => setTabla(event.target.value as AuditedTable | "")}
-            className="rounded border border-gray-300 px-2 py-1.5 text-sm text-gray-800"
+            className={inputClass}
           >
             <option value="">Todas las tablas</option>
             {AUDITED_TABLES.map((nombre) => (

@@ -30,9 +30,9 @@ function AdminDistributorsPage() {
   // UNA sola lectura de users con el conteo por distributor_id en el cliente
   // — sin N+1. Solo admin la dispara (el operador no puede leer users ⇒
   // undefined = la columna no existe); si falla, queda null ⇒ celdas «—».
-  const [userCounts, setUserCounts] = useState<
-    DistributorUserCounts | null | undefined
-  >(role === "admin" ? null : undefined);
+  const [userCounts, setUserCounts] = useState<DistributorUserCounts | null | undefined>(
+    role === "admin" ? null : undefined,
+  );
 
   useEffect(() => {
     if (role !== "admin") return;
@@ -52,7 +52,18 @@ function AdminDistributorsPage() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Distribuidores</h1>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Red</p>
+      <div className="mt-1 flex flex-wrap items-center gap-2.5">
+        <h1 className="text-2xl font-semibold tracking-tight">Distribuidores</h1>
+        {!list.loading && (
+          <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500">
+            {list.rows.length} {list.rows.length === 1 ? "distribuidor" : "distribuidores"}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+        Las empresas que abastecen a las tiendas, con sus datos de contacto y estado.
+      </p>
       <DistributorList
         rows={list.rows}
         loading={list.loading}

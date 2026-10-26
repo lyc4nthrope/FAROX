@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
+import { Box } from "../../../shared/ui/Box";
 import { fetchMyProfile, updateMyProfile } from "../api";
 import { ProfileForm, type ProfileFormErrors } from "../components/ProfileForm";
 import { profileSchema, type ProfileFormValues } from "../schemas";
@@ -79,23 +80,41 @@ export function ProfilePage() {
     })();
   }
 
+  const initial =
+    values.full_name.trim().charAt(0).toUpperCase() ||
+    (email === null ? "" : email.charAt(0).toUpperCase()) ||
+    "?";
+
   return (
-    <section className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-semibold tracking-tight">Perfil</h1>
-      <p className="mt-1 text-sm text-gray-600">
-        {email === null ? "" : `${email} · `}solo podés editar tu nombre, teléfono y
-        preferencia de contacto.
-      </p>
+    <section className="mx-auto max-w-2xl">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Cuenta</p>
+      <div className="mt-2 flex items-center gap-4">
+        <span
+          aria-hidden="true"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gray-900 text-lg font-semibold text-white shadow-sm"
+        >
+          {initial}
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">Perfil</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {email === null ? "" : `${email} · `}solo podés editar tu nombre, teléfono y preferencia
+            de contacto.
+          </p>
+        </div>
+      </div>
       <div className="mt-6">
-        <ProfileForm
-          values={values}
-          errors={errors}
-          formError={formError}
-          notice={notice}
-          saving={saving}
-          onChange={setValues}
-          onSubmit={handleSubmit}
-        />
+        <Box title="Datos de contacto">
+          <ProfileForm
+            values={values}
+            errors={errors}
+            formError={formError}
+            notice={notice}
+            saving={saving}
+            onChange={setValues}
+            onSubmit={handleSubmit}
+          />
+        </Box>
       </div>
     </section>
   );

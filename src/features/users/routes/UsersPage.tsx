@@ -45,7 +45,20 @@ export function UsersPage() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+        Administración
+      </p>
+      <div className="mt-1 flex flex-wrap items-center gap-2.5">
+        <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
+        {!list.loading && (
+          <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500">
+            {rows.length} {rows.length === 1 ? "usuario" : "usuarios"}
+          </span>
+        )}
+      </div>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
+        Roles, acceso Premium y alcance de cada persona. La baja se hace desactivando la cuenta.
+      </p>
       <UserList rows={rows} loading={list.loading} error={list.error} />
       <Pager list={list} />
     </section>
