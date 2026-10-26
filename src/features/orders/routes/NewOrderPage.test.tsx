@@ -112,6 +112,48 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     ).toBeInTheDocument();
   });
 
+  // create_order rechaza productos sin precio activo en la tienda (D40); sin
+  // este aviso el selector solo muestra opciones deshabilitadas y parece roto.
+  it("operador con productos sin precio: explica por qué y enlaza al inventario de la tienda", async () => {
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+
+    const notice = await screen.findByText(
+      /1 producto no tiene precio en esta tienda y no se puede pedir\./,
+    );
+    expect(notice).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Publicá su precio en Inventario" })).toHaveAttribute(
+      "href",
+      "/inventario/3",
+    );
+  });
+
+  it("operador sin ningún producto con precio: lo dice en plural", async () => {
+    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
+      data: [
+        { id: 10, name: "Arroz", price: null },
+        { id: 11, name: "Aceite", price: null },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+
+    expect(
+      await screen.findByText(/2 productos no tienen precio en esta tienda y no se pueden pedir\./),
+    ).toBeInTheDocument();
+  });
+
+  it("operador con todos los productos con precio: no muestra el aviso", async () => {
+    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
+      data: [{ id: 10, name: "Arroz", price: 4500 }],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+
+    await screen.findByRole("option", { name: /^Arroz/ });
+    expect(screen.queryByText(/no tiene precio en esta tienda/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Inventario/ })).not.toBeInTheDocument();
+  });
+
   it("cambiar de tienda limpia distribuidor, líneas y vuelve a consultar", async () => {
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
     const user = userEvent.setup();

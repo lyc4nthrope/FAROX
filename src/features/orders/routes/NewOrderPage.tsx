@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -149,6 +149,10 @@ export function NewOrderPage() {
     }
   }
 
+  // create_order exige precio activo en la tienda (D40): sin este conteo el
+  // selector solo muestra opciones deshabilitadas y no explica por qué.
+  const unpricedCount = products.data?.filter((p) => p.price === null).length ?? 0;
+
   return (
     <section>
       <h1 className="text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
@@ -193,6 +197,16 @@ export function NewOrderPage() {
               ? "Productos (solo los asignados a la tienda)"
               : "Productos (en la tienda y en el catálogo del distribuidor)"}
           </p>
+          {unpricedCount > 0 && (
+            <p className="text-sm">
+              {unpricedCount === 1
+                ? "1 producto no tiene precio en esta tienda y no se puede pedir."
+                : `${unpricedCount} productos no tienen precio en esta tienda y no se pueden pedir.`}{" "}
+              <Link className="underline" to={`/inventario/${storeId}`}>
+                Publicá su precio en Inventario
+              </Link>
+            </p>
+          )}
           {shortageIds.length > 0 && (
             <p className="text-sm text-gray-600">
               Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.
