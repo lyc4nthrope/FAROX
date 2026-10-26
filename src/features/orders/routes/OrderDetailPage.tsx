@@ -117,8 +117,9 @@ export function OrderDetailPage() {
   const canDispatch = o !== null && (role === "admin" || role === "distribuidor");
 
   function onSaveExpectedAt() {
-    const value =
-      expectedAtDraft === "" ? null : `${expectedAtDraft}T00:00:00Z`;
+    // Mediodía UTC: la fecha se ve igual en la zona horaria de Colombia
+    // (UTC-5); a medianoche UTC el resumen mostraba el día anterior.
+    const value = expectedAtDraft === "" ? null : `${expectedAtDraft}T12:00:00Z`;
     void act(() => setOrderExpectedAt(orderId, value), "Fecha prometida actualizada.");
   }
 

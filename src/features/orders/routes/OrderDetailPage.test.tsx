@@ -48,14 +48,14 @@ function renderPage(role: RoleName, premium = false) {
   );
 }
 
-function pedido(status: OrderRow["status"]): OrderRow {
+function pedido(status: OrderRow["status"], expectedAt: string | null = null): OrderRow {
   return {
     id: 5,
     store_id: 7,
     store_name: "Tienda Centro",
     distributor_name: "Distribuidora Andes",
     status,
-    expected_at: null,
+    expected_at: expectedAt,
     delivered_at: null,
     created_at: "2026-10-25T12:00:00Z",
     notes: null,
@@ -267,8 +267,24 @@ describe("OrderDetailPage · ciclo del pedido en manos del distribuidor (0025)",
     renderPage("distribuidor");
     const fecha = await screen.findByLabelText("Fecha prometida (opcional)");
     fireEvent.change(fecha, { target: { value: "2026-11-02" } });
+    // fireEvent no espera el commit del input controlado: sin este waitFor el
+    // click puede leer el borrador anterior bajo carga.
+    await waitFor(() => expect(fecha).toHaveValue("2026-11-02"));
     await user.click(screen.getByRole("button", { name: "Guardar fecha" }));
 
-    expect(ordersApi.setOrderExpectedAt).toHaveBeenCalledWith(5, "2026-11-02T00:00:00Z");
+    expect(ordersApi.setOrderExpectedAt).toHaveBeenCalledWith(5, "2026-11-02T12:00:00Z");
+  });
+
+  it("S8: el distribuidor quita la fecha prometida", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({
+      data: pedido("in_route", "2026-11-02T12:00:00Z"),
+      error: null,
+    });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+    await user.click(await screen.findByRole("button", { name: "Quitar fecha" }));
+
+    expect(ordersApi.setOrderExpectedAt).toHaveBeenCalledWith(5, null);
   });
 });

@@ -33,8 +33,8 @@ Supuestos:
 | T5 | S3-S6 | inline | hecho | `NewOrderPage` sin bloqueo ni aviso por precio; faltantes se precargan completos |
 | T6 | S4 | inline | hecho | caja «Cotización del distribuidor» en `OrderDetailPage` + `fetchOrderQuotes`/`setOrderPrices` |
 | T7 | S1-S6 | inline | hecho | `npm run typecheck`, `lint`, `check-scope` y `test` en verde; `APLICAR-EN-PRODUCCION.md` y manual actualizados |
-| T8 | S7-S8 | inline | en curso | migración 0025 (`update_order_status`, `confirm_delivery`, `set_order_expected_at`), detalle del pedido y tests |
-| T9 | S9 | inline | en curso | panel «Faltantes de la tienda» en `/pedidos/nuevo` + tests |
+| T8 | S7-S8 | inline | hecho | migración 0025 (`update_order_status`, `confirm_delivery`, `set_order_expected_at`), detalle del pedido y tests; verificador: flake de test corregido y fecha a mediodía UTC |
+| T9 | S9 | inline | hecho | panel «Faltantes de la tienda» en `/pedidos/nuevo` + tests de filtro por tienda, intersección, duplicados y sin distribuidor |
 
 ## Log
 
@@ -43,3 +43,6 @@ Supuestos:
 - **L3 (diseño):** se descartó reutilizar `unit_price` para la cotización: ese campo es el precio privado de la tienda y exponerlo al distribuidor habría roto D40/D41. `distributor_price` + `get_order_quotes` mantienen la separación. `confirm_delivery` se actualizó a `COALESCE(distributor_price, unit_price)` y a `COALESCE(..., 0)` para no violar el NOT NULL de `dashboard_daily.entries_value`.
 - **L4 (verificación):** la migración 0024 **no se ejecutó contra un Postgres real** (el entorno no tiene Supabase CLI/Docker/psql); queda pendiente aplicarla en el SQL editor y correr el diagnóstico de `supabase/APLICAR-EN-PRODUCCION.md`.
 - **L5 (verificador independiente):** bloqueador corregido — el operador Premium podía leer la cotización por RPC pero la UI no la mostraba. Se agregó la columna «Cotización» + total de solo lectura en el detalle (sin formulario) y un test con `premium: true`. Advisories aceptadas sin cambio: distributor premium viendo `unit_price` es comportamiento previo a 0024; un pedido parcialmente cotizado crea un fiado solo por las líneas cotizadas; el INVERSE ya no borra líneas sin precio (solo advierte).
+- **L6 (2026-10-26):** «Cuando se hace un pedido, el mismo que solicito el pedido puede marcar en ruta (de la misma manera el confirmar entrega), cuando eso lo debe hacer el distribuidor a que se solicito, ademas la fecha debe ser opcional y algo que va mas a la comunicacion entre distribuidor y el operador. Cuando se va a solicitar que en alguna parte se muestre los prodcutos faltantes para agregarlos rapidamente.»
+- **L7 (diseño 0025):** `update_order_status` y `confirm_delivery` pasan a admin o distribuidor dueño del pedido (el operador queda fuera). La fecha prometida se edita con `set_order_expected_at` (NULL la limpia) y se guarda a mediodía UTC para que en Colombia no muestre el día anterior. El panel de faltantes filtra por tienda y por la intersección del distribuidor elegido; para admin se conserva el flujo global (solo stock) y queda comentado en el código.
+- **L8 (verificador 0025):** bloqueador de test corregido (el `fireEvent.change` de la fecha no se esperaba antes del click; ahora hay `waitFor` y 5 corridas seguidas del archivo en verde). Se agregó el test de «Quitar fecha» y el chequeo de duplicados de faltantes; se endureció el diagnóstico de 0025 en `APLICAR-EN-PRODUCCION.md`. La migración 0025 sigue **sin ejecutarse contra Postgres**.

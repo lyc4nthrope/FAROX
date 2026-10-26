@@ -274,7 +274,12 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(screen.getAllByRole("button", { name: "Agregado" })[0]).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Agregar todos" }));
-    expect(screen.getByLabelText("Producto 2")).toHaveValue("11");
+    await user.click(screen.getByRole("button", { name: "Agregar todos" }));
+    const values = screen
+      .getAllByLabelText(/^Producto \d+$/)
+      .map((element) => (element as HTMLSelectElement).value);
+    expect(values).toEqual(["10", "11"]);
+    expect(new Set(values).size).toBe(values.length);
   });
 
   it("S9: no ofrece agregar un faltante que el distribuidor no maneja", async () => {

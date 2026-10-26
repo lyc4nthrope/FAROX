@@ -77,6 +77,10 @@ export function NewOrderPage() {
     () => (shortages.data ?? []).filter((row) => row.store_id === Number(storeId)),
     [shortages.data, storeId],
   );
+  // Operador: products.data ES la intersección stock × distribuidor. Admin:
+  // conserva a propósito el flujo global (solo stock), igual que create_order
+  // (0024/S5); por eso el panel puede ofrecer un faltante fuera del catálogo
+  // del distribuidor solo cuando quien pide es admin.
   const requestableIds = useMemo(
     () => new Set((products.data ?? []).map((product) => product.id)),
     [products.data],
@@ -181,7 +185,7 @@ export function NewOrderPage() {
         storeId: Number(storeId),
         distributorId: Number(distributorId),
         items,
-        expectedAt: expectedAt === "" ? null : new Date(expectedAt).toISOString(),
+        expectedAt: expectedAt === "" ? null : `${expectedAt}T12:00:00Z`,
         notes: notes.trim() === "" ? null : notes.trim(),
       });
       if (result.error) {

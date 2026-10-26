@@ -110,6 +110,12 @@ UNION ALL SELECT '0025 ciclo del distribuidor',
                  FROM pg_proc
                  WHERE proname = 'update_order_status'
                    AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false)
+   AND COALESCE((SELECT position('distribuidor' in prosrc) > 0
+                 AND position('operador' in prosrc) = 0
+                 FROM pg_proc
+                 WHERE proname = 'confirm_delivery'
+                   AND pronamespace = 'public'::regnamespace
                  LIMIT 1), false))::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
