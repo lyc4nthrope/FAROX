@@ -217,7 +217,7 @@ export function StoreFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">{isEdit ? "Tienda" : "Nueva tienda"}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{isEdit ? "Tienda" : "Nueva tienda"}</h1>
       {loading ? (
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (

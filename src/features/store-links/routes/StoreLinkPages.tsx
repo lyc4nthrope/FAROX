@@ -168,7 +168,7 @@ export function StoreQrPage() {
           ← Inventario de la tienda
         </Link>
       </p>
-      <h1 className="text-xl font-semibold">QR de vínculo — tienda #{storeId}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">QR de vínculo — tienda #{storeId}</h1>
       <StoreLinkPanel storeId={storeId} />
     </section>
   );
@@ -217,7 +217,7 @@ export function LinkStorePage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Vincular tienda</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Vincular tienda</h1>
       <Status loading={busy} error={msg.error} ok={msg.ok} />
       <Box title="Código de la tienda">
         <p className="text-sm">

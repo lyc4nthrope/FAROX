@@ -109,7 +109,7 @@ export function ResetPasswordPage() {
   if (phase === "checking") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-xl font-semibold">Verificando el link…</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Verificando el link…</h1>
         <p role="status" className="mt-1 text-sm text-gray-600">
           Un momento mientras validamos tu link de recuperación.
         </p>
@@ -120,7 +120,7 @@ export function ResetPasswordPage() {
   if (phase === "invalid") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-xl font-semibold">El link no es válido</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">El link no es válido</h1>
         <p className="mt-1 text-sm text-gray-600">
           Puede haber expirado o ya haber sido usado. Pedí un link nuevo para elegir tu
           contraseña.
@@ -142,7 +142,7 @@ export function ResetPasswordPage() {
   if (phase === "done") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-xl font-semibold">Contraseña actualizada</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Contraseña actualizada</h1>
         <p role="status" className="mt-1 text-sm text-gray-600">
           Ya podés usar FAROX con tu nueva contraseña.
         </p>
@@ -157,7 +157,7 @@ export function ResetPasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-xl font-semibold">Elegí una nueva contraseña</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Elegí una nueva contraseña</h1>
       <p className="mt-1 text-sm text-gray-600">
         Mínimo 6 caracteres. Después vas a poder iniciar sesión con la contraseña nueva.
       </p>

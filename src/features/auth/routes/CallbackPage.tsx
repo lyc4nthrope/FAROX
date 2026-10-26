@@ -84,7 +84,7 @@ export function CallbackPage() {
   if (phase === "error") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-xl font-semibold">No pudimos confirmar tu cuenta</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">No pudimos confirmar tu cuenta</h1>
         <p className="mt-1 text-sm text-gray-600">
           El link de confirmación puede haber expirado o ya haber sido usado.
         </p>
@@ -104,7 +104,7 @@ export function CallbackPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-xl font-semibold">Confirmando tu cuenta…</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Confirmando tu cuenta…</h1>
       <p role="status" className="mt-1 text-sm text-gray-600">
         Un momento mientras activamos tu cuenta.
       </p>

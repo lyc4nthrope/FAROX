@@ -160,7 +160,7 @@ export function DistributorFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl font-semibold tracking-tight">
         {isEdit ? "Distribuidor" : "Nuevo distribuidor"}
       </h1>
       {loadingRow ? (

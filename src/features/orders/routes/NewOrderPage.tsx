@@ -151,7 +151,7 @@ export function NewOrderPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Nuevo pedido</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
       <Status error={error ?? stores.error ?? distributors.error ?? products.error} />
       <Box title="Datos del pedido">
         <form onSubmit={(e) => void onSubmit(e)}>

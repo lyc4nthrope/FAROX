@@ -52,7 +52,7 @@ export function MyCatalogPage() {
     <section>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Productos</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600">
             Elegí del registro general los productos que manejás. Tu catálogo muestra solo los
             productos relacionados a tu tienda o distribuidora.

@@ -14,7 +14,7 @@ export function AdminProductsPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Productos</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
       <p className="mt-1 text-sm text-gray-600">
         Catálogo general de la base de datos. Las tiendas y distribuidores eligen de acá los
         productos que manejan.

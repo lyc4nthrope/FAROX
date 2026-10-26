@@ -340,7 +340,7 @@ export function UserDetailPage() {
   if (cargando) {
     return (
       <section>
-        <h1 className="text-xl font-semibold">Usuario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Usuario</h1>
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       </section>
     );
@@ -349,7 +349,7 @@ export function UserDetailPage() {
   if (usuario === null) {
     return (
       <section>
-        <h1 className="text-xl font-semibold">Usuario</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Usuario</h1>
         <div className="mt-4">
           {/* errorCarga SIEMPRE viene de mapError() (HARD-1) */}
           <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

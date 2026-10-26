@@ -26,7 +26,7 @@ export function InventoryStoresPage() {
   const stores = useLoad(() => fetchMyStores(role === "admin"), [role]);
   return (
     <section>
-      <h1 className="text-xl font-semibold">Inventario</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Inventario</h1>
       <Box title="Elegí una tienda">
         <Status loading={stores.loading} error={stores.error} />
         {stores.data?.length === 0 && <p>No tenés tiendas en tu alcance.</p>}
@@ -215,7 +215,7 @@ export function InventoryPage() {
           ← Tiendas
         </Link>
       </p>
-      <h1 className="text-xl font-semibold">Inventario — {storeName.data ?? `tienda #${storeId}`}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Inventario — {storeName.data ?? `tienda #${storeId}`}</h1>
       <p className="text-sm">
         <Link className="underline" to={`/tiendas/${storeId}/qr`}>
           QR de vínculo para distribuidores

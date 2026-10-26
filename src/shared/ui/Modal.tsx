@@ -60,7 +60,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4 backdrop-blur-sm sm:p-8"
       // El fondo cierra; el contenido detiene la propagación.
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -73,17 +73,28 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="w-full max-w-3xl rounded-lg bg-white p-4 shadow-xl outline-none sm:p-6"
+        className="my-auto w-full max-w-3xl rounded-2xl border border-gray-200/80 bg-white p-5 shadow-2xl shadow-gray-900/10 outline-none sm:p-6"
       >
-        <div className="mb-3 flex items-start justify-between gap-4 border-b border-gray-100 pb-2">
-          <h2 id={titleId} className="text-base font-semibold text-gray-900">
+        <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
+          <h2 id={titleId} className="text-base font-semibold tracking-tight text-gray-900">
             {title}
           </h2>
           <button
             type="button"
-            className="rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
             onClick={onClose}
           >
+            <svg
+              aria-hidden="true"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              viewBox="0 0 24 24"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
             Cerrar
           </button>
         </div>

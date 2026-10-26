@@ -52,7 +52,7 @@ function AdminDistributorsPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Distribuidores</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Distribuidores</h1>
       <DistributorList
         rows={list.rows}
         loading={list.loading}

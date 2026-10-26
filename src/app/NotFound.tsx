@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 export function NotFound() {
   return (
     <section>
-      <h1 className="text-xl font-semibold">Página no encontrada</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Página no encontrada</h1>
       <p className="mt-2 text-sm text-gray-600">
         La ruta que pediste no existe.{" "}
         <Link to="/inicio" className="text-gray-900 underline">

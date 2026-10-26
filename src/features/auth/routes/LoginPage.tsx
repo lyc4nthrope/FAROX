@@ -71,7 +71,7 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-xl font-semibold">Iniciar sesión</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Iniciar sesión</h1>
       <p className="mt-1 text-sm text-gray-600">
         Ingresá con tu email y contraseña para usar FAROX.
       </p>

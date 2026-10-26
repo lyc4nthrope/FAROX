@@ -41,7 +41,7 @@ export function RolesPage() {
   return (
     <section>
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Roles</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
       </div>
       <RoleTable rows={rows} loading={loading} error={error} />
     </section>

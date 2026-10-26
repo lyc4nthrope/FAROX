@@ -71,7 +71,7 @@ export function ForgotPasswordPage() {
   if (phase === "sent") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-xl font-semibold">Revisá tu email</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Revisá tu email</h1>
         <p role="status" className="mt-1 text-sm text-gray-600">
           Si el email está registrado, te enviamos un link para restablecer tu contraseña.
           Revisá tu bandeja de entrada y la carpeta de spam.
@@ -87,7 +87,7 @@ export function ForgotPasswordPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-xl font-semibold">Recuperar contraseña</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Recuperar contraseña</h1>
       <p className="mt-1 text-sm text-gray-600">
         Escribí el email de tu cuenta y te enviamos un link para elegir una nueva
         contraseña.

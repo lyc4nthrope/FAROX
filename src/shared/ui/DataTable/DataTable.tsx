@@ -62,7 +62,7 @@ export function DataTable<Row>({
     );
   }
   if (loading) {
-    return <p className="mt-4 text-sm text-gray-600">Cargando…</p>;
+    return <p className="mt-4 text-sm text-gray-500">Cargando…</p>;
   }
   if (rows.length === 0) {
     return (
@@ -79,28 +79,22 @@ export function DataTable<Row>({
     <div className="mt-4 overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-gray-600">
+          <tr>
             {columns.map((column) => (
-              <th key={column.key} className="py-2 font-medium">
-                {column.header}
-              </th>
+              <th key={column.key}>{column.header}</th>
             ))}
-            {(actions ?? []).length > 0 && (
-              <th className="py-2 font-medium">Acciones</th>
-            )}
+            {(actions ?? []).length > 0 && <th>Acciones</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-gray-100">
+            <tr key={rowKey(row)} className="transition-colors">
               {columns.map((column) => (
-                <td key={column.key} className="py-2 text-gray-700">
-                  {column.render(row)}
-                </td>
+                <td key={column.key}>{column.render(row)}</td>
               ))}
               {(actions ?? []).length > 0 && (
-                <td className="py-2">
-                  <span className="flex gap-2">
+                <td>
+                  <span className="flex flex-wrap gap-1.5">
                     {visibles(row).map((action) => (
                       <button
                         key={action.key}
@@ -108,7 +102,7 @@ export function DataTable<Row>({
                         disabled={action.disabled?.(row) ?? false}
                         title={action.title?.(row)}
                         onClick={() => action.onClick(row)}
-                        className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {action.label}
                       </button>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { Field, Status, inputClass } from "../../../shared/ui/Box";
-import { PremiumLock } from "../../../shared/ui";
+import { PremiumLock, EmptyState } from "../../../shared/ui";
 import { StoreLinkPanel } from "../../store-links";
 import { fetchMyStoreOptions } from "../../store-links/api";
 
@@ -21,30 +21,38 @@ export function MyDistributorsPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Distribuidores</h1>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Vínculos</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Distribuidores</h1>
+      <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Estos son los distribuidores vinculados a tus tiendas. Para vincular uno nuevo, compartí el
         código o QR con el distribuidor.
       </p>
       <Status loading={stores.loading} error={stores.error} />
       {stores.data !== null && stores.data.length === 0 && (
-        <p className="mt-4 text-sm">No tenés una tienda asignada.</p>
+        <div className="mt-4">
+          <EmptyState
+            title="No tenés una tienda asignada"
+            hint="Cuando tengas una tienda activa, vas a poder vincular distribuidores desde acá."
+          />
+        </div>
       )}
       {stores.data !== null && stores.data.length > 0 && (
         <>
-          <Field label="Tienda">
-            <select
-              className={inputClass}
-              value={storeId}
-              onChange={(event) => setStoreId(event.target.value)}
-            >
-              {stores.data.map((store) => (
-                <option key={store.id} value={store.id}>
-                  {store.name}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <div className="mt-4 max-w-md">
+            <Field label="Tienda">
+              <select
+                className={inputClass}
+                value={storeId}
+                onChange={(event) => setStoreId(event.target.value)}
+              >
+                {stores.data.map((store) => (
+                  <option key={store.id} value={store.id}>
+                    {store.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
           {storeId !== "" && <StoreLinkPanel storeId={Number(storeId)} />}
         </>
       )}

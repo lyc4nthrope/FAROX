@@ -91,7 +91,7 @@ export function AuditPage() {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Auditoría</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Auditoría</h1>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           Filtrar por tabla
           <select

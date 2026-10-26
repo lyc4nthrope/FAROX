@@ -96,7 +96,7 @@ export function ShortagePage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Faltantes</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Faltantes</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-600">
         Productos que marcaste como faltantes para reponer. El distribuidor no ve esta lista: le
         llega cuando le hacés el pedido.

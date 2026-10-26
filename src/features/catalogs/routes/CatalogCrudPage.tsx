@@ -196,7 +196,7 @@ function CatalogCrudScreen({ definition }: { definition: CatalogDefinition }) {
       <Link to="/catalogs" className="text-sm text-gray-600 underline">
         ← Volver a Catálogos
       </Link>
-      <h1 className="mt-3 text-xl font-semibold">{definition.label}</h1>
+      <h1 className="mt-3 text-2xl font-semibold tracking-tight">{definition.label}</h1>
       <div className="mt-3">
         <h2 className="text-lg font-semibold">
           {editId === null ? "Nuevo registro" : "Editando registro"}

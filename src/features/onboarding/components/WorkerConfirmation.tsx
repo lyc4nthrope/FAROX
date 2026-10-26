@@ -11,7 +11,7 @@ export interface WorkerConfirmationProps {
 export function WorkerConfirmation({ onAck }: WorkerConfirmationProps) {
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">Trabajo en tienda</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Trabajo en tienda</h1>
       <p className="mt-4 text-sm text-gray-700">
         No hace falta que crees nada: un administrador te va a asignar las tiendas a las que
         pertenecés. Hasta entonces no vas a ver pedidos ni stock.

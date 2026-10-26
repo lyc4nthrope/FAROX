@@ -1,18 +1,25 @@
 @import "tailwindcss";
 
-/* Tablas legibles en todas las pantallas (cabecera, bordes y zebra). */
+/* Base del sistema visual: gris 50 de fondo, texto gris 900 y tablas legibles
+   en todas las pantallas (cabecera, bordes y zebra). */
 @layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
   main table {
     @apply w-full border-collapse text-left text-sm;
   }
   main th {
-    @apply border-b border-gray-300 bg-gray-50 px-3 py-2 font-medium text-gray-700;
+    @apply border-b border-gray-200 bg-gray-50/80 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500;
   }
   main td {
-    @apply border-b border-gray-100 px-3 py-2 align-top;
+    @apply border-b border-gray-100 px-3 py-2.5 align-top;
   }
   main tbody tr:nth-child(even) {
-    @apply bg-gray-50/50;
+    @apply bg-gray-50/40;
+  }
+  main tbody tr:hover {
+    @apply bg-gray-100/60;
   }
   main h1 {
     @apply text-gray-900;

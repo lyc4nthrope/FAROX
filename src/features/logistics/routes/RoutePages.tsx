@@ -101,7 +101,7 @@ export function MyRoutePage() {
   const route = useLoad(() => fetchRouteDetail(null, today), [today]);
   return (
     <section>
-      <h1 className="text-xl font-semibold">Mi ruta de hoy</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Mi ruta de hoy</h1>
       <Status loading={route.loading} error={route.error} />
       {!route.loading && route.data === null && !route.error && <p>No tenés ruta para hoy.</p>}
       {route.data && <RouteView route={route.data} onChanged={route.reload} />}
@@ -167,7 +167,7 @@ export function RoutesPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Rutas</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Rutas</h1>
       <Box title="Planificar ruta">
         <Status error={msg.error ?? distributors.error ?? stores.error} ok={msg.ok} />
         <form onSubmit={(e) => void onSubmit(e)}>

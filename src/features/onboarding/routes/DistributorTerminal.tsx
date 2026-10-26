@@ -76,7 +76,7 @@ export function DistributorTerminal({ onBack }: { onBack: () => void }) {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">Registro de distribuidor</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Registro de distribuidor</h1>
       <p className="mt-2 text-sm text-gray-600">
         Creá tu distribuidor con el NIT del negocio. Un administrador puede auditar o revertir
         esta alta después.

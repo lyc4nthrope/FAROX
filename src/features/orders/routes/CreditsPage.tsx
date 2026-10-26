@@ -115,7 +115,7 @@ export function CreditsPage() {
   const credits = useLoad(() => fetchCredits(), []);
   return (
     <section>
-      <h1 className="text-xl font-semibold">Fiado</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Fiado</h1>
       <p className="text-sm text-gray-600">Los créditos se crean desde el detalle de un pedido entregado.</p>
       <Status loading={credits.loading} error={credits.error} />
       {credits.data?.length === 0 && <p>No hay créditos.</p>}

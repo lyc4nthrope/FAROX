@@ -69,7 +69,7 @@ export function OrderDetailPage() {
           ← Pedidos
         </Link>
       </p>
-      <h1 className="text-xl font-semibold">Pedido #{orderId}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Pedido #{orderId}</h1>
       <Status loading={order.loading} error={order.error ?? msg.error} ok={msg.ok} />
       {o && (
         <Box title="Resumen">

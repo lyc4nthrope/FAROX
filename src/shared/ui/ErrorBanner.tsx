@@ -9,7 +9,7 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <p
       role="alert"
-      className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+      className="rounded-xl border border-red-200 border-l-4 border-l-red-500 bg-red-50 px-3 py-2 text-sm text-red-800"
     >
       {message}
     </p>

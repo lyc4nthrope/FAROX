@@ -81,7 +81,7 @@ export function ProfilePage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">Perfil</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Perfil</h1>
       <p className="mt-1 text-sm text-gray-600">
         {email === null ? "" : `${email} · `}solo podés editar tu nombre, teléfono y
         preferencia de contacto.

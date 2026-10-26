@@ -147,7 +147,7 @@ export function RoleFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-xl font-semibold">
+      <h1 className="text-2xl font-semibold tracking-tight">
         {isEdit ? "Rol" : "Nuevo rol"}
       </h1>
       {loadingRow ? (

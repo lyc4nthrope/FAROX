@@ -33,9 +33,34 @@ export function StoresPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Tiendas</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Tiendas</h1>
       {sujetaAlTope && (
-        <p className="mt-2 text-sm text-gray-600">{STORE_CAP_MESSAGE}</p>
+        <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200/80 bg-gradient-to-b from-amber-50/70 to-white p-3.5 shadow-sm">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-200">
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              viewBox="0 0 24 24"
+            >
+              <rect height="11" rx="2" width="16" x="4" y="10" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
+              Límite del plan
+              <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-800">
+                Premium
+              </span>
+            </p>
+            <p className="mt-1 text-sm text-gray-700">{STORE_CAP_MESSAGE}</p>
+          </div>
+        </div>
       )}
       <StoreList
         rows={list.rows}

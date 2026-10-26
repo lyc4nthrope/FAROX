@@ -8,7 +8,7 @@ interface RoutePlaceholderProps {
 export function RoutePlaceholder({ title, batch }: RoutePlaceholderProps) {
   return (
     <section>
-      <h1 className="text-xl font-semibold">{title}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="mt-2 text-sm text-gray-600">
         Esta pantalla aún no está disponible: la implementa el lote {batch}.
       </p>

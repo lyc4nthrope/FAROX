@@ -9,7 +9,7 @@ import { CATALOG_DEFINITIONS } from "../definitions";
 export function CatalogsPage() {
   return (
     <section>
-      <h1 className="text-xl font-semibold">Catálogos</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Catálogos</h1>
       <p className="mt-2 text-sm text-gray-600">
         Cada catálogo se lista completo; crear, editar y borrar es solo para
         administradores.

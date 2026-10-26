@@ -45,7 +45,7 @@ export function UsersPage() {
 
   return (
     <section>
-      <h1 className="text-xl font-semibold">Usuarios</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
       <UserList rows={rows} loading={list.loading} error={list.error} />
       <Pager list={list} />
     </section>
