@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +21,7 @@ vi.mock("../api", () => ({
   fetchOrderItems: vi.fn(),
   fetchOrderQuotes: vi.fn(),
   setOrderPrices: vi.fn(),
+  setOrderExpectedAt: vi.fn(),
   updateOrderStatus: vi.fn(),
   confirmDelivery: vi.fn(),
   createCredit: vi.fn(),
@@ -71,6 +72,8 @@ describe("OrderDetailPage · fiado (0023)", () => {
     vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({ data: [], error: null });
     vi.mocked(ordersApi.createCredit).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.setOrderPrices).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
@@ -134,6 +137,8 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
       data: [{ product_id: 10, distributor_price: null }],
       error: null,
     });
+    vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
@@ -202,5 +207,68 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
 
     expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
     expect(screen.queryByText("Cotización del distribuidor")).not.toBeInTheDocument();
+  });
+});
+
+describe("OrderDetailPage · ciclo del pedido en manos del distribuidor (0025)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
+    vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.confirmDelivery).mockResolvedValue({ error: null });
+    vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("el operador que pidió no marca en ruta ni confirma la entrega", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+
+    renderPage("operador");
+
+    expect(
+      await screen.findByText(
+        "El distribuidor marca el pedido en ruta y confirma la entrega. Vos seguís el estado acá.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Marcar en ruta" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Confirmar entrega" })).not.toBeInTheDocument();
+  });
+
+  it("el distribuidor marca el pedido en ruta", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+    await user.click(await screen.findByRole("button", { name: "Marcar en ruta" }));
+
+    expect(ordersApi.updateOrderStatus).toHaveBeenCalledWith(5, "in_route", null);
+  });
+
+  it("el distribuidor confirma la entrega", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+    await user.click(await screen.findByRole("button", { name: "Confirmar entrega" }));
+
+    expect(ordersApi.confirmDelivery).toHaveBeenCalledWith(5, []);
+  });
+
+  it("la fecha prometida es opcional y la guarda el distribuidor", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+    const fecha = await screen.findByLabelText("Fecha prometida (opcional)");
+    fireEvent.change(fecha, { target: { value: "2026-11-02" } });
+    await user.click(screen.getByRole("button", { name: "Guardar fecha" }));
+
+    expect(ordersApi.setOrderExpectedAt).toHaveBeenCalledWith(5, "2026-11-02T00:00:00Z");
   });
 });

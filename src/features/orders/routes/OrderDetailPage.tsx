@@ -21,6 +21,7 @@ import {
   fetchOrder,
   fetchOrderItems,
   fetchOrderQuotes,
+  setOrderExpectedAt,
   setOrderPrices,
   updateOrderStatus,
 } from "../api";
@@ -46,6 +47,7 @@ export function OrderDetailPage() {
   });
   const [received, setReceived] = useState<Record<number, string>>({});
   const [quoteDrafts, setQuoteDrafts] = useState<Record<number, string>>({});
+  const [expectedAtDraft, setExpectedAtDraft] = useState("");
   const [dueDate, setDueDate] = useState("");
 
   // Por defecto, recibido = pedido; la cotización arranca con lo ya guardado.
@@ -54,6 +56,13 @@ export function OrderDetailPage() {
       setReceived(Object.fromEntries(items.data.map((i) => [i.product_id, String(i.quantity)])));
     }
   }, [items.data]);
+
+  // 0025: la fecha prometida es comunicación distribuidor ↔ operador.
+  useEffect(() => {
+    if (order.data) {
+      setExpectedAtDraft(order.data.expected_at ? order.data.expected_at.slice(0, 10) : "");
+    }
+  }, [order.data]);
 
   // Al cambiar de pedido se descartan los borradores del anterior.
   useEffect(() => {
@@ -102,6 +111,16 @@ export function OrderDetailPage() {
         : o?.status === "in_route"
           ? "blue"
           : "amber";
+
+  // 0025: el ciclo operativo (ruta/entrega/fecha) es del distribuidor; el
+  // admin conserva el override.
+  const canDispatch = o !== null && (role === "admin" || role === "distribuidor");
+
+  function onSaveExpectedAt() {
+    const value =
+      expectedAtDraft === "" ? null : `${expectedAtDraft}T00:00:00Z`;
+    void act(() => setOrderExpectedAt(orderId, value), "Fecha prometida actualizada.");
+  }
 
   // 0024: el distribuidor cotiza lo que le cobra a la tienda mientras el
   // pedido sigue pendiente. El admin puede corregir la cotización.
@@ -246,7 +265,7 @@ export function OrderDetailPage() {
                 <th>Estado línea</th>
                 {showPrice && <th>Precio unitario</th>}
                 {showQuoteReadOnly && <th>Cotización</th>}
-                {open && role !== "admin" && <th>Recibir</th>}
+                {open && canDispatch && <th>Recibir</th>}
               </tr>
             </thead>
             <tbody>
@@ -276,7 +295,7 @@ export function OrderDetailPage() {
                         : formatCOP(savedQuotes.get(i.product_id) as number)}
                     </td>
                   )}
-                  {open && role !== "admin" && (
+                  {open && canDispatch && (
                     <td>
                       <input
                         aria-label={`Recibido de ${i.product_name}`}
@@ -309,6 +328,12 @@ export function OrderDetailPage() {
           </p>
         )}
       </Box>
+
+      {o && open && role === "operador" && (
+        <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+          El distribuidor marca el pedido en ruta y confirma la entrega. Vos seguís el estado acá.
+        </p>
+      )}
 
       {canQuote && (
         <Box title="Cotización del distribuidor">
@@ -358,10 +383,44 @@ export function OrderDetailPage() {
         </Box>
       )}
 
-      {o && open && (
+      {o && open && canDispatch && (
+        <Box title="Entrega y comunicación">
+          <p className="text-sm text-gray-600">
+            La fecha prometida es opcional y el operador la ve en el resumen. Podés ajustarla o
+            quitarla mientras el pedido siga abierto.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <Field label="Fecha prometida (opcional)">
+              <input
+                className={inputClass}
+                type="date"
+                value={expectedAtDraft}
+                onChange={(event) => setExpectedAtDraft(event.target.value)}
+              />
+            </Field>
+            <button className={buttonClass} type="button" onClick={onSaveExpectedAt}>
+              Guardar fecha
+            </button>
+            {o.expected_at !== null && (
+              <button
+                className={secondaryButtonClass}
+                type="button"
+                onClick={() => {
+                  setExpectedAtDraft("");
+                  void act(() => setOrderExpectedAt(orderId, null), "Fecha prometida quitada.");
+                }}
+              >
+                Quitar fecha
+              </button>
+            )}
+          </div>
+        </Box>
+      )}
+
+      {o && open && canDispatch && (
         <Box title="Acciones">
           <div className="flex flex-wrap gap-2">
-            {o.status === "pending" && (role === "admin" || role === "operador") && (
+            {o.status === "pending" && (
               <button
                 className={buttonClass}
                 type="button"
@@ -372,11 +431,9 @@ export function OrderDetailPage() {
                 Marcar en ruta
               </button>
             )}
-            {(role === "operador" || role === "distribuidor") && (
-              <button className={buttonClass} type="button" onClick={onConfirm}>
-                Confirmar entrega
-              </button>
-            )}
+            <button className={buttonClass} type="button" onClick={onConfirm}>
+              Confirmar entrega
+            </button>
             {role === "admin" && (
               <button
                 className={`${secondaryButtonClass} border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800`}

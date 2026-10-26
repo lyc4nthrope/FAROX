@@ -245,6 +245,21 @@ export async function updateOrderStatus(
   return { error };
 }
 
+/**
+ * 0025 — fecha prometida opcional, editable por el distribuidor (o admin)
+ * mientras el pedido siga abierto. null la limpia.
+ */
+export async function setOrderExpectedAt(
+  orderId: number,
+  expectedAt: string | null,
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("set_order_expected_at", {
+    p_order: orderId,
+    p_expected_at: expectedAt,
+  });
+  return { error };
+}
+
 export async function confirmDelivery(
   orderId: number,
   items: { product_id: number; received_quantity: number }[],

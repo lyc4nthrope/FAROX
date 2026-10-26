@@ -43,9 +43,8 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados |
 | Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |
 | Vincular un distribuidor | Distribuidores → Vincular otro distribuidor | Compartí el QR o dictá el código; el distribuidor lo escanea o lo escribe |
-| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza |
-| Mandar el pedido a ruta | Pedidos → pedido → Marcar en ruta | |
-| Recibir un pedido | Pedidos → pedido → Confirmar entrega | Cantidad recibida por producto (puede ser parcial); el stock sube solo |
+| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza. Los **faltantes de la tienda** se agregan con un clic desde el mismo formulario |
+| Seguir el pedido | Pedidos → pedido | El distribuidor lo marca en ruta y confirma la entrega; vos ves el estado y la fecha prometida |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
 | Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |
@@ -61,7 +60,9 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora |
 | Cotizar un pedido | Mis pedidos → pedido pendiente → Cotización del distribuidor | Precio por producto; podés dejar líneas sin precio y completarlas luego |
-| Confirmar una entrega | Mis pedidos → pedido → Confirmar entrega | Cantidades recibidas por producto |
+| Marcar un pedido en ruta | Mis pedidos → pedido → Marcar en ruta | Lo hace el distribuidor al que se le solicitó; el operador ya no puede |
+| Fijar la fecha prometida | Mis pedidos → pedido → Entrega y comunicación | Opcional; el operador la ve en el resumen. Podés cambiarla o quitarla mientras el pedido siga abierto |
+| Confirmar una entrega | Mis pedidos → pedido → Confirmar entrega | Cantidades entregadas por producto (puede ser parcial); el stock sube solo |
 
 ## Guion corto de demo (H1 → H3)
 
@@ -70,7 +71,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 3. **Admin:** le da Premium al operador y le pone precio al producto en esa tienda.
 4. **Operador:** entrada 20 → salida 12 → aparece la alerta "Stock bajo" → salida 9 → "No hay stock suficiente".
 5. **Operador:** Distribuidores → código/QR de la tienda → **Distribuidor:** Vincular tienda → “Escanear QR” (o escribir el código).
-6. **Operador:** Nuevo pedido de 24 → Marcar en ruta. **Admin:** planifica la ruta de hoy e "Iniciar ruta".
+6. **Operador:** Nuevo pedido de 24 (puede agregar los faltantes de la tienda con un clic). **Distribuidor:** marca el pedido en ruta. **Admin:** planifica la ruta de hoy e "Iniciar ruta".
 7. **Distribuidor:** Mi ruta → Llegué → confirma la entrega de 20 de 24 → el stock sube 20.
 8. **Operador Premium:** Dashboard → se ve la entrada del distribuidor.
 

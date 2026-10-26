@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../auth/types";
 import * as authApi from "../../auth/api";
+import * as productsApi from "../../products/api";
 import * as storeLinksApi from "../../store-links/api";
 import * as ordersApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
@@ -19,6 +20,9 @@ vi.mock("../api", () => ({
 vi.mock("../../store-links/api", () => ({
   fetchLinkedDistributorOptions: vi.fn(),
   fetchStoreDistributorProducts: vi.fn(),
+}));
+vi.mock("../../products/api", () => ({
+  fetchShortageProducts: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -72,6 +76,7 @@ beforeEach(() => {
     ],
     error: null,
   });
+  vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({ data: [], error: null });
 });
 
 afterEach(() => {
@@ -214,5 +219,112 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
         "Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("S9: muestra los faltantes de la tienda y los agrega rápido", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 11,
+          name: "Aceite",
+          brand: null,
+          unit: "L",
+          category: "Aceites",
+          quantity: 0,
+          base_quantity: 1,
+        },
+        {
+          store_id: 4,
+          store_name: "Tienda Norte",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    expect(
+      await screen.findByRole("heading", { name: "Faltantes de la tienda" }),
+    ).toBeInTheDocument();
+    // Solo los faltantes de la tienda elegida (2, no 3).
+    expect(screen.getAllByRole("button", { name: "Agregar" })).toHaveLength(2);
+
+    await user.click(screen.getAllByRole("button", { name: "Agregar" })[0]);
+    expect(screen.getByLabelText("Producto 1")).toHaveValue("10");
+    expect(screen.getAllByRole("button", { name: "Agregado" })[0]).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Agregar todos" }));
+    expect(screen.getByLabelText("Producto 2")).toHaveValue("11");
+  });
+
+  it("S9: no ofrece agregar un faltante que el distribuidor no maneja", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 99,
+          name: "Detergente",
+          brand: null,
+          unit: "L",
+          category: "Aseo",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+
+    expect(
+      await screen.findByText("No está en el catálogo del distribuidor"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar" })).toBeDisabled();
+  });
+
+  it("S9: sin distribuidor elegido, los faltantes se ven pero no se pueden agregar", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3");
+
+    expect(
+      await screen.findByText("Elegí un distribuidor para saber cuáles podés pedir."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Agregar todos" })).toBeDisabled();
   });
 });

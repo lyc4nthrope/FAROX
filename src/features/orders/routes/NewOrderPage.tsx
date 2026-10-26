@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
+import { formatQty } from "../../../shared/lib/format";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   Box,
@@ -13,6 +14,7 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { ProductPicker, type ProductPickerOption } from "../../../shared/ui";
+import { fetchShortageProducts } from "../../products/api";
 import {
   fetchStoreDistributorProducts,
   fetchLinkedDistributorOptions,
@@ -68,6 +70,17 @@ export function NewOrderPage() {
     if (distributorId === "") return Promise.resolve({ data: [], error: null });
     return fetchStoreDistributorProducts(Number(storeId), Number(distributorId));
   }, [admin, storeId, distributorId]);
+  // S9: faltantes de la tienda para agregarlos rápido. La RPC ya acota el
+  // alcance (operador: sus tiendas; admin: todas).
+  const shortages = useLoad(fetchShortageProducts, []);
+  const storeShortages = useMemo(
+    () => (shortages.data ?? []).filter((row) => row.store_id === Number(storeId)),
+    [shortages.data, storeId],
+  );
+  const requestableIds = useMemo(
+    () => new Set((products.data ?? []).map((product) => product.id)),
+    [products.data],
+  );
   const [lines, setLines] = useState<Line[]>([{ productId: "", quantity: "" }]);
   const [expectedAt, setExpectedAt] = useState("");
   const [notes, setNotes] = useState("");
@@ -120,6 +133,35 @@ export function NewOrderPage() {
 
   function updateLine(index: number, patch: Partial<Line>) {
     setLines(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  }
+
+  // S9: agrega un faltante sin duplicar la línea ni pisar las cantidades ya
+  // escritas. Descarta las líneas vacías (no se envían igual).
+  function addShortage(productId: number): void {
+    const id = String(productId);
+    setLines((current) => {
+      if (current.some((line) => line.productId === id)) return current;
+      return [
+        ...current.filter((line) => line.productId !== ""),
+        { productId: id, quantity: "1" },
+      ];
+    });
+  }
+
+  function addAllShortages(): void {
+    const ids = storeShortages
+      .map((row) => row.product_id)
+      .filter((id) => requestableIds.has(id));
+    setLines((current) => {
+      const existing = new Set(
+        current.map((line) => line.productId).filter((value) => value !== ""),
+      );
+      const additions = ids
+        .filter((id) => !existing.has(String(id)))
+        .map((id) => ({ productId: String(id), quantity: "1" }));
+      if (additions.length === 0) return current;
+      return [...current.filter((line) => line.productId !== ""), ...additions];
+    });
   }
 
   async function onSubmit(event: FormEvent) {
@@ -175,7 +217,9 @@ export function NewOrderPage() {
           ? "Elegí la tienda, el distribuidor y los productos. Al confirmar, el pedido queda listo para su entrega."
           : "Elegí la tienda, el distribuidor vinculado y los productos. No hace falta precio: el distribuidor recibe la solicitud y la cotiza."}
       </p>
-      <Status error={error ?? stores.error ?? distributors.error ?? products.error} />
+      <Status
+        error={error ?? stores.error ?? distributors.error ?? products.error ?? shortages.error}
+      />
       <form onSubmit={(e) => void onSubmit(e)}>
         <Box title="Origen y destino">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -292,6 +336,66 @@ export function NewOrderPage() {
             </svg>
             Agregar producto
           </button>
+
+          {storeId !== "" && storeShortages.length > 0 && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">Faltantes de la tienda</h3>
+                  <p className="text-xs text-gray-600">
+                    {distributorId === ""
+                      ? "Elegí un distribuidor para saber cuáles podés pedir."
+                      : "Agregalos a la solicitud con un clic."}
+                  </p>
+                </div>
+                <button
+                  className={secondaryButtonClass}
+                  type="button"
+                  disabled={distributorId === ""}
+                  onClick={addAllShortages}
+                >
+                  Agregar todos
+                </button>
+              </div>
+              <ul className="mt-3 space-y-1.5">
+                {storeShortages.map((row) => {
+                  const requestable = requestableIds.has(row.product_id);
+                  const added = lines.some((line) => line.productId === String(row.product_id));
+                  return (
+                    <li
+                      key={row.product_id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-sm"
+                    >
+                      <span className="min-w-0">
+                        <span className="font-medium text-gray-900">{row.name}</span>
+                        {row.brand !== null && (
+                          <span className="text-gray-500"> · {row.brand}</span>
+                        )}
+                        <span className="ml-2 text-xs text-gray-500">
+                          Stock: {formatQty(row.quantity)}
+                        </span>
+                      </span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        {!requestable && (
+                          <span className="text-xs text-gray-500">
+                            No está en el catálogo del distribuidor
+                          </span>
+                        )}
+                        <button
+                          className={secondaryButtonClass}
+                          type="button"
+                          disabled={!requestable || added}
+                          onClick={() => addShortage(row.product_id)}
+                        >
+                          {added ? "Agregado" : "Agregar"}
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </Box>
 
         <Box title="Entrega">

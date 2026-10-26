@@ -10,6 +10,9 @@ Objetivo: unificar Productos dentro de Inventario y permitir que el operador sol
 - **S4.** «ya el dsitrbuidor tomaria la solicitud y ahi tal vez marque cuanto le cobrara al operador»: el distribuidor dueño del pedido puede fijar el precio de cotización de cada línea (`order_items.distributor_price`) mientras el pedido está `pending` (RPC `set_order_prices`) y verlo en el detalle. La cotización alimenta el fiado y el valor del movimiento (`COALESCE(distributor_price, unit_price)`). `unit_price` sigue siendo el precio privado de la tienda y `get_order_items` no lo expone (D40/D41).
 - **S5.** Sin cambios para el admin: su catálogo global sigue en `/products` y `create_order` sigue exigiendo precio activo cuando quien pide es admin.
 - **S6.** La UI de `/pedidos/nuevo` del operador ya no deshabilita productos sin precio ni muestra el aviso «Publicá su precio en Inventario»; los faltantes se preseleccionan aunque no tengan precio.
+- **S7.** «Cuando se hace un pedido, el mismo que solicito el pedido puede marcar en ruta (de la misma manera el confirmar entrega), cuando eso lo debe hacer el distribuidor a que se solicito»: «Marcar en ruta» y «Confirmar entrega» dejan de estar disponibles para el operador que solicitó. Los ejecuta el distribuidor dueño del pedido (el admin conserva el override). Se aplica en UI y en `update_order_status`/`confirm_delivery`.
+- **S8.** «la fecha debe ser opcional y algo que va mas a la comunicacion entre distribuidor y el operador»: la fecha prometida es opcional y editable por el distribuidor (o admin) mientras el pedido está abierto, con la RPC `set_order_expected_at`; el operador la ve en el resumen.
+- **S9.** «Cuando se va a solicitar que en alguna parte se muestre los prodcutos faltantes para agregarlos rapidamente»: `/pedidos/nuevo` muestra los faltantes de la tienda seleccionada con acciones «Agregar» y «Agregar todos», limitados a los productos que también están en el catálogo del distribuidor elegido.
 
 Supuestos:
 
@@ -17,6 +20,7 @@ Supuestos:
 - La cotización se modela en una columna propia (`distributor_price`) para no reutilizar `unit_price`, que es el precio privado de la tienda (D40/D41); el distribuidor no lo ve.
 - La visibilidad de precios para no-premium se mantiene: la cotización se muestra al admin, al distribuidor del pedido y al operador Premium de la tienda.
 - La limpieza de umbral necesita una RPC propia (`set_stock_threshold`) porque `assign_product_to_store` no borra umbrales existentes.
+- El admin conserva el override de operación (marcar en ruta, confirmar entrega y fijar la fecha) para destrabar pedidos.
 
 ## Tasks
 
@@ -28,7 +32,9 @@ Supuestos:
 | T4 | S1-S2 | inline | hecho | `InventoryPage` compone el panel; pestaña inicial «Productos»; nav del operador sin `/products`; redirección en `ProductsPage` |
 | T5 | S3-S6 | inline | hecho | `NewOrderPage` sin bloqueo ni aviso por precio; faltantes se precargan completos |
 | T6 | S4 | inline | hecho | caja «Cotización del distribuidor» en `OrderDetailPage` + `fetchOrderQuotes`/`setOrderPrices` |
-| T7 | S1-S6 | inline | hecho | `npm run typecheck`, `lint`, `check-scope` y `test` (606 tests) en verde; `APLICAR-EN-PRODUCCION.md` y manual actualizados |
+| T7 | S1-S6 | inline | hecho | `npm run typecheck`, `lint`, `check-scope` y `test` en verde; `APLICAR-EN-PRODUCCION.md` y manual actualizados |
+| T8 | S7-S8 | inline | en curso | migración 0025 (`update_order_status`, `confirm_delivery`, `set_order_expected_at`), detalle del pedido y tests |
+| T9 | S9 | inline | en curso | panel «Faltantes de la tienda» en `/pedidos/nuevo` + tests |
 
 ## Log
 
