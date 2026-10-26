@@ -1,5 +1,6 @@
 import type { ProductFormValues } from "../schemas";
 import type { CatalogRef } from "../types";
+import { BarcodeScanner } from "./BarcodeScanner";
 
 export interface ProductFormErrors {
   name?: string;
@@ -215,7 +216,7 @@ export function ProductForm({
       </div>
       <div>
         <label htmlFor="product-barcode" className="block text-sm font-medium text-gray-700">
-          Código de barras
+          Código de barras (opcional)
         </label>
         <input
           id="product-barcode"
@@ -224,13 +225,26 @@ export function ProductForm({
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.barcode}
           aria-invalid={errors.barcode !== undefined}
-          aria-describedby={errors.barcode === undefined ? undefined : "product-barcode-error"}
+          aria-describedby={
+            errors.barcode === undefined
+              ? "product-barcode-hint"
+              : "product-barcode-hint product-barcode-error"
+          }
           onChange={(event) => onChange({ ...values, barcode: event.target.value })}
         />
+        <p id="product-barcode-hint" className="mt-1 text-xs text-gray-500">
+          Escaneá el código con la cámara o escribilo a mano.
+        </p>
         {errors.barcode !== undefined && (
           <p id="product-barcode-error" className="mt-1 text-xs text-red-600">
             {errors.barcode}
           </p>
+        )}
+        {!readOnly && (
+          <BarcodeScanner
+            disabled={saving}
+            onCode={(raw) => onChange({ ...values, barcode: raw })}
+          />
         )}
       </div>
       {!readOnly && (

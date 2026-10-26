@@ -213,6 +213,25 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(productsApi.createProduct).not.toHaveBeenCalled();
   });
 
+  it("código de barras: opcional explícito y escaneo con cámara (PROD-2)", async () => {
+    renderRutas("/products/new", "admin");
+
+    expect(await screen.findByLabelText("Código de barras (opcional)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Escaneá el código con la cámara o escribilo a mano."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Escanear código" })).toBeInTheDocument();
+  });
+
+  it("código de barras: en solo lectura no se ofrece escanear (0019/S7)", async () => {
+    vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
+    renderRutas("/products/1", "operador");
+
+    expect(await screen.findByDisplayValue("Café molido")).toBeInTheDocument();
+    expect(screen.getByLabelText("Código de barras (opcional)")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Escanear código" })).not.toBeInTheDocument();
+  });
+
   it("cantidad inválida (0): error inline y CERO requests (Zod, idea:198)", async () => {
     const user = userEvent.setup();
     renderRutas("/products/new", "admin");
