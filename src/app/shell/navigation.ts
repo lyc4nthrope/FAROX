@@ -17,6 +17,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/inventario", label: "Inventario" },
   { to: "/alertas", label: "Alertas" },
   { to: "/pedidos", label: "Pedidos" },
+  { to: "/faltantes", label: "Faltantes" },
   { to: "/fiado", label: "Fiado" },
   { to: "/rutas", label: "Rutas" },
   { to: "/dashboard", label: "Dashboard" },
@@ -41,6 +42,7 @@ const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
+  { to: "/faltantes", label: "Faltantes" },
   { to: "/vincular", label: "Vincular tienda" },
   { to: "/alertas", label: "Alertas" },
   { to: "/dashboard", label: "Dashboard" },

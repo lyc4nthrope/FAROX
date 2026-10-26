@@ -10,7 +10,7 @@ import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../feat
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
 import { LinkStorePage, StoreQrPage } from "../features/store-links";
 import { PrivacyPage } from "../features/legal";
-import { ProductFormPage, ProductsPage } from "../features/products";
+import { ProductFormPage, ProductsPage, ShortagePage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
 import { RoleFormPage, RolesPage } from "../features/roles";
@@ -139,6 +139,11 @@ export function AppRoutes() {
                 USING true, 0006:144-145). La escritura la oculta el feature
                 products para no-admin y la enforcea products_update. */}
             <Route path="/products/:id" element={<ProductFormPage />} />
+            {/* Faltantes: cualquier sesión autenticada. La RPC 0022 resuelve
+                el alcance real (distribuidor → tiendas vinculadas, operador →
+                sus tiendas, admin → todas), así que no hace falta un guard de
+                rol y un usuario sin alcance ve el estado vacío. */}
+            <Route path="/faltantes" element={<ShortagePage />} />
             <Route
               path="/stores"
               element={

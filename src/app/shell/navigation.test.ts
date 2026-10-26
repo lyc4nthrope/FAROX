@@ -11,6 +11,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/inventario",
       "/alertas",
       "/pedidos",
+      "/faltantes",
       "/fiado",
       "/rutas",
       "/dashboard",
@@ -30,6 +31,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/inventario",
       "/alertas",
       "/pedidos",
+      "/faltantes",
       "/fiado",
       "/dashboard",
     ]);
@@ -42,6 +44,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     expect(visibleNavItems("distribuidor").map((item) => item.to)).toEqual([
       "/mi-ruta",
       "/pedidos",
+      "/faltantes",
       "/vincular",
       "/alertas",
       "/dashboard",

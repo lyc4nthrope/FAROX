@@ -4,3 +4,4 @@
 // obs #488).
 export { ProductsPage } from "./routes/ProductsPage";
 export { ProductFormPage } from "./routes/ProductFormPage";
+export { ShortagePage } from "./routes/ShortagePage";
