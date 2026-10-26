@@ -164,7 +164,9 @@ export function HomePage() {
             Panel de control
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {/* text-white explícito: la regla base `main h1` (index.css) gana a
+                la herencia del contenedor y lo dejaba casi negro sobre oscuro. */}
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
               Bienvenido a FARØX
             </h1>
             {premium && (
