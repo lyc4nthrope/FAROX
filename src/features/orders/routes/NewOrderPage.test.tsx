@@ -138,4 +138,18 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(ordersApi.fetchStoreProducts).toHaveBeenCalledWith(3);
     expect(storeLinksApi.fetchStoreDistributorProducts).not.toHaveBeenCalled();
   });
+
+  // S3: /faltantes llega con los productos elegidos; solo se precargan los
+  // pedibles (con precio) y con cantidad 1 para ajustar.
+  it("operador desde faltantes: precarga los productos pedibles y descarta los que no tienen precio", async () => {
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7&faltantes=10,11");
+
+    await waitFor(() => expect(screen.getByLabelText("Producto 1")).toHaveValue("10"));
+    expect(screen.getByLabelText("Cantidad 1")).toHaveValue(1);
+    expect(
+      screen.getByText("Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades."),
+    ).toBeInTheDocument();
+    // El 11 venía en la lista pero no tiene precio activo: no se precarga.
+    expect(screen.queryByLabelText("Producto 2")).not.toBeInTheDocument();
+  });
 });

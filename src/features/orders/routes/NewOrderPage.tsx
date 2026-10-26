@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
@@ -68,6 +68,31 @@ export function NewOrderPage() {
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // S3: /faltantes envía los productos ya elegidos. Se precargan UNA vez, solo
+  // los que existen en la intersección y tienen precio; si el operador cambia
+  // de distribuidor, las líneas se reinician y no se vuelven a pisar.
+  const shortageIds = useMemo(
+    () =>
+      (params.get("faltantes") ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => /^\d+$/.test(value)),
+    [params],
+  );
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (prefilled.current || shortageIds.length === 0) return;
+    if (storeId === "" || distributorId === "" || products.data === null) return;
+    const requestable = new Set(
+      products.data.filter((product) => product.price !== null).map((product) => String(product.id)),
+    );
+    const wanted = shortageIds.filter((id) => requestable.has(id));
+    if (wanted.length === 0) return;
+    prefilled.current = true;
+    setLines(wanted.map((id) => ({ productId: id, quantity: "1" })));
+  }, [distributorId, products.data, shortageIds, storeId]);
 
   // Un distribuidor que no está vinculado (p. ej. link viejo) no puede quedar
   // seleccionado: se limpia la selección y las líneas.
@@ -168,6 +193,11 @@ export function NewOrderPage() {
               ? "Productos (solo los asignados a la tienda)"
               : "Productos (en la tienda y en el catálogo del distribuidor)"}
           </p>
+          {shortageIds.length > 0 && (
+            <p className="text-sm text-gray-600">
+              Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.
+            </p>
+          )}
           {lines.map((line, index) => (
             <div key={index} className="mb-2 flex gap-2">
               <select

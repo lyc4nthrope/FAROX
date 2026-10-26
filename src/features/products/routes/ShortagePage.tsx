@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
+import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { formatQty } from "../../../shared/lib/format";
 import { EmptyState, ErrorBanner } from "../../../shared/ui";
-import { Badge } from "../../../shared/ui/Box";
+import { Badge, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
+import { fetchLinkedDistributorOptions } from "../../store-links/api";
 import { fetchShortageProducts } from "../api";
 import type { ShortageRow } from "../types";
 
@@ -26,11 +29,68 @@ function groupByStore(rows: ShortageRow[]): StoreGroup[] {
   return [...groups.values()].sort((a, b) => a.storeName.localeCompare(b.storeName));
 }
 
+/**
+ * Solicitud al distribuidor (S3): arma el pedido con los faltantes de ESTA
+ * tienda ya preseleccionados en /pedidos/nuevo. Solo aplica al operador: el
+ * admin no tiene tienda propia y usa el flujo general de pedidos.
+ */
+function ShortageRequest({ storeId, rows }: { storeId: number; rows: ShortageRow[] }) {
+  const distributors = useLoad(() => fetchLinkedDistributorOptions(storeId), [storeId]);
+  const [distributorId, setDistributorId] = useState("");
+
+  useEffect(() => {
+    if (distributorId !== "") return;
+    const first = distributors.data?.[0];
+    if (first !== undefined) setDistributorId(String(first.id));
+  }, [distributorId, distributors.data]);
+
+  if (distributors.loading) return <Status loading />;
+  if (distributors.error !== null) return <Status error={distributors.error} />;
+  if (distributors.data !== null && distributors.data.length === 0) {
+    return (
+      <p className="mt-3 text-sm text-gray-600">
+        No tenés distribuidores vinculados a esta tienda.{" "}
+        <Link className="underline" to="/distributors">
+          Vinculá uno
+        </Link>{" "}
+        para pedirle los faltantes.
+      </p>
+    );
+  }
+
+  const href = `/pedidos/nuevo?storeId=${storeId}&distributorId=${distributorId}&faltantes=${rows
+    .map((row) => row.product_id)
+    .join(",")}`;
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2">
+      <label className="text-sm">
+        <span className="block font-medium text-gray-700">Pedirle a</span>
+        <select
+          className={inputClass}
+          value={distributorId}
+          onChange={(event) => setDistributorId(event.target.value)}
+        >
+          {distributors.data?.map((distributor) => (
+            <option key={distributor.id} value={distributor.id}>
+              {distributor.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Link className={buttonClass} to={href}>
+        Solicitar faltantes
+      </Link>
+    </div>
+  );
+}
+
 // /faltantes (0023): lo que las tiendas marcaron como faltante. Lo ve SOLO el
 // operador de esa tienda (el admin, todas). El distribuidor no tiene vista de
 // faltantes: se entera cuando el operador le crea el pedido. La RPC
 // list_shortage_products() resuelve el alcance y el cliente no filtra nada.
 export function ShortagePage() {
+  const { role } = useAuth();
   const { data, error, loading } = useLoad(fetchShortageProducts, []);
   const groups = useMemo(() => groupByStore(data ?? []), [data]);
 
@@ -93,6 +153,7 @@ export function ShortagePage() {
                 ))}
               </tbody>
             </table>
+            {role === "operador" && <ShortageRequest storeId={group.storeId} rows={group.rows} />}
           </section>
         ))}
       </div>
