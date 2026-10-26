@@ -2,10 +2,8 @@ import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode }
 import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
-import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { formatCOP, formatQty } from "../../../shared/lib/format";
-import { initialListQuery } from "../../../shared/lib/list";
 import {
   Badge,
   Box,
@@ -16,31 +14,20 @@ import {
   runAction,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
-import {
-  DataTable,
-  EmptyState,
-  PremiumLock,
-  ProductPicker,
-  type DataTableColumn,
-  type ProductPickerOption,
-} from "../../../shared/ui";
+import { EmptyState, PremiumLock, ProductPicker, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
-import { Pager } from "../../../shared/ui/Pager";
+import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
 import {
-  assignProduct,
-  fetchActiveProducts,
   fetchMotives,
   fetchMovements,
   fetchMyStores,
   fetchPrices,
-  fetchStock,
   fetchStockOptions,
   fetchStoreName,
   registerMovement,
   reverseMovement,
   setPrice,
   type MovementRow,
-  type StockRow,
 } from "../api";
 
 /** /inventario — elegir tienda. */
@@ -125,42 +112,11 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-function StockBadge({ quantity, threshold }: { quantity: number; threshold: number | null }) {
-  if (quantity === 0) return <Badge tone="red">Agotado</Badge>;
-  if (threshold !== null && quantity <= threshold) return <Badge tone="amber">Bajo</Badge>;
-  return <Badge tone="green">OK</Badge>;
-}
-
-const STOCK_COLUMNS: DataTableColumn<StockRow>[] = [
-  { key: "product", header: "Producto", render: (row) => row.product_name },
-  {
-    key: "quantity",
-    header: "Cantidad",
-    render: (row) => <span className="tabular-nums">{formatQty(row.quantity)}</span>,
-  },
-  {
-    key: "threshold",
-    header: "Umbral",
-    render: (row) =>
-      row.threshold === null ? (
-        "—"
-      ) : (
-        <span className="tabular-nums">{formatQty(row.threshold)}</span>
-      ),
-  },
-  { key: "expiry", header: "Vence", render: (row) => row.expiry_date ?? "—" },
-  {
-    key: "status",
-    header: "Estado",
-    render: (row) => <StockBadge quantity={row.quantity} threshold={row.threshold} />,
-  },
-];
-
-type InventoryTab = "stock" | "movements" | "prices";
-type ModalKind = "movement" | "assign" | "price";
+type InventoryTab = "products" | "movements" | "prices";
+type ModalKind = "movement" | "price";
 
 const TABS: readonly { id: InventoryTab; label: string }[] = [
-  { id: "stock", label: "Stock" },
+  { id: "products", label: "Productos" },
   { id: "movements", label: "Movimientos" },
   { id: "prices", label: "Precios" },
 ];
@@ -231,11 +187,9 @@ function segmentClass(active: boolean, tone: "entry" | "exit"): string {
 function InventoryTabBar({
   active,
   onChange,
-  stockCount,
 }: {
   active: InventoryTab;
   onChange: (tab: InventoryTab) => void;
-  stockCount: number | null;
 }) {
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const current = TABS.findIndex((tab) => tab.id === active);
@@ -277,16 +231,6 @@ function InventoryTabBar({
             }`}
           >
             {tab.label}
-            {tab.id === "stock" && stockCount !== null && (
-              <span
-                aria-hidden="true"
-                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                  selected ? "bg-white/15 text-white" : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {stockCount}
-              </span>
-            )}
           </button>
         );
       })}
@@ -294,18 +238,16 @@ function InventoryTabBar({
   );
 }
 
-/** /inventario/:storeId — stock, movimientos y precios de una tienda. */
+/** /inventario/:storeId — productos/asignación, movimientos y precios. */
 export function InventoryPage() {
   const storeId = Number(useParams().storeId);
   const { role, premium } = useAuth();
   const isAdmin = role === "admin";
 
   const storeName = useLoad(() => fetchStoreName(storeId), [storeId]);
-  const stock = useList<StockRow>((query) => fetchStock(storeId, query), initialListQuery);
   const stockOptions = useLoad(() => fetchStockOptions(storeId), [storeId]);
   const movements = useLoad(() => fetchMovements(storeId), [storeId]);
   const prices = useLoad(() => fetchPrices(storeId), [storeId]);
-  const products = useLoad(() => fetchActiveProducts(), []);
   const motives = useLoad(() => fetchMotives(), []);
 
   const stockPickerOptions = useMemo<ProductPickerOption[]>(
@@ -318,29 +260,21 @@ export function InventoryPage() {
       })),
     [stockOptions.data],
   );
-  const productPickerOptions = useMemo<ProductPickerOption[]>(
-    () =>
-      (products.data ?? []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        brand: product.brand,
-      })),
-    [products.data],
-  );
 
-  const [tab, setTab] = useState<InventoryTab>("stock");
+  const [tab, setTab] = useState<InventoryTab>("products");
   const [modal, setModal] = useState<ModalKind | null>(null);
   const [busy, setBusy] = useState(false);
+  const [catalogVersion, setCatalogVersion] = useState(0);
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
   });
 
   const reloadAll = () => {
-    stock.refetch();
     stockOptions.reload();
     movements.reload();
     prices.reload();
+    setCatalogVersion((value) => value + 1);
   };
 
   async function act(action: () => Promise<{ error: { message: string } | null }>, ok: string) {
@@ -358,29 +292,6 @@ export function InventoryPage() {
   function openModal(kind: ModalKind) {
     setMsg({ error: null, ok: null });
     setModal(kind);
-  }
-
-  // --- asignar producto
-  const [assign, setAssign] = useState({ productId: "", threshold: "" });
-  async function onAssign(event: FormEvent) {
-    event.preventDefault();
-    if (assign.productId === "") {
-      setMsg({ error: "Elegí un producto para asignar.", ok: null });
-      return;
-    }
-    const success = await act(
-      () =>
-        assignProduct(
-          storeId,
-          Number(assign.productId),
-          assign.threshold === "" ? null : Number(assign.threshold),
-        ),
-      "Producto asignado a la tienda.",
-    );
-    if (success) {
-      setAssign({ productId: "", threshold: "" });
-      setModal(null);
-    }
   }
 
   // --- movimiento
@@ -494,7 +405,7 @@ export function InventoryPage() {
         required
         showQuantityFilter
         autoFocusSearch
-        emptyHint="La tienda no tiene productos asignados. Usá «Asignar producto» primero."
+        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
       />
       {selectedStock !== null && (
         <p className="-mt-3 mb-3 text-xs text-gray-500">
@@ -548,38 +459,6 @@ export function InventoryPage() {
     </form>
   );
 
-  const assignForm = (
-    <form onSubmit={onAssign}>
-      <ProductPicker
-        label="Producto"
-        value={assign.productId}
-        onChange={(value) => setAssign({ ...assign, productId: value })}
-        options={productPickerOptions}
-        loading={products.loading}
-        error={products.error}
-        required
-        autoFocusSearch
-        emptyHint="No hay productos activos en el registro."
-      />
-      <Field label="Umbral de alerta (opcional)">
-        <input
-          className={inputClass}
-          type="number"
-          min="0"
-          step="0.001"
-          value={assign.threshold}
-          onChange={(e) => setAssign({ ...assign, threshold: e.target.value })}
-        />
-      </Field>
-      <p className="-mt-2 mb-4 text-xs text-gray-500">
-        Si el producto ya está asignado, se actualiza el umbral.
-      </p>
-      <button className={buttonClass} type="submit" disabled={busy}>
-        {busy ? "Asignando…" : "Asignar producto"}
-      </button>
-    </form>
-  );
-
   const priceForm = (
     <form onSubmit={onPrice}>
       <ProductPicker
@@ -592,7 +471,7 @@ export function InventoryPage() {
         required
         showQuantityFilter
         autoFocusSearch
-        emptyHint="La tienda no tiene productos asignados. Usá «Asignar producto» primero."
+        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
       />
       {selectedPrice !== null && (
         <p className="-mt-3 mb-3 text-xs text-gray-500">
@@ -647,7 +526,7 @@ export function InventoryPage() {
             {storeName.data ?? `Tienda #${storeId}`}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
-            Stock, movimientos y precios de la tienda en un solo lugar.
+            Productos, movimientos y precios de la tienda en un solo lugar.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -672,12 +551,12 @@ export function InventoryPage() {
           <button
             className={secondaryButtonClass}
             type="button"
-            onClick={() => openModal("assign")}
+            onClick={() => setTab("products")}
           >
             <Icon>
               <path d="M12 5v14M5 12h14" />
             </Icon>
-            Asignar producto
+            Productos de la tienda
           </button>
           <Link className={secondaryButtonClass} to={`/tiendas/${storeId}/qr`}>
             <Icon>
@@ -691,38 +570,21 @@ export function InventoryPage() {
 
       <Status error={msg.error} ok={msg.ok} />
 
-      <InventoryTabBar active={tab} onChange={setTab} stockCount={stock.count} />
+      <InventoryTabBar active={tab} onChange={setTab} />
 
-      {tab === "stock" && (
+      {tab === "products" && (
         <section
           role="tabpanel"
-          id="inventory-panel-stock"
-          aria-labelledby="inventory-tab-stock"
+          id="inventory-panel-products"
+          aria-labelledby="inventory-tab-products"
           className={PANEL_CLASS}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold tracking-tight text-gray-900">
-                Productos en inventario
-              </h2>
-              <p className="text-xs text-gray-500">
-                Cantidad, umbral de alerta y vencimiento por producto.
-              </p>
-            </div>
-            <span className="text-xs font-medium text-gray-500">
-              {stock.count === null ? "—" : `${stock.count} productos`}
-            </span>
-          </div>
-          <DataTable
-            columns={STOCK_COLUMNS}
-            rows={stock.rows}
-            rowKey={(row) => String(row.product_id)}
-            loading={stock.loading}
-            error={stock.error}
-            emptyTitle="La tienda no tiene productos asignados"
-            emptyHint="Usá «Asignar producto» para sumar el primero al inventario."
+          <StoreCatalogPanel
+            storeId={storeId}
+            storeName={storeName.data ?? `Tienda #${storeId}`}
+            reloadToken={catalogVersion}
+            onChanged={() => stockOptions.reload()}
           />
-          <Pager list={stock} />
         </section>
       )}
 
@@ -883,13 +745,6 @@ export function InventoryPage() {
               {movementForm}
             </PremiumLock>
           )}
-        </Modal>
-      )}
-
-      {modal === "assign" && (
-        <Modal title="Asignar producto a la tienda" onClose={() => setModal(null)}>
-          <Status error={msg.error} />
-          {assignForm}
         </Modal>
       )}
 

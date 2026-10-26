@@ -1,9 +1,9 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
-import { pageRange, type ListQuery, type ListResult } from "../../shared/lib/list";
 import { supabase } from "../../shared/lib/supabase/client";
 
-// Inventario por tienda: asignación (stock), movimientos (register_entry/exit,
-// register_reverse), precios (set_price) y alertas abiertas de la tienda.
+// Inventario por tienda: movimientos (register_entry/exit, register_reverse),
+// precios (set_price) y selectores de productos asignados. El catálogo y la
+// asignación viven en la feature products (StoreCatalogPanel) desde 0024.
 // Toda escritura va por RPC; las lecturas las filtra la RLS por rol/alcance.
 
 type Err = { message: string } | null;
@@ -11,13 +11,6 @@ type Err = { message: string } | null;
 export interface StoreOption {
   id: number;
   name: string;
-}
-export interface StockRow {
-  product_id: number;
-  product_name: string;
-  quantity: number;
-  threshold: number | null;
-  expiry_date: string | null;
 }
 export interface StockOptionRow {
   product_id: number;
@@ -38,11 +31,6 @@ export interface MotiveOption {
   id: number;
   name: string;
   suggested_type: "entry" | "exit" | null;
-}
-export interface ProductOption {
-  id: number;
-  name: string;
-  brand: string | null;
 }
 export interface PriceRow {
   product_id: number;
@@ -88,27 +76,6 @@ export async function fetchStoreName(storeId: number): Promise<LoadResult<string
     .eq("id", storeId)
     .maybeSingle();
   return { data: data ? String((data as { name: unknown }).name) : null, error };
-}
-
-/** Página del stock de la tienda (useList). El total es 'planned', no exacto. */
-export async function fetchStock(storeId: number, query: ListQuery): Promise<ListResult<StockRow>> {
-  const { from, to } = pageRange(query);
-  const { data, error, count } = await supabase
-    .from("stock")
-    .select("product_id,quantity,threshold,expiry_date,product:products(name)", {
-      count: "planned",
-    })
-    .eq("store_id", storeId)
-    .order("product_id")
-    .range(from, to);
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    product_id: Number(r.product_id),
-    product_name: relName(r.product),
-    quantity: Number(r.quantity),
-    threshold: r.threshold === null ? null : Number(r.threshold),
-    expiry_date: (r.expiry_date as string | null) ?? null,
-  }));
-  return { rows, count: count ?? null, error };
 }
 
 /**
@@ -160,24 +127,6 @@ export async function fetchMotives(): Promise<LoadResult<MotiveOption[]>> {
   return { data: (data ?? []) as MotiveOption[], error };
 }
 
-export async function fetchActiveProducts(): Promise<LoadResult<ProductOption[]>> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("id,name,brand:brands(name)")
-    .eq("is_active", true)
-    .order("name")
-    .limit(500);
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => {
-    const brand = relName(r.brand);
-    return {
-      id: Number(r.id),
-      name: String(r.name ?? ""),
-      brand: brand === "" ? null : brand,
-    };
-  });
-  return { data: rows, error };
-}
-
 export async function fetchPrices(storeId: number): Promise<LoadResult<PriceRow[]>> {
   const { data, error } = await supabase
     .from("price_publications")
@@ -192,19 +141,6 @@ export async function fetchPrices(storeId: number): Promise<LoadResult<PriceRow[
     currency: String(r.currency),
   }));
   return { data: rows, error };
-}
-
-export async function assignProduct(
-  storeId: number,
-  productId: number,
-  threshold: number | null,
-): Promise<{ error: Err }> {
-  const { error } = await supabase.rpc("assign_product_to_store", {
-    p_product: productId,
-    p_store: storeId,
-    p_threshold: threshold,
-  });
-  return { error };
 }
 
 export interface MovementInput {

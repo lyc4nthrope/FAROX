@@ -21,7 +21,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Asignar tiendas a un trabajador | Usuarios → usuario → tiendas | (pendiente en la UI; hoy por SQL) |
 | Crear catálogos | Catálogos | Marcas, categorías, unidades, tipos de tienda, motivos |
 | Crear distribuidores | Distribuidores → Nuevo | Nombre + NIT único |
-| Poner precio a un producto en una tienda | Inventario → tienda → Precios | Obligatorio antes de que esa tienda pueda pedir ese producto |
+| Poner precio a un producto en una tienda | Inventario → tienda → Precios | Opcional para pedir: el operador puede solicitar sin precio y el distribuidor cotiza |
 | Revertir un movimiento equivocado | Inventario → tienda → Últimos movimientos → Revertir | Pide motivo; el original queda en el historial |
 | Planificar la ruta del día | Rutas → Planificar ruta | Distribuidor, fecha, tiendas en orden (↑ ↓), hora estimada |
 | Iniciar o cancelar una ruta | Rutas → ruta | "Iniciar ruta" (el distribuidor solo puede terminar rutas iniciadas) |
@@ -34,14 +34,16 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 
 | Quiero… | Dónde | Cómo |
 |---|---|---|
-| Ver el stock y su estado | Inventario → mi tienda | OK / Bajo / Agotado según el umbral |
-| Agregar un producto a mi tienda | Inventario → Asignar producto | Umbral opcional para recibir alertas |
+| Ver el stock y su estado | Inventario → mi tienda → Productos | OK / Bajo / Agotado según el umbral |
+| Agregar productos a mi tienda | Inventario → mi tienda → Productos → Agregar productos | Buscá en el registro; el umbral se edita en la misma tabla |
+| Editar cantidad, umbral o faltante | Inventario → mi tienda → Productos | La cantidad se ajusta sin movimiento; el umbral vacío lo deja sin alerta |
+| Quitar un producto de mi tienda | Inventario → mi tienda → Productos → Quitar | Con stock pide doble confirmación y descarta las existencias |
 | Registrar una venta o una compra | Inventario → Registrar entrada o salida | Tipo, producto, cantidad, motivo (y vencimiento en entradas). **Requiere Premium** |
 | Ver qué se está agotando | Alertas | Marcar leída cuando la revise |
-| Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados (solo los que tienen precio) |
+| Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados |
 | Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |
 | Vincular un distribuidor | Distribuidores → Vincular otro distribuidor | Compartí el QR o dictá el código; el distribuidor lo escanea o lo escribe |
-| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. Cada producto necesita precio activo (lo pone el admin); si no lo tiene, aparece deshabilitado |
+| Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → solo productos que estén en el catálogo del distribuidor **y** en el stock de la tienda. No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza |
 | Mandar el pedido a ruta | Pedidos → pedido → Marcar en ruta | |
 | Recibir un pedido | Pedidos → pedido → Confirmar entrega | Cantidad recibida por producto (puede ser parcial); el stock sube solo |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
@@ -58,6 +60,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora |
+| Cotizar un pedido | Mis pedidos → pedido pendiente → Cotización del distribuidor | Precio por producto; podés dejar líneas sin precio y completarlas luego |
 | Confirmar una entrega | Mis pedidos → pedido → Confirmar entrega | Cantidades recibidas por producto |
 
 ## Guion corto de demo (H1 → H3)

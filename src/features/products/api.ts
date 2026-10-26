@@ -307,6 +307,8 @@ function normalizeCatalogEntry(
   raw: Record<string, unknown>,
   quantity: number | null,
   is_shortage: boolean,
+  threshold: number | null = null,
+  expiryDate: string | null = null,
 ): CatalogEntry {
   const embedded = raw.product;
   const product =
@@ -320,7 +322,7 @@ function normalizeCatalogEntry(
           unit: null,
           category: null,
         };
-  return { ...product, quantity, is_shortage };
+  return { ...product, quantity, is_shortage, threshold, expiry_date: expiryDate };
 }
 
 function normalizeShortageRow(raw: Record<string, unknown>): ShortageRow {
@@ -386,9 +388,12 @@ export async function fetchStoreCatalog(
   const { from, to } = pageRange(query);
   let request = supabase
     .from("stock")
-    .select(`product_id, quantity, is_shortage, ${CATALOG_PRODUCT_SELECT}`, {
-      count: "planned",
-    })
+    .select(
+      `product_id, quantity, threshold, expiry_date, is_shortage, ${CATALOG_PRODUCT_SELECT}`,
+      {
+        count: "planned",
+      },
+    )
     .eq("store_id", storeId);
   if (query.q.trim() !== "") {
     request = request.ilike("product.name", likePattern(query.q));
@@ -408,6 +413,10 @@ export async function fetchStoreCatalog(
       raw,
       normalizeQuantity(raw.quantity),
       raw.is_shortage === true,
+      raw.threshold === null || raw.threshold === undefined
+        ? null
+        : normalizeQuantity(raw.threshold),
+      typeof raw.expiry_date === "string" ? raw.expiry_date : null,
     ),
   );
   return { rows, count, error: null };
@@ -523,6 +532,21 @@ export async function setStoreProductShortage(
     p_product: productId,
     p_store: storeId,
     p_shortage: shortage,
+  });
+  return { error };
+}
+
+// 0024 — umbral de alerta editable desde el inventario unificado. Acepta null
+// para dejarlo sin umbral (assign_product_to_store conserva el anterior).
+export async function setStoreProductThreshold(
+  storeId: number,
+  productId: number,
+  threshold: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_stock_threshold", {
+    p_product: productId,
+    p_store: storeId,
+    p_threshold: threshold,
   });
   return { error };
 }

@@ -43,10 +43,12 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     cleanup();
   });
 
-  it("operador: distribuidores, productos y tiendas; sin /users", async () => {
+  it("operador: distribuidores, inventario y tiendas; sin /users ni /products", async () => {
     renderShell("operador");
     expect(await screen.findByRole("link", { name: "Distribuidores" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Productos" })).toBeInTheDocument();
+    // 0024: Productos se fusionó en Inventario.
+    expect(screen.queryByRole("link", { name: "Productos" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Inventario" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tiendas" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Perfil" })).toBeInTheDocument();
@@ -98,7 +100,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
   it("ADM-11.2: premium false sin rol admin ⇒ sin insignia", async () => {
     renderShell("operador", false);
 
-    expect(await screen.findByRole("link", { name: "Productos" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Inventario" })).toBeInTheDocument();
     expect(screen.queryByText("Premium")).not.toBeInTheDocument();
   });
 

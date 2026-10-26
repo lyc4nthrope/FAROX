@@ -26,7 +26,6 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     const visibles = visibleNavItems("operador").map((item) => item.to);
     expect(visibles).toEqual([
       "/distributors",
-      "/products",
       "/stores",
       "/inventario",
       "/alertas",
@@ -38,6 +37,8 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     for (const adminOnly of ["/users", "/roles", "/catalogs", "/audit", "/rutas"]) {
       expect(visibles).not.toContain(adminOnly);
     }
+    // 0024: Productos se fusionó en Inventario.
+    expect(visibles).not.toContain("/products");
   });
 
   it("distribuidor: su ruta, sus pedidos, alertas, dashboard y productos (lectura)", () => {

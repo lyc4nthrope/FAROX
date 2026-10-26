@@ -35,6 +35,10 @@ export interface StoreOption {
 // (null para el distribuidor, que no maneja inventario).
 export interface CatalogEntry extends ProductListRow {
   quantity: number | null;
+  // stock.threshold / stock.expiry_date: solo el catálogo de tienda los trae
+  // (el distribuidor no maneja inventario ⇒ ausentes/null).
+  threshold?: number | null;
+  expiry_date?: string | null;
   // stock.is_shortage (0022): el operador marcó que le falta este producto.
   // El catálogo del distribuidor no maneja inventario ⇒ siempre false.
   is_shortage: boolean;

@@ -8,6 +8,7 @@ import * as authApi from "../../auth/api";
 import * as productsApi from "../api";
 import type { CatalogEntry, ProductListRow } from "../types";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
+import { MyCatalogPage } from "./MyCatalogPage";
 import { ProductsPage } from "./ProductsPage";
 
 // D7 (componente, api de la feature mockeada COMPLETA): /products ya no es la
@@ -53,7 +54,13 @@ const FILA: ProductListRow = {
   category: { id: 1, name: "Bebidas" },
 };
 
-const ENTRADA_TIENDA: CatalogEntry = { ...FILA, quantity: 0, is_shortage: false };
+const ENTRADA_TIENDA: CatalogEntry = {
+  ...FILA,
+  quantity: 0,
+  threshold: null,
+  expiry_date: null,
+  is_shortage: false,
+};
 
 const OTRO_PRODUCTO: ProductListRow = {
   id: 2,
@@ -71,11 +78,16 @@ const SIN_FILTROS = { q: "", categoryId: null, onlyShortage: false };
 function renderPagina(role: RoleName) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  // 0024: el operador ya no llega a /products (redirige a /inventario), pero el
+  // catálogo por entidad sigue usándose para el distribuidor y el rol nulo. Los
+  // casos de tienda se montan sobre MyCatalogPage directamente.
+  const element = role === "operador" ? <MyCatalogPage /> : <ProductsPage />;
   return render(
     <MemoryRouter initialEntries={["/products"]}>
       <AuthProvider>
         <Routes>
-          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products" element={element} />
+          <Route path="/inventario" element={<p>Inventario destino</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -115,7 +127,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       error: null,
     });
     vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-      rows: [{ ...FILA, quantity: null, is_shortage: false }],
+      rows: [{ ...FILA, quantity: null, threshold: null, expiry_date: null, is_shortage: false }],
       count: 1,
       error: null,
     });
@@ -137,6 +149,25 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("operador: /products redirige a /inventario (0024)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "operador", premium: false });
+
+    render(
+      <MemoryRouter initialEntries={["/products"]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/inventario" element={<p>Inventario destino</p>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Inventario destino")).toBeInTheDocument();
+    expect(productsApi.fetchCatalogContext).not.toHaveBeenCalled();
   });
 
   it("admin: vista GENERAL con todos los productos + alta del catálogo global", async () => {

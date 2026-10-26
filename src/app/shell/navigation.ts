@@ -55,7 +55,11 @@ const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
 export function visibleNavItems(role: RoleName | null): NavItem[] {
   if (role === "admin") return [...NAV_ITEMS];
   if (role === "operador") {
-    return NAV_ITEMS.filter((item) => !ADMIN_ONLY_PATHS.has(item.to));
+    // 0024: el catálogo y la asignación de productos viven en /inventario
+    // (pestaña «Productos»); /products redirige ahí, así que no va en el nav.
+    return NAV_ITEMS.filter(
+      (item) => !ADMIN_ONLY_PATHS.has(item.to) && item.to !== "/products",
+    );
   }
   if (role === "distribuidor") return [...DISTRIBUTOR_ITEMS];
   return [{ to: "/products", label: "Productos" }];

@@ -2,9 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
 import {
-  assignProduct,
-  fetchActiveProducts,
-  fetchStock,
   fetchStockOptions,
   registerMovement,
   reverseMovement,
@@ -54,64 +51,9 @@ describe("inventory api — stock paginado", () => {
       { product_id: 10, product_name: "Arroz Diana", brand: "Diana", quantity: 12 },
     ]);
   });
-
-  it("fetchActiveProducts trae la marca embebida", async () => {
-    const builder = {
-      select: vi.fn(),
-      eq: vi.fn(),
-      order: vi.fn(),
-      limit: vi.fn().mockResolvedValue({
-        data: [{ id: 10, name: "Arroz Diana", brand: { name: "Diana" } }],
-        error: null,
-      }),
-    };
-    builder.select.mockReturnValue(builder);
-    builder.eq.mockReturnValue(builder);
-    builder.order.mockReturnValue(builder);
-    from.mockReturnValue(builder);
-
-    const result = await fetchActiveProducts();
-
-    expect(builder.select).toHaveBeenCalledWith("id,name,brand:brands(name)");
-    expect(result.data).toEqual([{ id: 10, name: "Arroz Diana", brand: "Diana" }]);
-  });
-
-  it("usa range() y count planned, nunca limit()", async () => {
-    const range = vi.fn().mockResolvedValue({ data: [], error: null, count: 3 });
-    const builder = {
-      select: vi.fn(),
-      eq: vi.fn(),
-      order: vi.fn(),
-      range,
-    };
-    builder.select.mockReturnValue(builder);
-    builder.eq.mockReturnValue(builder);
-    builder.order.mockReturnValue(builder);
-    from.mockReturnValue(builder);
-
-    const result = await fetchStock(3, { page: 2, pageSize: 25 });
-
-    expect(builder.select).toHaveBeenCalledWith(
-      "product_id,quantity,threshold,expiry_date,product:products(name)",
-      { count: "planned" },
-    );
-    expect(builder.eq).toHaveBeenCalledWith("store_id", 3);
-    expect(builder.order).toHaveBeenCalledWith("product_id");
-    expect(range).toHaveBeenCalledWith(50, 74);
-    expect(result).toEqual({ rows: [], count: 3, error: null });
-  });
 });
 
 describe("inventory api — contrato exacto de las RPC", () => {
-  it("assign_product_to_store con umbral nulo cuando no se indica", async () => {
-    await assignProduct(3, 10, null);
-    expect(rpc).toHaveBeenCalledWith("assign_product_to_store", {
-      p_product: 10,
-      p_store: 3,
-      p_threshold: null,
-    });
-  });
-
   it("una entrada usa register_entry con vencimiento", async () => {
     await registerMovement({
       type: "entry",
