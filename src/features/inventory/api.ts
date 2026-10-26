@@ -1,4 +1,5 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
+import { pageRange, type ListQuery, type ListResult } from "../../shared/lib/list";
 import { supabase } from "../../shared/lib/supabase/client";
 
 // Inventario por tienda: asignación (stock), movimientos (register_entry/exit,
@@ -18,6 +19,12 @@ export interface StockRow {
   threshold: number | null;
   expiry_date: string | null;
 }
+export interface StockOptionRow {
+  product_id: number;
+  product_name: string;
+  brand: string | null;
+  quantity: number;
+}
 export interface MovementRow {
   id: number;
   type: "entry" | "exit";
@@ -35,6 +42,7 @@ export interface MotiveOption {
 export interface ProductOption {
   id: number;
   name: string;
+  brand: string | null;
 }
 export interface PriceRow {
   product_id: number;
@@ -49,6 +57,13 @@ function relName(value: unknown): string {
     return typeof name === "string" ? name : "";
   }
   return "";
+}
+
+/** Marca embebida en product: { brand: { name } }. */
+function relBrand(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("brand" in value)) return null;
+  const brand = relName((value as { brand: unknown }).brand);
+  return brand === "" ? null : brand;
 }
 
 /** Tiendas sobre las que el usuario opera: admin todas; operador su alcance. */
@@ -67,23 +82,52 @@ export async function fetchMyStores(isAdmin: boolean): Promise<LoadResult<StoreO
 }
 
 export async function fetchStoreName(storeId: number): Promise<LoadResult<string>> {
-  const { data, error } = await supabase.from("stores").select("name").eq("id", storeId).maybeSingle();
+  const { data, error } = await supabase
+    .from("stores")
+    .select("name")
+    .eq("id", storeId)
+    .maybeSingle();
   return { data: data ? String((data as { name: unknown }).name) : null, error };
 }
 
-export async function fetchStock(storeId: number): Promise<LoadResult<StockRow[]>> {
-  const { data, error } = await supabase
+/** Página del stock de la tienda (useList). El total es 'planned', no exacto. */
+export async function fetchStock(storeId: number, query: ListQuery): Promise<ListResult<StockRow>> {
+  const { from, to } = pageRange(query);
+  const { data, error, count } = await supabase
     .from("stock")
-    .select("product_id,quantity,threshold,expiry_date,product:products(name)")
+    .select("product_id,quantity,threshold,expiry_date,product:products(name)", {
+      count: "planned",
+    })
     .eq("store_id", storeId)
     .order("product_id")
-    .limit(500);
+    .range(from, to);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     product_id: Number(r.product_id),
     product_name: relName(r.product),
     quantity: Number(r.quantity),
     threshold: r.threshold === null ? null : Number(r.threshold),
     expiry_date: (r.expiry_date as string | null) ?? null,
+  }));
+  return { rows, count: count ?? null, error };
+}
+
+/**
+ * Productos asignados a la tienda para los selectores de movimiento y precio.
+ * No se pagina: el formulario necesita poder elegir cualquier producto asignado,
+ * no solo los de la página visible del inventario.
+ */
+export async function fetchStockOptions(storeId: number): Promise<LoadResult<StockOptionRow[]>> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select("product_id,quantity,product:products(name, brand:brands(name))")
+    .eq("store_id", storeId)
+    .order("product_id")
+    .limit(500);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    product_id: Number(r.product_id),
+    product_name: relName(r.product),
+    brand: relBrand(r.product),
+    quantity: Number(r.quantity),
   }));
   return { data: rows, error };
 }
@@ -119,11 +163,19 @@ export async function fetchMotives(): Promise<LoadResult<MotiveOption[]>> {
 export async function fetchActiveProducts(): Promise<LoadResult<ProductOption[]>> {
   const { data, error } = await supabase
     .from("products")
-    .select("id,name")
+    .select("id,name,brand:brands(name)")
     .eq("is_active", true)
     .order("name")
     .limit(500);
-  return { data: (data ?? []) as ProductOption[], error };
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const brand = relName(r.brand);
+    return {
+      id: Number(r.id),
+      name: String(r.name ?? ""),
+      brand: brand === "" ? null : brand,
+    };
+  });
+  return { data: rows, error };
 }
 
 export async function fetchPrices(storeId: number): Promise<LoadResult<PriceRow[]>> {

@@ -41,6 +41,10 @@ export interface Option {
   id: number;
   name: string;
 }
+export interface StoreProductOption extends Option {
+  brand: string | null;
+  quantity: number | null;
+}
 export interface CreditRow {
   id: number;
   order_id: number;
@@ -64,6 +68,13 @@ function relName(value: unknown): string {
     return typeof name === "string" ? name : "";
   }
   return "";
+}
+
+/** Marca embebida en product: { brand: { name } }. */
+function relBrand(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("brand" in value)) return null;
+  const brand = relName((value as { brand: unknown }).brand);
+  return brand === "" ? null : brand;
 }
 
 const ORDER_COLUMNS =
@@ -145,15 +156,19 @@ export async function fetchDistributorOptions(): Promise<LoadResult<Option[]>> {
 }
 
 /** Productos asignados a la tienda (stock) — los únicos que tiene sentido pedir. */
-export async function fetchStoreProducts(storeId: number): Promise<LoadResult<Option[]>> {
+export async function fetchStoreProducts(
+  storeId: number,
+): Promise<LoadResult<StoreProductOption[]>> {
   const { data, error } = await supabase
     .from("stock")
-    .select("product_id,product:products(name)")
+    .select("product_id,quantity,product:products(name, brand:brands(name))")
     .eq("store_id", storeId)
     .limit(500);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.product_id),
     name: relName(r.product),
+    brand: relBrand(r.product),
+    quantity: Number(r.quantity),
   }));
   return { data: rows, error };
 }
@@ -166,7 +181,9 @@ export interface NewOrderInput {
   notes: string | null;
 }
 
-export async function createOrder(input: NewOrderInput): Promise<{ data: number | null; error: Err }> {
+export async function createOrder(
+  input: NewOrderInput,
+): Promise<{ data: number | null; error: Err }> {
   const { data, error } = await supabase.rpc("create_order", {
     p_distributor: input.distributorId,
     p_store: input.storeId,
@@ -227,7 +244,10 @@ export async function fetchPayments(creditId: number): Promise<LoadResult<Paymen
   return { data: (data ?? []) as PaymentRow[], error };
 }
 
-export async function createCredit(orderId: number, dueDate: string | null): Promise<{ error: Err }> {
+export async function createCredit(
+  orderId: number,
+  dueDate: string | null,
+): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("create_credit", { p_order: orderId, p_due_date: dueDate });
   return { error };
 }

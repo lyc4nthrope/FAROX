@@ -58,7 +58,7 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(ordersApi.fetchStoreProducts).mockResolvedValue({
-    data: [{ id: 10, name: "Arroz" }],
+    data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12 }],
     error: null,
   });
   vi.mocked(storeLinksApi.fetchLinkedDistributorOptions).mockResolvedValue({
@@ -67,8 +67,8 @@ beforeEach(() => {
   });
   vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
     data: [
-      { id: 10, name: "Arroz", price: 4500 },
-      { id: 11, name: "Aceite", price: null },
+      { id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 },
+      { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
     ],
     error: null,
   });
@@ -96,6 +96,28 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(arroz).toHaveTextContent("4.500");
     expect(screen.getByRole("option", { name: "Aceite (sin precio)" })).toBeDisabled();
     expect(product).toHaveValue("");
+  });
+
+  it("operador: busca productos por marca y por cantidad en stock", async () => {
+    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
+      data: [
+        { id: 10, name: "Arroz", brand: "Diana", quantity: 12, price: 4500 },
+        { id: 11, name: "Aceite", brand: "Premier", quantity: 0, price: 3000 },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    const search = await screen.findByLabelText("Buscar producto 1");
+    await user.type(search, "premier");
+    expect(screen.queryByRole("option", { name: /^Arroz/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Aceite/ })).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(screen.getByLabelText("Cantidad mínima de producto 1"), "5");
+    expect(screen.getByRole("option", { name: /^Arroz/ })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /^Aceite/ })).not.toBeInTheDocument();
   });
 
   it("operador sin vínculos: explica que debe vincular un distribuidor", async () => {
@@ -130,8 +152,8 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
   it("operador sin ningún producto con precio: lo dice en plural", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [
-        { id: 10, name: "Arroz", price: null },
-        { id: 11, name: "Aceite", price: null },
+        { id: 10, name: "Arroz", brand: null, quantity: null, price: null },
+        { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
       ],
       error: null,
     });
@@ -144,7 +166,7 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
 
   it("operador con todos los productos con precio: no muestra el aviso", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
-      data: [{ id: 10, name: "Arroz", price: 4500 }],
+      data: [{ id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 }],
       error: null,
     });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
@@ -175,7 +197,7 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     renderPage("admin", "/pedidos/nuevo?storeId=3");
 
     expect(await screen.findByRole("option", { name: "Distribuidora Global" })).toBeInTheDocument();
-    expect(await screen.findByRole("option", { name: "Arroz" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /^Arroz/ })).toBeInTheDocument();
     expect(ordersApi.fetchDistributorOptions).toHaveBeenCalledTimes(1);
     expect(ordersApi.fetchStoreProducts).toHaveBeenCalledWith(3);
     expect(storeLinksApi.fetchStoreDistributorProducts).not.toHaveBeenCalled();
@@ -189,7 +211,9 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     await waitFor(() => expect(screen.getByLabelText("Producto 1")).toHaveValue("10"));
     expect(screen.getByLabelText("Cantidad 1")).toHaveValue(1);
     expect(
-      screen.getByText("Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades."),
+      screen.getByText(
+        "Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.",
+      ),
     ).toBeInTheDocument();
     // El 11 venía en la lista pero no tiene precio activo: no se precarga.
     expect(screen.queryByLabelText("Producto 2")).not.toBeInTheDocument();

@@ -6,6 +6,21 @@ import { supabase } from "../../shared/lib/supabase/client";
 
 type Err = { message: string } | null;
 
+function relName(value: unknown): string {
+  if (value !== null && typeof value === "object" && "name" in value) {
+    const name = (value as { name: unknown }).name;
+    return typeof name === "string" ? name : "";
+  }
+  return "";
+}
+
+/** Marca embebida en product: { brand: { name } }. */
+function relBrand(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("brand" in value)) return null;
+  const brand = relName((value as { brand: unknown }).brand);
+  return brand === "" ? null : brand;
+}
+
 export interface LinkedDistributor {
   distributor_id: number;
   name: string;
@@ -25,6 +40,8 @@ export interface LinkedDistributorOption {
 export interface RequestableProduct {
   id: number;
   name: string;
+  brand: string | null;
+  quantity: number | null;
   /** null = el producto está en ambos catálogos pero no tiene precio activo. */
   price: number | null;
 }
@@ -67,7 +84,10 @@ export async function linkToStore(code: string): Promise<{ data: number | null; 
   return { data: data == null ? null : Number(data), error };
 }
 
-export async function unlinkDistributor(storeId: number, distributorId: number): Promise<{ error: Err }> {
+export async function unlinkDistributor(
+  storeId: number,
+  distributorId: number,
+): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("unlink_distributor", {
     p_store: storeId,
     p_distributor: distributorId,
@@ -75,7 +95,9 @@ export async function unlinkDistributor(storeId: number, distributorId: number):
   return { error };
 }
 
-export async function fetchLinkedDistributors(storeId: number): Promise<LoadResult<LinkedDistributor[]>> {
+export async function fetchLinkedDistributors(
+  storeId: number,
+): Promise<LoadResult<LinkedDistributor[]>> {
   const { data, error } = await supabase
     .from("store_distributors")
     .select("distributor_id,created_at,distributor:distributors(name)")
@@ -119,10 +141,45 @@ export async function fetchStoreDistributorProducts(
     p_store: storeId,
     p_distributor: distributorId,
   });
+  if (error !== null) {
+    return { data: null, error };
+  }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.product_id),
     name: String(r.name ?? ""),
     price: r.price == null ? null : Number(r.price),
   }));
-  return { data: rows, error };
+  if (rows.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // La RPC de intersección no expone marca/stock. Se completan con una lectura
+  // de stock de la tienda (la misma RLS que ya usa el operador), para que el
+  // selector pueda buscar por marca y filtrar por cantidad.
+  const { data: stockData, error: stockError } = await supabase
+    .from("stock")
+    .select("product_id,quantity,product:products(brand:brands(name))")
+    .eq("store_id", storeId)
+    .in(
+      "product_id",
+      rows.map((row) => row.id),
+    );
+  if (stockError !== null) {
+    return { data: null, error: stockError };
+  }
+  const meta = new Map<number, { brand: string | null; quantity: number | null }>();
+  for (const raw of (stockData ?? []) as Record<string, unknown>[]) {
+    meta.set(Number(raw.product_id), {
+      brand: relBrand(raw.product),
+      quantity: raw.quantity == null ? null : Number(raw.quantity),
+    });
+  }
+  return {
+    data: rows.map((row) => ({
+      ...row,
+      brand: meta.get(row.id)?.brand ?? null,
+      quantity: meta.get(row.id)?.quantity ?? null,
+    })),
+    error: null,
+  };
 }

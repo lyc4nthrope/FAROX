@@ -20,7 +20,10 @@ type Mock = ReturnType<typeof vi.fn>;
 
 function chain(result: Result) {
   const stub = {} as Record<string, Mock> & {
-    then: (ok?: (value: unknown) => unknown, err?: (reason: unknown) => unknown) => Promise<unknown>;
+    then: (
+      ok?: (value: unknown) => unknown,
+      err?: (reason: unknown) => unknown,
+    ) => Promise<unknown>;
   };
   for (const method of ["select", "in", "eq", "order", "limit"]) {
     stub[method] = vi.fn(() => stub);
@@ -132,9 +135,34 @@ describe("store-links api · tiendas y distribuidores vinculados", () => {
     });
     expect(result).toEqual({
       data: [
-        { id: 10, name: "Arroz", price: 4500 },
-        { id: 11, name: "Aceite", price: null },
+        { id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 },
+        { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
       ],
+      error: null,
+    });
+  });
+
+  it("fetchStoreDistributorProducts completa marca y stock desde la tabla stock", async () => {
+    rpc.mockResolvedValue({
+      data: [{ product_id: 10, name: "Arroz", price: 4500 }],
+      error: null,
+    });
+    const stock = chain({
+      data: [{ product_id: 10, quantity: 12, product: { brand: { name: "Diana" } } }],
+      error: null,
+    });
+    from.mockReturnValue(stock);
+
+    const result = await fetchStoreDistributorProducts(3, 7);
+
+    expect(from).toHaveBeenCalledWith("stock");
+    expect(stock.select).toHaveBeenCalledWith(
+      "product_id,quantity,product:products(brand:brands(name))",
+    );
+    expect(stock.eq).toHaveBeenCalledWith("store_id", 3);
+    expect(stock.in).toHaveBeenCalledWith("product_id", [10]);
+    expect(result).toEqual({
+      data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12, price: 4500 }],
       error: null,
     });
   });

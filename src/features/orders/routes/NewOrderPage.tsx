@@ -4,7 +4,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
-import { formatCOP } from "../../../shared/lib/format";
 import {
   Box,
   Field,
@@ -13,6 +12,7 @@ import {
   inputClass,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
+import { ProductPicker, type ProductPickerOption } from "../../../shared/ui";
 import {
   fetchStoreDistributorProducts,
   fetchLinkedDistributorOptions,
@@ -30,13 +30,11 @@ interface Line {
   quantity: string;
 }
 
-type ProductOption = Option & { price?: number | null };
-
-function productLabel(product: ProductOption): string {
-  if (product.price === null) return `${product.name} (sin precio)`;
-  if (product.price === undefined) return product.name;
-  return `${product.name} — ${formatCOP(product.price)}`;
-}
+type ProductOption = Option & {
+  brand: string | null;
+  quantity: number | null;
+  price?: number | null;
+};
 
 function idParam(value: string | null): string {
   return value !== null && /^\d+$/.test(value) && Number(value) > 0 ? value : "";
@@ -163,6 +161,19 @@ export function NewOrderPage() {
   // selector solo muestra opciones deshabilitadas y no explica por qué.
   const unpricedCount = products.data?.filter((p) => p.price === null).length ?? 0;
 
+  const pickerOptions = useMemo<ProductPickerOption[]>(
+    () =>
+      (products.data ?? []).map((product) => ({
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        quantity: product.quantity,
+        price: product.price,
+        disabled: product.price === null,
+      })),
+    [products.data],
+  );
+
   return (
     <section>
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Pedidos</p>
@@ -246,19 +257,23 @@ export function NewOrderPage() {
                 key={index}
                 className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto] sm:items-end"
               >
-                <select
-                  aria-label={`Producto ${index + 1}`}
-                  className={inputClass}
+                <ProductPicker
+                  key={`${storeId}:${distributorId}:${index}`}
+                  compact
+                  label={`Producto ${index + 1}`}
+                  searchLabel={`Buscar producto ${index + 1}`}
+                  quantityLabel={`Cantidad mínima de producto ${index + 1}`}
                   value={line.productId}
-                  onChange={(e) => updateLine(index, { productId: e.target.value })}
-                >
-                  <option value="">— producto —</option>
-                  {products.data?.map((p) => (
-                    <option key={p.id} value={p.id} disabled={p.price === null}>
-                      {productLabel(p)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => updateLine(index, { productId: value })}
+                  options={pickerOptions}
+                  loading={products.loading}
+                  showQuantityFilter
+                  emptyHint={
+                    products.error === null
+                      ? "No hay productos disponibles para esta tienda y distribuidor."
+                      : undefined
+                  }
+                />
                 <input
                   aria-label={`Cantidad ${index + 1}`}
                   className={inputClass}
