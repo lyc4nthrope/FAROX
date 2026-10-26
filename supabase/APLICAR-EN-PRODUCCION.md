@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. El `supabase/seed.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. El `supabase/seed.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -79,6 +79,18 @@ UNION ALL SELECT '0022 catálogo del operador',
             WHERE proname IN ('set_store_product_quantity','remove_store_product',
                               'set_store_shortage','list_shortage_products')
               AND pronamespace = 'public'::regnamespace), false)::text
+UNION ALL SELECT '0023 faltantes solo de la tienda',
+  COALESCE((SELECT position('store_distributors' in prosrc) = 0
+            FROM pg_proc
+            WHERE proname = 'list_shortage_products'
+              AND pronamespace = 'public'::regnamespace
+            LIMIT 1), false)::text
+UNION ALL SELECT '0023 fiado del operador',
+  COALESCE((SELECT position('tienda fuera del alcance del operador' in prosrc) > 0
+            FROM pg_proc
+            WHERE proname = 'create_credit'
+              AND pronamespace = 'public'::regnamespace
+            LIMIT 1), false)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -106,6 +118,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0020 | `20261025000020_store_link_store_users.sql` | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo** | ✅ (`CREATE OR REPLACE`) |
 | 0021 | `20261025000021_store_distributor_requests.sql` | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto** | ✅ (`CREATE OR REPLACE`) |
 | 0022 | `20261025000022_catalogo_operador.sql` | `0022 … = true` — **sin esta, el operador no puede editar cantidades, marcar faltantes ni ver la vista `/faltantes`** | ✅ (`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE`) |
+| 0023 | `20261026000023_faltantes_operador_y_fiado.sql` | `0023 … = true` (los dos) — **sin esta, el distribuidor sigue viendo los faltantes de la tienda y el operador no puede crear el fiado** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
 | seed | `supabase/seed.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
@@ -161,6 +174,8 @@ SELECT has_function_privilege('authenticated','public.set_store_product_quantity
 SELECT has_function_privilege('authenticated','public.remove_store_product(bigint,bigint,boolean)','EXECUTE');             -- true
 SELECT has_function_privilege('authenticated','public.set_store_shortage(bigint,bigint,boolean)','EXECUTE');               -- true
 SELECT has_function_privilege('authenticated','public.list_shortage_products()','EXECUTE');                                -- true
+-- 0023: alcance del tablero y fiado del operador
+SELECT has_function_privilege('authenticated','public.create_credit(bigint,date)','EXECUTE');                                              -- true
 ```
 
 Y después:
@@ -181,7 +196,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas
@@ -199,7 +214,8 @@ Y después:
     public.set_store_product_quantity(bigint,bigint,numeric),
     public.remove_store_product(bigint,bigint,boolean),
     public.set_store_shortage(bigint,bigint,boolean),
-    public.list_shortage_products()
+    public.list_shortage_products(),
+    public.create_credit(bigint,date)
   TO authenticated, service_role;
   ```
 - **H1.1/H1.3/H1.4 seguirán en FAIL.** No perseguirlos: ver §4. El job `schema-check` los trata como fallos conocidos y aceptados (`ACCEPTED_FAILS` en `scripts/parse-verify-output.mjs`) y sigue fallando ante cualquier otro `[FAIL]` o ante un `RESUMEN` cuyo conteo no cuadre con las líneas del log.
