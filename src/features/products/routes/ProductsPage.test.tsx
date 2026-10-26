@@ -31,6 +31,10 @@ vi.mock("../api", () => ({
   removeStoreCatalogProduct: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   removeDistributorCatalogProduct: vi.fn(),
+  setStoreProductQuantity: vi.fn(),
+  removeStoreProduct: vi.fn(),
+  setStoreProductShortage: vi.fn(),
+  fetchShortageProducts: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -49,7 +53,7 @@ const FILA: ProductListRow = {
   category: { id: 1, name: "Bebidas" },
 };
 
-const ENTRADA_TIENDA: CatalogEntry = { ...FILA, quantity: 0 };
+const ENTRADA_TIENDA: CatalogEntry = { ...FILA, quantity: 0, is_shortage: false };
 
 const OTRO_PRODUCTO: ProductListRow = {
   id: 2,
@@ -61,6 +65,8 @@ const OTRO_PRODUCTO: ProductListRow = {
 };
 
 const ERROR_RLS = { code: "42501", message: "permission denied for table products" };
+
+const SIN_FILTROS = { q: "", categoryId: null, onlyShortage: false };
 
 function renderPagina(role: RoleName) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
@@ -76,6 +82,12 @@ function renderPagina(role: RoleName) {
   );
 }
 
+async function cajaCatalogo(): Promise<HTMLElement> {
+  return (await screen.findByRole("heading", { name: "Catálogo de Tienda Centro" })).closest(
+    "section",
+  ) as HTMLElement;
+}
+
 describe("ProductsPage (0019 · catálogo por entidad)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -84,6 +96,13 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     vi.mocked(productsApi.fetchProducts).mockResolvedValue({
       rows: [FILA],
       count: 1,
+      error: null,
+    });
+    vi.mocked(productsApi.fetchProductCategories).mockResolvedValue({
+      rows: [
+        { id: 1, name: "Bebidas" },
+        { id: 2, name: "Granos" },
+      ],
       error: null,
     });
     vi.mocked(productsApi.fetchCatalogContext).mockResolvedValue({
@@ -96,7 +115,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       error: null,
     });
     vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-      rows: [{ ...FILA, quantity: null }],
+      rows: [{ ...FILA, quantity: null, is_shortage: false }],
       count: 1,
       error: null,
     });
@@ -109,10 +128,15 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     vi.mocked(productsApi.removeStoreCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.addDistributorCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.removeDistributorCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.setStoreProductQuantity).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.removeStoreProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.setStoreProductShortage).mockResolvedValue({ error: null });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it("admin: vista GENERAL con todos los productos + alta del catálogo global", async () => {
@@ -132,6 +156,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledWith(7, {
       page: 0,
       pageSize: 25,
+      ...SIN_FILTROS,
     });
     expect(productsApi.fetchProducts).not.toHaveBeenCalled();
   });
@@ -148,6 +173,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledWith({
       page: 0,
       pageSize: 25,
+      ...SIN_FILTROS,
     });
     expect(productsApi.fetchStoreCatalog).not.toHaveBeenCalled();
   });
@@ -164,16 +190,20 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     ).toBeInTheDocument();
   });
 
-  it("agregar a la tienda: llama la RPC con la tienda y el producto, y recarga", async () => {
+  it("S2: el botón del header abre el registro y agregar suma el producto", async () => {
     const user = userEvent.setup();
     renderPagina("operador");
 
-    const boton = await screen.findByRole("button", { name: "Agregar" });
-    await user.click(boton);
+    // El registro no se pide hasta abrir el alta (no ensucia la carga).
+    expect(productsApi.fetchActiveProductsForCatalog).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
 
-    await waitFor(() =>
-      expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2),
-    );
+    const panel = (
+      await screen.findByRole("heading", { name: "Agregar productos a mi catálogo" })
+    ).closest("section") as HTMLElement;
+    await user.click(await within(panel).findByRole("button", { name: "Agregar" }));
+
+    await waitFor(() => expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2));
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
     // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
@@ -193,14 +223,14 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     await waitFor(() =>
       expect(productsApi.removeDistributorCatalogProduct).toHaveBeenCalledWith(1),
     );
-    expect(productsApi.removeStoreCatalogProduct).not.toHaveBeenCalled();
+    expect(productsApi.removeStoreProduct).not.toHaveBeenCalled();
   });
 
   it("S5: un producto INACTIVO ya asignado a la tienda se puede quitar", async () => {
     // El registro "agregar" solo lista activos; si el catálogo ocultara los
     // inactivos asignados, quedarían sin salida (dead end).
     vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
-      rows: [{ ...FILA, is_active: false, quantity: 0 }],
+      rows: [{ ...FILA, is_active: false, quantity: 0, is_shortage: false }],
       count: 1,
       error: null,
     });
@@ -210,16 +240,143 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     expect(await screen.findByRole("button", { name: "Quitar" })).toBeInTheDocument();
   });
 
-  it("S5: con existencias no se ofrece quitar (la RPC lo rechazaría)", async () => {
+  it("S5: quitar sin stock pide UNA confirmación y llama la RPC con confirm_stock=false", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    await user.click(await within(section).findByRole("button", { name: "Quitar" }));
+
+    expect(window.confirm).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(productsApi.removeStoreProduct).toHaveBeenCalledWith(7, 1, false));
+    expect(await screen.findByText("Producto quitado del catálogo.")).toBeInTheDocument();
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S5: quitar CON stock pide DOS confirmaciones y descarta el stock", async () => {
     vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
-      rows: [{ ...FILA, quantity: 2 }],
+      rows: [{ ...FILA, quantity: 2, is_shortage: false }],
       count: 1,
       error: null,
     });
+    const user = userEvent.setup();
     renderPagina("operador");
 
-    expect(await screen.findByText(/Con stock/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Quitar" })).not.toBeInTheDocument();
+    const section = await cajaCatalogo();
+    // La cantidad está visible antes de decidir.
+    expect(await within(section).findByLabelText("Cantidad de Café molido")).toHaveValue(2);
+    await user.click(await within(section).findByRole("button", { name: "Quitar" }));
+
+    expect(window.confirm).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(productsApi.removeStoreProduct).toHaveBeenCalledWith(7, 1, true));
+  });
+
+  it("S5: cancelar la primera confirmación NO dispara ninguna baja", async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: [{ ...FILA, quantity: 2, is_shortage: false }],
+      count: 1,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    await user.click(await within(section).findByRole("button", { name: "Quitar" }));
+
+    expect(productsApi.removeStoreProduct).not.toHaveBeenCalled();
+  });
+
+  it("S4: la cantidad se edita y se guarda sin movimiento", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    const input = await within(section).findByLabelText("Cantidad de Café molido");
+    await user.clear(input);
+    await user.type(input, "5");
+    await user.click(await within(section).findByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(productsApi.setStoreProductQuantity).toHaveBeenCalledWith(7, 1, 5));
+    expect(await screen.findByText('Cantidad de "Café molido" actualizada.')).toBeInTheDocument();
+    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S6: marcar faltante prende el flag y la fila lo muestra", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    await user.click(await within(section).findByRole("button", { name: "Marcar faltante" }));
+
+    await waitFor(() => expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, true));
+    expect(await screen.findByText('"Café molido" marcado como faltante.')).toBeInTheDocument();
+  });
+
+  it("S6: con faltante activo el botón ofrece quitarlo y muestra la etiqueta", async () => {
+    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
+      rows: [{ ...FILA, quantity: 0, is_shortage: true }],
+      count: 1,
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    expect(await within(section).findByText("Faltante")).toBeInTheDocument();
+    await user.click(await within(section).findByRole("button", { name: "Quitar faltante" }));
+
+    await waitFor(() =>
+      expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, false),
+    );
+  });
+
+  it("S3: la búsqueda viaja al servidor (no filtra la página cargada)", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    await user.type(within(section).getByLabelText("Buscar en mi catálogo"), "café");
+
+    await waitFor(
+      () =>
+        expect(productsApi.fetchStoreCatalog).toHaveBeenLastCalledWith(7, {
+          page: 0,
+          pageSize: 25,
+          q: "café",
+          categoryId: null,
+          onlyShortage: false,
+        }),
+      { timeout: 2000 },
+    );
+  });
+
+  it("S3: la categoría y el faltante también se filtran en el servidor", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    const section = await cajaCatalogo();
+    await user.selectOptions(within(section).getByLabelText("Categoría"), "2");
+    await waitFor(() =>
+      expect(productsApi.fetchStoreCatalog).toHaveBeenLastCalledWith(7, {
+        page: 0,
+        pageSize: 25,
+        q: "",
+        categoryId: 2,
+        onlyShortage: false,
+      }),
+    );
+
+    await user.click(within(section).getByLabelText("Solo faltantes"));
+    await waitFor(() =>
+      expect(productsApi.fetchStoreCatalog).toHaveBeenLastCalledWith(7, {
+        page: 0,
+        pageSize: 25,
+        q: "",
+        categoryId: 2,
+        onlyShortage: true,
+      }),
+    );
   });
 
   it("S4: el registro global se pagina (nada queda truncado en silencio)", async () => {
@@ -236,37 +393,20 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const user = userEvent.setup();
     renderPagina("operador");
 
-    const pager = await screen.findByRole("navigation", { name: "Paginación" });
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const panel = (
+      await screen.findByRole("heading", { name: "Agregar productos a mi catálogo" })
+    ).closest("section") as HTMLElement;
+    const pager = await within(panel).findByRole("navigation", { name: "Paginación" });
     await user.click(within(pager).getByRole("button", { name: "Siguiente" }));
 
     await waitFor(() =>
       expect(productsApi.fetchActiveProductsForCatalog).toHaveBeenLastCalledWith({
         page: 1,
         pageSize: 25,
+        ...SIN_FILTROS,
       }),
     );
-  });
-
-  it("S5: el Quitar del producto inactivo asignado ejecuta la baja y refresca", async () => {
-    vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
-      rows: [{ ...FILA, is_active: false, quantity: 0 }],
-      count: 1,
-      error: null,
-    });
-    const user = userEvent.setup();
-    renderPagina("operador");
-
-    const section = (
-      await screen.findByRole("heading", { name: "Catálogo de Tienda Centro" })
-    ).closest("section") as HTMLElement;
-    expect(await within(section).findByText("Inactivo")).toBeInTheDocument();
-    await user.click(within(section).getByRole("button", { name: "Quitar" }));
-
-    await waitFor(() =>
-      expect(productsApi.removeStoreCatalogProduct).toHaveBeenCalledWith(7, 1),
-    );
-    expect(await screen.findByText("Producto quitado del catálogo.")).toBeInTheDocument();
-    expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
   });
 
   it("S4: el catálogo de la tienda pagina (página 2 solicitable)", async () => {
@@ -275,6 +415,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       id: 100 + index,
       name: `Producto ${index + 1}`,
       quantity: 0,
+      is_shortage: false,
     }));
     vi.mocked(productsApi.fetchStoreCatalog).mockResolvedValue({
       rows: many,
@@ -284,9 +425,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const user = userEvent.setup();
     renderPagina("operador");
 
-    const section = (
-      await screen.findByRole("heading", { name: "Catálogo de Tienda Centro" })
-    ).closest("section") as HTMLElement;
+    const section = await cajaCatalogo();
     const nav = await within(section).findByRole("navigation", { name: "Paginación" });
     await user.click(within(nav).getByRole("button", { name: "Siguiente" }));
 
@@ -294,6 +433,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       expect(productsApi.fetchStoreCatalog).toHaveBeenLastCalledWith(7, {
         page: 1,
         pageSize: 25,
+        ...SIN_FILTROS,
       }),
     );
   });
@@ -308,6 +448,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       id: 100 + index,
       name: `Producto ${index + 1}`,
       quantity: null,
+      is_shortage: false,
     }));
     vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
       rows: many,
@@ -327,6 +468,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       expect(productsApi.fetchDistributorCatalog).toHaveBeenLastCalledWith({
         page: 1,
         pageSize: 25,
+        ...SIN_FILTROS,
       }),
     );
   });

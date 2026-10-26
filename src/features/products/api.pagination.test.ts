@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Los tres fetchers del catálogo deben paginar con .range() + count 'planned':
 // un .limit() fijo truncaría en silencio (S4 exige poder llegar a TODOS los
-// productos del registro). Este test pinea el contrato de red, no la UI.
+// productos del registro). Además, los filtros del catálogo del operador viajan
+// al servidor (S3/S8): filtrar solo la página cargada escondería el resto.
+// Este test pinea el contrato de red, no la UI.
 const h = vi.hoisted(() => {
   const calls: Array<Record<string, unknown>> = [];
   const result = { data: [] as unknown[], count: 0, error: null };
@@ -14,6 +16,10 @@ const h = vi.hoisted(() => {
     };
     query.eq = (column: string, value: unknown) => {
       calls.push({ op: "eq", column, value });
+      return query;
+    };
+    query.ilike = (column: string, value: unknown) => {
+      calls.push({ op: "ilike", column, value });
       return query;
     };
     query.order = (column: string) => {
@@ -39,6 +45,7 @@ import {
   fetchStoreCatalog,
 } from "./api";
 
+const NO_FILTERS = { q: "", categoryId: null, onlyShortage: false };
 const SECOND_PAGE = { page: 1, pageSize: 25 };
 
 describe("catálogo: los tres fetchers paginan (S4)", () => {
@@ -47,7 +54,7 @@ describe("catálogo: los tres fetchers paginan (S4)", () => {
   });
 
   it("fetchStoreCatalog: filtra por tienda y pide el rango de la página", async () => {
-    expect(await fetchStoreCatalog(7, SECOND_PAGE)).toEqual({
+    expect(await fetchStoreCatalog(7, { ...SECOND_PAGE, ...NO_FILTERS })).toEqual({
       rows: [],
       count: 0,
       error: null,
@@ -76,7 +83,7 @@ describe("catálogo: los tres fetchers paginan (S4)", () => {
   });
 
   it("fetchActiveProductsForCatalog: solo activos, en rango", async () => {
-    expect(await fetchActiveProductsForCatalog(SECOND_PAGE)).toEqual({
+    expect(await fetchActiveProductsForCatalog({ ...SECOND_PAGE, ...NO_FILTERS })).toEqual({
       rows: [],
       count: 0,
       error: null,
@@ -86,5 +93,60 @@ describe("catálogo: los tres fetchers paginan (S4)", () => {
     expect(h.calls.find((call) => call.op === "select")?.options).toEqual({
       count: "planned",
     });
+  });
+
+  it("el catálogo de tienda resuelve búsqueda, categoría y faltantes en el servidor", async () => {
+    await fetchStoreCatalog(7, {
+      page: 0,
+      pageSize: 25,
+      q: "  café  ",
+      categoryId: 3,
+      onlyShortage: true,
+    });
+
+    expect(h.calls).toContainEqual({
+      op: "ilike",
+      column: "product.name",
+      value: "%café%",
+    });
+    expect(h.calls).toContainEqual({ op: "eq", column: "product.category_id", value: 3 });
+    expect(h.calls).toContainEqual({ op: "eq", column: "is_shortage", value: true });
+  });
+
+  it("el registro global busca por nombre en el servidor y por categoría", async () => {
+    await fetchActiveProductsForCatalog({
+      page: 0,
+      pageSize: 25,
+      q: "arroz",
+      categoryId: 5,
+      onlyShortage: false,
+    });
+
+    expect(h.calls).toContainEqual({ op: "ilike", column: "name", value: "%arroz%" });
+    expect(h.calls).toContainEqual({ op: "eq", column: "category_id", value: 5 });
+  });
+
+  it("escapa los comodines de LIKE para que la búsqueda sea literal", async () => {
+    await fetchActiveProductsForCatalog({
+      page: 0,
+      pageSize: 25,
+      q: "50%_off",
+      categoryId: null,
+      onlyShortage: false,
+    });
+
+    expect(h.calls).toContainEqual({
+      op: "ilike",
+      column: "name",
+      value: "%50\\%\\_off%",
+    });
+  });
+
+  it("sin filtros no agrega cláusulas ilike ni de categoría", async () => {
+    await fetchStoreCatalog(7, { page: 0, pageSize: 25, ...NO_FILTERS });
+
+    expect(h.calls.some((call) => call.op === "ilike")).toBe(false);
+    expect(h.calls.some((call) => call.column === "product.category_id")).toBe(false);
+    expect(h.calls.some((call) => call.column === "is_shortage")).toBe(false);
   });
 });

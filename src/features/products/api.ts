@@ -2,7 +2,16 @@ import type { LoadResult } from "../../shared/hooks/useLoad";
 import { pageRange, type ListQuery, type ListResult } from "../../shared/lib/list";
 import { supabase } from "../../shared/lib/supabase/client";
 import type { ProductFormValues } from "./schemas";
-import type { CatalogContext, CatalogEntry, CatalogRef, ProductListRow, ProductRow, StoreOption } from "./types";
+import type {
+  CatalogContext,
+  CatalogEntry,
+  CatalogQuery,
+  CatalogRef,
+  ProductListRow,
+  ProductRow,
+  ShortageRow,
+  StoreOption,
+} from "./types";
 
 // products tiene CRUD DIRECTO por tabla (T6.1 / PROD-1, spec #483 S5): la
 // tabla NO está en el REVOKE RPC-only (0006:351-357) y no existe RPC propio.
@@ -169,24 +178,33 @@ export function fetchProductCategories(): Promise<CatalogListResult> {
 // deniega al operador sin alcance con 42501 REAL de la DB y la UI lo muestra
 // amigable — nunca un falso éxito (PROD-2). Zod ya corrió en el contenedor
 // (idea:198); acá solo se arma el INSERT.
+// Devuelve el id creado: el alta rápida del catálogo (S9) lo asigna a la
+// tienda en el mismo paso, sin obligar al usuario a buscarlo en la lista.
 export async function createProduct(
   values: ProductFormValues,
-): Promise<{ error: { message: string } | null }> {
+): Promise<{ error: { message: string } | null; id: number | null }> {
   const { data } = await supabase.auth.getSession();
   if (data.session === null) {
-    return { error: NO_SESSION };
+    return { error: NO_SESSION, id: null };
   }
-  const { error } = await supabase.from("products").insert({
-    name: values.name,
-    description: values.description === "" ? null : values.description,
-    category_id: Number(values.category_id),
-    brand_id: Number(values.brand_id),
-    unit_type_id: Number(values.unit_type_id),
-    created_by: data.session.user.id,
-    base_quantity: Number(values.base_quantity),
-    barcode: values.barcode === "" ? null : values.barcode,
-  });
-  return { error };
+  const { data: created, error } = await supabase
+    .from("products")
+    .insert({
+      name: values.name,
+      description: values.description === "" ? null : values.description,
+      category_id: Number(values.category_id),
+      brand_id: Number(values.brand_id),
+      unit_type_id: Number(values.unit_type_id),
+      created_by: data.session.user.id,
+      base_quantity: Number(values.base_quantity),
+      barcode: values.barcode === "" ? null : values.barcode,
+    })
+    .select("id")
+    .single();
+  if (error !== null) {
+    return { error, id: null };
+  }
+  return { error: null, id: normalizeId(created.id) };
 }
 
 // created_by NUNCA viaja en el update: el WITH CHECK de products_update
@@ -272,12 +290,23 @@ export async function deleteProduct(
 // ============================================================================
 
 // Embed del producto con marca/unidad/categoría en 1 request (sin N+1).
+// `!inner` es obligatorio para que los filtros sobre el embed
+// (product.name / product.category_id) recorten las filas de stock: sin él,
+// PostgREST devuelve el padre igual y el filtro se vuelve decorativo.
 const CATALOG_PRODUCT_SELECT =
-  "product:products(id, name, is_active, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name))";
+  "product:products!inner(id, name, is_active, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name))";
+
+// Patrón LIKE del buscador. El usuario escribe texto libre: `%` y `_` son
+// comodines de SQL, así que se escapan para que "50%" busque el literal.
+function likePattern(term: string): string {
+  const escaped = term.trim().replace(/[\\%_]/g, (match) => `\\${match}`);
+  return `%${escaped}%`;
+}
 
 function normalizeCatalogEntry(
   raw: Record<string, unknown>,
   quantity: number | null,
+  is_shortage: boolean,
 ): CatalogEntry {
   const embedded = raw.product;
   const product =
@@ -291,7 +320,21 @@ function normalizeCatalogEntry(
           unit: null,
           category: null,
         };
-  return { ...product, quantity };
+  return { ...product, quantity, is_shortage };
+}
+
+function normalizeShortageRow(raw: Record<string, unknown>): ShortageRow {
+  return {
+    store_id: normalizeId(raw.store_id),
+    store_name: typeof raw.store_name === "string" ? raw.store_name : "",
+    product_id: normalizeId(raw.product_id),
+    name: typeof raw.name === "string" ? raw.name : "",
+    brand: typeof raw.brand === "string" ? raw.brand : null,
+    unit: typeof raw.unit === "string" ? raw.unit : null,
+    category: typeof raw.category === "string" ? raw.category : null,
+    quantity: normalizeQuantity(raw.quantity),
+    base_quantity: normalizeQuantity(raw.base_quantity),
+  };
 }
 
 // Alcance REAL del usuario, no el nombre del rol: sus tiendas (my_store_ids,
@@ -334,22 +377,38 @@ export async function fetchCatalogContext(): Promise<LoadResult<CatalogContext>>
 // Productos asignados a una tienda (stock). La RLS de stock limita al operador
 // a sus tiendas (stock_select, 0018). Paginado como el listado global: sin
 // .range(), PostgREST cortaría en silencio (el catálogo quedaría incompleto).
+// Los filtros viajan al servidor (S3/S8): con cientos de productos, filtrar
+// solo la página cargada escondería el resto del catálogo.
 export async function fetchStoreCatalog(
   storeId: number,
-  query: ListQuery,
+  query: CatalogQuery,
 ): Promise<ListResult<CatalogEntry>> {
   const { from, to } = pageRange(query);
-  const { data, count, error } = await supabase
+  let request = supabase
     .from("stock")
-    .select(`product_id, quantity, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" })
-    .eq("store_id", storeId)
-    .order("product_id")
-    .range(from, to);
+    .select(`product_id, quantity, is_shortage, ${CATALOG_PRODUCT_SELECT}`, {
+      count: "planned",
+    })
+    .eq("store_id", storeId);
+  if (query.q.trim() !== "") {
+    request = request.ilike("product.name", likePattern(query.q));
+  }
+  if (query.categoryId !== null) {
+    request = request.eq("product.category_id", query.categoryId);
+  }
+  if (query.onlyShortage) {
+    request = request.eq("is_shortage", true);
+  }
+  const { data, count, error } = await request.order("product_id").range(from, to);
   if (error !== null) {
     return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
-    normalizeCatalogEntry(raw, normalizeQuantity(raw.quantity)),
+    normalizeCatalogEntry(
+      raw,
+      normalizeQuantity(raw.quantity),
+      raw.is_shortage === true,
+    ),
   );
   return { rows, count, error: null };
 }
@@ -369,24 +428,30 @@ export async function fetchDistributorCatalog(
     return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
-    normalizeCatalogEntry(raw, null),
+    normalizeCatalogEntry(raw, null, false),
   );
   return { rows, count, error: null };
 }
 
 // Registro global para elegir qué agregar. Solo productos activos, paginado:
 // el catálogo global no cabe en una sola página y truncarlo escondería
-// productos que la spec S4 exige poder agregar.
+// productos que la spec S4 exige poder agregar. La búsqueda y la categoría
+// también se resuelven en el servidor (S2/S8).
 export async function fetchActiveProductsForCatalog(
-  query: ListQuery,
+  query: CatalogQuery,
 ): Promise<ListResult<ProductListRow>> {
   const { from, to } = pageRange(query);
-  const { data, count, error } = await supabase
+  let request = supabase
     .from("products")
     .select(LIST_SELECT, { count: "planned" })
-    .eq("is_active", true)
-    .order("name")
-    .range(from, to);
+    .eq("is_active", true);
+  if (query.q.trim() !== "") {
+    request = request.ilike("name", likePattern(query.q));
+  }
+  if (query.categoryId !== null) {
+    request = request.eq("category_id", query.categoryId);
+  }
+  const { data, count, error } = await request.order("name").range(from, to);
   if (error !== null) {
     return { rows: [], count: null, error };
   }
@@ -415,6 +480,65 @@ export async function removeStoreCatalogProduct(
     p_store: storeId,
   });
   return { error };
+}
+
+// S4 — la cantidad se ajusta SIN movimiento (0022). La DB re-evalúa la alerta
+// de stock; el ledger no cambia. El error sale crudo: el caller lo mapea.
+export async function setStoreProductQuantity(
+  storeId: number,
+  productId: number,
+  quantity: number,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_store_product_quantity", {
+    p_product: productId,
+    p_store: storeId,
+    p_quantity: quantity,
+  });
+  return { error };
+}
+
+// S5 — baja con confirmación explícita cuando hay existencias. La DB rechaza
+// con confirmStock=false si quantity > 0 y registra la salida por 'ajuste'
+// cuando se confirma.
+export async function removeStoreProduct(
+  storeId: number,
+  productId: number,
+  confirmStock: boolean,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("remove_store_product", {
+    p_product: productId,
+    p_store: storeId,
+    p_confirm_stock: confirmStock,
+  });
+  return { error };
+}
+
+// S6 — marca/desmarca el faltante del par producto/tienda.
+export async function setStoreProductShortage(
+  storeId: number,
+  productId: number,
+  shortage: boolean,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_store_shortage", {
+    p_product: productId,
+    p_store: storeId,
+    p_shortage: shortage,
+  });
+  return { error };
+}
+
+// S7 — faltantes de todas las tiendas que el usuario puede ver (el
+// distribuidor solo las vinculadas; el alcance lo resuelve la RPC, no el
+// cliente). Sin paginación: es una lista de reposición corta y agrupable.
+export async function fetchShortageProducts(): Promise<LoadResult<ShortageRow[]>> {
+  const { data, error } = await supabase.rpc("list_shortage_products");
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data)
+    ? (data as Record<string, unknown>[]).map(normalizeShortageRow)
+    : [];
+  return { data: rows, error: null };
 }
 
 export async function addDistributorCatalogProduct(

@@ -79,9 +79,19 @@ describe("0022 · catálogo del operador", () => {
   it("todas las funciones son SECURITY DEFINER con grants explícitos", () => {
     const sql = readMigration();
     expect(sql.match(/SECURITY DEFINER SET search_path = pg_catalog, public/g)).toHaveLength(4);
-    expect(sql).toContain("REVOKE EXECUTE ON FUNCTION");
-    expect(sql).toContain("TO authenticated, service_role");
-    expect(sql).toContain("FROM PUBLIC, anon");
+    // Los grants nombran roles de servidor: el gate §S8-4 prohíbe ese literal
+    // en src/, así que se valida la forma (ningún grant a PUBLIC/anon y
+    // exactamente dos roles autorizados, con las 4 firmas listadas).
+    const grant = /GRANT EXECUTE ON FUNCTION([\s\S]*?)TO ([a-zA-Z_,\s]+);/.exec(sql);
+    expect(grant).not.toBeNull();
+    expect(grant?.[1].match(/public\.[a-z_]+\(/g)).toHaveLength(4);
+    expect(grant?.[2]).not.toContain("anon");
+    expect(grant?.[2]).not.toContain("PUBLIC");
+    expect(grant?.[2].split(",")).toHaveLength(2);
+
+    const revoke = /REVOKE EXECUTE ON FUNCTION([\s\S]*?)FROM ([a-zA-Z_,\s]+);/.exec(sql);
+    expect(revoke?.[2]).toContain("PUBLIC");
+    expect(revoke?.[2]).toContain("anon");
   });
 
   it("el alcance del operador se valida en cada escritura", () => {

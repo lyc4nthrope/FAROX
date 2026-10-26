@@ -1,3 +1,5 @@
+import type { ListQuery } from "../../shared/lib/list";
+
 // Referencia mínima de catálogo (brands / unit_types / product_categories —
 // catálogos de solo lectura, policies 0006:66-120). En el listado llega
 // embebida en 1 request (Base:698) y en el formulario hace de opción de los
@@ -33,6 +35,33 @@ export interface StoreOption {
 // (null para el distribuidor, que no maneja inventario).
 export interface CatalogEntry extends ProductListRow {
   quantity: number | null;
+  // stock.is_shortage (0022): el operador marcó que le falta este producto.
+  // El catálogo del distribuidor no maneja inventario ⇒ siempre false.
+  is_shortage: boolean;
+}
+
+// Filtros del catálogo propio. Viajan al SERVIDOR dentro del ListQuery: con
+// cientos de productos, filtrar solo la página cargada escondería el resto.
+export interface CatalogFilters {
+  q: string;
+  categoryId: number | null;
+  onlyShortage: boolean;
+}
+
+export type CatalogQuery = ListQuery & CatalogFilters;
+
+// Fila de la vista /faltantes del distribuidor (RPC list_shortage_products):
+// todo viene en una sola tabla, agrupable por tienda.
+export interface ShortageRow {
+  store_id: number;
+  store_name: string;
+  product_id: number;
+  name: string;
+  brand: string | null;
+  unit: string | null;
+  category: string | null;
+  quantity: number;
+  base_quantity: number;
 }
 
 // Alcance REAL del usuario: sus tiendas (my_store_ids) y su distribuidora
@@ -41,6 +70,18 @@ export interface CatalogEntry extends ProductListRow {
 export interface CatalogContext {
   stores: StoreOption[];
   distributorId: number | null;
+}
+
+// Entidad cuyo catálogo se está viendo (una tienda propia o la distribuidora).
+export interface CatalogTarget {
+  kind: "store" | "distribuidor";
+  id: number;
+  name: string;
+}
+
+// Clave estable para el <select> de catálogo y para remontar la caja.
+export function targetKey(target: CatalogTarget): string {
+  return `${target.kind}:${target.id}`;
 }
 
 // Fila para el formulario de edición (tabla products, 0002:90-100). NO se pide
