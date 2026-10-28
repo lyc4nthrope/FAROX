@@ -60,6 +60,7 @@ describe("inventory api — contrato exacto de las RPC", () => {
       storeId: 3,
       productId: 10,
       quantity: 20,
+      unitPrice: 4500,
       motiveId: 2,
       expiryDate: "2026-12-31",
     });
@@ -70,6 +71,7 @@ describe("inventory api — contrato exacto de las RPC", () => {
       p_motive_id: 2,
       p_order_id: null,
       p_expiry_date: "2026-12-31",
+      p_unit_price: 4500,
     });
   });
 
@@ -79,6 +81,7 @@ describe("inventory api — contrato exacto de las RPC", () => {
       storeId: 3,
       productId: 10,
       quantity: 12,
+      unitPrice: null,
       motiveId: 1,
       expiryDate: "2026-12-31",
     });
@@ -88,6 +91,7 @@ describe("inventory api — contrato exacto de las RPC", () => {
       p_qty: 12,
       p_motive_id: 1,
       p_order_id: null,
+      p_unit_price: null,
     });
   });
 
@@ -114,6 +118,7 @@ describe("inventory api — contrato exacto de las RPC", () => {
       storeId: 3,
       productId: 10,
       quantity: 99,
+      unitPrice: null,
       motiveId: 1,
       expiryDate: null,
     });

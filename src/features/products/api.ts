@@ -448,6 +448,7 @@ export async function fetchDistributorCatalog(
 // también se resuelven en el servidor (S2/S8).
 export async function fetchActiveProductsForCatalog(
   query: CatalogQuery,
+  excludeIds: readonly number[] = [],
 ): Promise<ListResult<ProductListRow>> {
   const { from, to } = pageRange(query);
   let request = supabase
@@ -459,6 +460,12 @@ export async function fetchActiveProductsForCatalog(
   }
   if (query.categoryId !== null) {
     request = request.eq("category_id", query.categoryId);
+  }
+  if (excludeIds.length > 0) {
+    const ids = excludeIds.map((id) => Math.trunc(id)).filter((id) => id > 0);
+    if (ids.length > 0) {
+      request = request.not("id", "in", `(${ids.join(",")})`);
+    }
   }
   const { data, count, error } = await request.order("name").range(from, to);
   if (error !== null) {
@@ -508,12 +515,14 @@ export async function addStoreProduct(
   productId: number,
   quantity: number,
   threshold: number | null = null,
+  price: number | null = null,
 ): Promise<{ error: { message: string } | null }> {
   const { error } = await supabase.rpc("add_store_product", {
     p_product: productId,
     p_store: storeId,
     p_quantity: quantity,
     p_threshold: threshold,
+    p_price: price,
   });
   return { error };
 }

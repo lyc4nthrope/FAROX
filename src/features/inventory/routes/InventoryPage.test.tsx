@@ -94,17 +94,6 @@ describe("InventoryPage · pestaña Productos (0024)", () => {
     );
     expect(screen.queryByRole("button", { name: "Asignar producto" })).not.toBeInTheDocument();
   });
-
-  it("el botón «Productos de la tienda» vuelve a la pestaña desde otra sección", async () => {
-    renderPage();
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("tab", { name: /movimientos/i }));
-    expect(screen.queryByText("Panel de productos de la tienda")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Productos de la tienda" }));
-    expect(await screen.findByText("Panel de productos de la tienda")).toBeInTheDocument();
-  });
 });
 
 describe("InventoryPage · pestañas", () => {
@@ -196,6 +185,7 @@ describe("InventoryPage · acciones en botones", () => {
     await user.click(
       within(dialog).getByRole("button", { name: "Sumar cantidad de Leche Alpina" }),
     );
+    await user.type(within(dialog).getByLabelText("Precio de compra (opcional)"), "4500");
     await user.selectOptions(within(dialog).getByLabelText("Motivo"), "1");
     await user.click(within(dialog).getByRole("button", { name: "Registrar entrada" }));
 
@@ -205,6 +195,7 @@ describe("InventoryPage · acciones en botones", () => {
         storeId: 10,
         productId: 2,
         quantity: 2,
+        unitPrice: 4500,
         motiveId: 1,
         expiryDate: null,
       }),

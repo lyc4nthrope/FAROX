@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
@@ -179,10 +179,13 @@ export function AddProductsPanel({
   target,
   categories,
   onAdded,
+  canSetPrice = false,
 }: {
   target: CatalogTarget;
   categories: CatalogRef[];
   onAdded: () => void;
+  /** 0027: Premium/admin puede fijar el precio de venta al dar de alta. */
+  canSetPrice?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -190,19 +193,14 @@ export function AddProductsPanel({
   const [msg, setMsg] = useState<Msg>(NO_MSG);
   // 0026: cantidad inicial por producto del registro (solo catálogo de tienda).
   const [quantities, setQuantities] = useState<Record<number, string>>({});
+  // 0027: precio de venta opcional por producto (solo Premium/admin).
+  const [prices, setPrices] = useState<Record<number, string>>({});
+  // 0027: mostrar solo los productos que todavía no están en la tienda/catálogo.
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
 
-  const list = useList<ProductListRow, CatalogQuery>(fetchActiveProductsForCatalog, INITIAL_QUERY);
-
-  const activeSearch = list.query.q;
-  const setQuery = list.setQuery;
-  useEffect(() => {
-    if (search === activeSearch) return;
-    const timer = setTimeout(() => setQuery({ q: search }), 300);
-    return () => clearTimeout(timer);
-  }, [search, activeSearch, setQuery]);
-
-  // 0026: estado real de la entidad para reemplazar la columna «Estado» (que
-  // solo decía Activo) por algo útil: qué ya está asignado y con cuánto stock.
+  // 0026/0027: estado real de la entidad para reemplazar la columna «Estado»
+  // (que solo decía Activo) por algo útil: qué ya está asignado y con cuánto
+  // stock. También alimenta el filtro «solo no añadidos».
   const storeStock = useLoad(
     () =>
       target.kind === "store"
@@ -226,6 +224,41 @@ export function AddProductsPanel({
     [distributorIds.data],
   );
   const assignedError = storeStock.error ?? distributorIds.error;
+  const assignedIds = useMemo(
+    () =>
+      target.kind === "store"
+        ? [...stockByProduct.keys()]
+        : [...distributorSet],
+    [target.kind, stockByProduct, distributorSet],
+  );
+
+  const list = useList<ProductListRow, CatalogQuery>(
+    (query) =>
+      onlyUnassigned
+        ? fetchActiveProductsForCatalog(query, assignedIds)
+        : fetchActiveProductsForCatalog(query),
+    INITIAL_QUERY,
+  );
+
+  const activeSearch = list.query.q;
+  const setQuery = list.setQuery;
+  useEffect(() => {
+    if (search === activeSearch) return;
+    const timer = setTimeout(() => setQuery({ q: search }), 300);
+    return () => clearTimeout(timer);
+  }, [search, activeSearch, setQuery]);
+
+  // El filtro cambia el WHERE del servidor: se refetchea al activarlo y cuando
+  // termina de cargar el estado real de la tienda.
+  const refetch = list.refetch;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    refetch();
+  }, [onlyUnassigned, assignedIds, refetch]);
 
   function isAssigned(productId: number): boolean {
     return target.kind === "store"
@@ -237,19 +270,31 @@ export function AddProductsPanel({
     return quantities[productId] ?? "0";
   }
 
+  function priceOf(productId: number): string {
+    return prices[productId] ?? "";
+  }
+
   async function agregar(product: ProductListRow): Promise<void> {
     if (busyId === product.id || isAssigned(product.id)) return;
     setBusyId(product.id);
     const raw = Number(quantityOf(product.id));
     const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+    const rawPrice = priceOf(product.id).trim();
+    const price = rawPrice === "" ? null : Number(rawPrice);
+    if (price !== null && (!Number.isFinite(price) || price <= 0)) {
+      setMsg({ error: "El precio debe ser mayor a 0.", ok: null });
+      setBusyId(null);
+      return;
+    }
     const error = await runAction(() =>
       target.kind === "store"
-        ? addStoreProduct(target.id, product.id, quantity)
+        ? addStoreProduct(target.id, product.id, quantity, null, price)
         : addDistributorCatalogProduct(product.id),
     );
     setMsg({ error, ok: error === null ? "Producto agregado al catálogo." : null });
     if (error === null) {
       setQuantities((current) => ({ ...current, [product.id]: "0" }));
+      setPrices((current) => ({ ...current, [product.id]: "" }));
       onAdded();
     }
     setBusyId(null);
@@ -297,6 +342,14 @@ export function AddProductsPanel({
             ))}
           </select>
         </div>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={onlyUnassigned}
+            onChange={(event) => setOnlyUnassigned(event.target.checked)}
+          />
+          Solo no añadidos
+        </label>
         <button
           className={buttonClass}
           type="button"
@@ -333,11 +386,22 @@ export function AddProductsPanel({
       )}
       {list.error === null && !list.loading && list.rows.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
+          <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
             <colgroup>
-              <col className="w-[46%]" />
-              <col className="w-[22%]" />
-              <col className="w-[32%]" />
+              {target.kind === "store" && canSetPrice ? (
+                <>
+                  <col className="w-[34%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[26%]" />
+                </>
+              ) : (
+                <>
+                  <col className="w-[46%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[32%]" />
+                </>
+              )}
             </colgroup>
             <thead>
               <tr className="border-b border-gray-200 text-gray-600">
@@ -345,6 +409,9 @@ export function AddProductsPanel({
                 <th className="py-2 pr-3 font-medium">
                   {target.kind === "store" ? "En la tienda" : "En el catálogo"}
                 </th>
+                {target.kind === "store" && canSetPrice && (
+                  <th className="py-2 pr-3 font-medium">Precio de venta</th>
+                )}
                 <th className="py-2 text-right font-medium">Acción</th>
               </tr>
             </thead>
@@ -384,6 +451,32 @@ export function AddProductsPanel({
                         <Badge tone="gray">Sin asignar</Badge>
                       )}
                     </td>
+                    {target.kind === "store" && canSetPrice && (
+                      <td
+                        className="py-2 pr-3 align-top"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {assigned ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <input
+                            aria-label={`Precio de venta de ${row.name}`}
+                            className={`${inputClass} w-full min-w-0 px-2 py-1 text-xs`}
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="Opcional"
+                            value={priceOf(row.id)}
+                            onChange={(event) =>
+                              setPrices((current) => ({
+                                ...current,
+                                [row.id]: event.target.value,
+                              }))
+                            }
+                          />
+                        )}
+                      </td>
+                    )}
                     <td className="py-2 align-top" onClick={(event) => event.stopPropagation()}>
                       <span className="flex items-center justify-end gap-2 whitespace-nowrap">
                         {target.kind === "store" && !assigned && (

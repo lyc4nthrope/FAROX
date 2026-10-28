@@ -65,12 +65,15 @@ export function StoreCatalogPanel({
   storeId,
   storeName,
   reloadToken = 0,
+  canSetPrice = false,
   onChanged,
 }: {
   storeId: number;
   storeName: string;
   /** Sube desde la página tras un movimiento/precio para refrescar cantidades. */
   reloadToken?: number;
+  /** 0027: Premium/admin puede fijar el precio al agregar un producto. */
+  canSetPrice?: boolean;
   onChanged?: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -373,6 +376,7 @@ export function StoreCatalogPanel({
           <AddProductsPanel
             target={{ kind: "store", id: storeId, name: storeName }}
             categories={categories.data ?? []}
+            canSetPrice={canSetPrice}
             onAdded={() => {
               refetch();
               onChanged?.();

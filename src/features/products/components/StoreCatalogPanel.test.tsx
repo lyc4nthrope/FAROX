@@ -36,8 +36,14 @@ const ROW: CatalogEntry = {
   is_shortage: false,
 };
 
-function renderPanel() {
-  return render(<StoreCatalogPanel storeId={10} storeName="Tienda Centro" />);
+function renderPanel(canSetPrice = false) {
+  return render(
+    <StoreCatalogPanel
+      storeId={10}
+      storeName="Tienda Centro"
+      canSetPrice={canSetPrice}
+    />,
+  );
 }
 
 beforeEach(() => {
@@ -59,6 +65,7 @@ beforeEach(() => {
     count: 0,
     error: null,
   });
+  vi.mocked(productsApi.addStoreProduct).mockResolvedValue({ error: null });
   vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({ data: [], error: null });
   vi.mocked(productsApi.fetchDistributorProductIds).mockResolvedValue({
     data: [],
@@ -245,6 +252,35 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     expect(
       await screen.findByRole("dialog", { name: "Agregar productos a la tienda" }),
     ).toBeInTheDocument();
+  });
+
+  it("0027: Premium fija el precio de venta al agregar el producto", async () => {
+    vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
+      rows: [
+        {
+          id: 2,
+          name: "Arroz blanco",
+          is_active: true,
+          brand: { id: 2, name: "Roa" },
+          unit: { id: 1, name: "Kilos" },
+          category: { id: 2, name: "Granos" },
+        },
+      ],
+      count: 1,
+      error: null,
+    });
+    renderPanel(true);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Agregar productos" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a la tienda" });
+    expect(within(dialog).getByRole("columnheader", { name: "Precio de venta" })).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Precio de venta de Arroz blanco"), "2500");
+    await user.click(within(dialog).getByRole("button", { name: "Agregar" }));
+
+    await waitFor(() =>
+      expect(productsApi.addStoreProduct).toHaveBeenCalledWith(10, 2, 0, null, 2500),
+    );
   });
 
   it("sin filas explica que la tienda no tiene productos asignados", async () => {

@@ -148,6 +148,8 @@ export interface MovementInput {
   storeId: number;
   productId: number;
   quantity: number;
+  /** 0027: precio de compra (entrada) o de venta (salida). null = derivado. */
+  unitPrice: number | null;
   motiveId: number;
   expiryDate: string | null;
 }
@@ -161,6 +163,7 @@ export async function registerMovement(input: MovementInput): Promise<{ error: E
       p_motive_id: input.motiveId,
       p_order_id: null,
       p_expiry_date: input.expiryDate,
+      p_unit_price: input.unitPrice,
     });
     return { error };
   }
@@ -170,6 +173,7 @@ export async function registerMovement(input: MovementInput): Promise<{ error: E
     p_qty: input.quantity,
     p_motive_id: input.motiveId,
     p_order_id: null,
+    p_unit_price: input.unitPrice,
   });
   return { error };
 }

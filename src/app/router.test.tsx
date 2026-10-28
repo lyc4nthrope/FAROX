@@ -73,6 +73,9 @@ vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
 }));
+vi.mock("../features/inventory/alertsApi", () => ({
+  fetchOpenAlerts: vi.fn().mockResolvedValue({ data: [], error: null }),
+}));
 // D3 (T2.2/T2.7): el guard derivado OnboardingGate consulta la feature
 // onboarding — mockeada COMPLETA como el resto (sin esto, el módulo real
 // importa el cliente supabase, que valida el env en el arranque (V0-1)).

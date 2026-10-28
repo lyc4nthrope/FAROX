@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { fetchOpenAlerts } from "../../features/inventory/alertsApi";
+import { useLoad } from "../../shared/hooks/useLoad";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -11,7 +13,19 @@ import { roleLabel, visibleNavItems } from "./navigation";
 export function AppShell() {
   const { role, premium, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
   const items = visibleNavItems(role);
+  // 0027: contador de alertas abiertas en la pestaña «Alertas». Se refresca al
+  // navegar (sin realtime) y respeta el alcance de la RLS.
+  const showAlerts = items.some((item) => item.to === "/alertas");
+  const alerts = useLoad(
+    () =>
+      showAlerts
+        ? fetchOpenAlerts()
+        : Promise.resolve({ data: [], error: null }),
+    [showAlerts, location.pathname],
+  );
+  const alertCount = alerts.data?.length ?? 0;
   // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
   // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
   // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la
@@ -165,7 +179,23 @@ export function AppShell() {
                   }`
                 }
               >
-                {item.label}
+                {({ isActive }) => (
+                  <>
+                    {item.label}
+                    {item.to === "/alertas" && alertCount > 0 && (
+                      <span
+                        aria-label={`${alertCount} alertas`}
+                        className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {alertCount > 99 ? "99+" : alertCount}
+                      </span>
+                    )}
+                  </>
+                )}
               </NavLink>
             </li>
           ))}

@@ -306,6 +306,7 @@ export function InventoryPage() {
     type: "entry" as "entry" | "exit",
     productId: "",
     quantity: "",
+    unitPrice: "",
     motiveId: "",
     expiry: "",
   });
@@ -323,13 +324,21 @@ export function InventoryPage() {
           storeId,
           productId: Number(mov.productId),
           quantity: Number(mov.quantity),
+          unitPrice: mov.unitPrice === "" ? null : Number(mov.unitPrice),
           motiveId: Number(mov.motiveId),
           expiryDate: mov.type === "entry" && mov.expiry !== "" ? mov.expiry : null,
         }),
       mov.type === "entry" ? "Entrada registrada." : "Salida registrada.",
     );
     if (success) {
-      setMov({ type: "entry", productId: "", quantity: "", motiveId: "", expiry: "" });
+      setMov({
+        type: "entry",
+        productId: "",
+        quantity: "",
+        unitPrice: "",
+        motiveId: "",
+        expiry: "",
+      });
       setMovementSearch("");
       setModal(null);
     }
@@ -487,6 +496,26 @@ export function InventoryPage() {
         </div>
       </div>
 
+      {premium && (
+        <Field
+          label={
+            mov.type === "entry"
+              ? "Precio de compra (opcional)"
+              : "Precio de venta (opcional)"
+          }
+        >
+          <input
+            className={inputClass}
+            type="number"
+            min="0.01"
+            step="0.01"
+            placeholder="0"
+            value={mov.unitPrice}
+            onChange={(event) => setMov({ ...mov, unitPrice: event.target.value })}
+          />
+        </Field>
+      )}
+
       <Status loading={motives.loading} error={motives.error} />
       <Field label="Motivo">
         <select
@@ -610,16 +639,6 @@ export function InventoryPage() {
               </span>
             )}
           </button>
-          <button
-            className={secondaryButtonClass}
-            type="button"
-            onClick={() => setTab("products")}
-          >
-            <Icon>
-              <path d="M12 5v14M5 12h14" />
-            </Icon>
-            Productos de la tienda
-          </button>
           <Link className={secondaryButtonClass} to={`/tiendas/${storeId}/qr`}>
             <Icon>
               <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" />
@@ -645,6 +664,7 @@ export function InventoryPage() {
             storeId={storeId}
             storeName={storeName.data ?? `Tienda #${storeId}`}
             reloadToken={catalogVersion}
+            canSetPrice={premium}
             onChanged={() => stockOptions.reload()}
           />
         </section>
@@ -748,7 +768,7 @@ export function InventoryPage() {
               </h2>
               <p className="text-xs text-gray-500">Precio de venta publicado para cada producto.</p>
             </div>
-            {isAdmin && (
+            {(isAdmin || premium) && (
               <button className={buttonClass} type="button" onClick={() => openModal("price")}>
                 <Icon>
                   <path d="M12 5v14M5 12h14" />
@@ -764,7 +784,7 @@ export function InventoryPage() {
               <EmptyState
                 title="La tienda todavía no tiene precios publicados"
                 hint={
-                  isAdmin
+                  isAdmin || premium
                     ? "Usá «Publicar precio» para cargar el primero."
                     : "Cuando se publiquen precios, van a aparecer acá."
                 }

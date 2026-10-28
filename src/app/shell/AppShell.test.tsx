@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../features/auth/types";
 import * as authApi from "../../features/auth/api";
+import * as alertsApi from "../../features/inventory/alertsApi";
 import { AuthProvider } from "../providers/AuthProvider";
 import { AppShell } from "./AppShell";
 
@@ -14,6 +15,9 @@ vi.mock("../../features/auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+}));
+vi.mock("../../features/inventory/alertsApi", () => ({
+  fetchOpenAlerts: vi.fn(),
 }));
 
 function renderShell(role: RoleName | null, premium = false) {
@@ -37,6 +41,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     vi.clearAllMocks();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    vi.mocked(alertsApi.fetchOpenAlerts).mockResolvedValue({ data: [], error: null });
   });
 
   afterEach(() => {
@@ -71,6 +76,40 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+  });
+
+  it("Alertas muestra el número de alertas abiertas", async () => {
+    vi.mocked(alertsApi.fetchOpenAlerts).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          type: "stock_low",
+          message: "Arroz bajo",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+        {
+          id: 2,
+          type: "expiry_soon",
+          message: "Leche vence",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+        {
+          id: 3,
+          type: "order_late",
+          message: "Pedido atrasado",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+      ],
+      error: null,
+    });
+
+    renderShell("operador");
+
+    const badge = await screen.findByLabelText("3 alertas");
+    expect(badge).toHaveTextContent("3");
   });
 
   it("menú móvil: alterna el estado expuesto en aria-expanded", async () => {

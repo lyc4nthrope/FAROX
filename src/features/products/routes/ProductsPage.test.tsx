@@ -236,7 +236,9 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
     await user.click(await within(dialog).findByRole("button", { name: "Agregar" }));
 
-    await waitFor(() => expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 0));
+    await waitFor(() =>
+      expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 0, null, null),
+    );
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
     // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
@@ -255,7 +257,9 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     // La fila entera agrega; el botón sigue existiendo como referencia.
     await user.click(within(dialog).getByText("Arroz blanco"));
 
-    await waitFor(() => expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 1));
+    await waitFor(() =>
+      expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 1, null, null),
+    );
     expect(within(dialog).getByRole("button", { name: "Agregar" })).toBeInTheDocument();
   });
 
@@ -275,6 +279,28 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     expect(yaEsta).toBeDisabled();
     await user.click(within(dialog).getByText("Arroz blanco"));
     expect(productsApi.addStoreProduct).not.toHaveBeenCalled();
+  });
+
+  it("0027: el filtro «Solo no añadidos» excluye los ya asignados en el servidor", async () => {
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({
+      data: [{ product_id: 2, quantity: 7 }],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    await within(dialog).findByText("En tienda · 7");
+
+    await user.click(within(dialog).getByLabelText("Solo no añadidos"));
+
+    await waitFor(() =>
+      expect(productsApi.fetchActiveProductsForCatalog).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 0, pageSize: 25 }),
+        [2],
+      ),
+    );
   });
 
   it("S2: el alta es una ventana emergente y Escape la cierra", async () => {
