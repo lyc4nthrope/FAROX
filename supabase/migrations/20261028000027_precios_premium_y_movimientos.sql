@@ -80,13 +80,9 @@ BEGIN
   IF p_qty IS NULL OR p_qty <= 0 THEN
     RAISE EXCEPTION 'register_entry: quantity debe ser > 0';
   END IF;
-  -- 0027: el precio de compra informado manda sobre la derivación anterior.
-  IF p_unit_price IS NOT NULL THEN
-    IF p_unit_price <= 0 THEN
-      RAISE EXCEPTION 'register_entry: el precio de compra debe ser > 0';
-    END IF;
-    v_price := p_unit_price;
-  ELSIF p_order_id IS NOT NULL THEN
+  -- 0027: el pedido (si viene) siempre valida su tienda y atribuye el
+  -- distribuidor; el precio informado solo pisa el unit_price al final.
+  IF p_order_id IS NOT NULL THEN
     SELECT o.distributor_id, o.store_id INTO v_dist, v_order_store
     FROM public.orders o WHERE o.id = p_order_id;
     IF NOT FOUND THEN
@@ -101,7 +97,13 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION 'producto % no pertenece al pedido %', p_product, p_order_id;
     END IF;
-  ELSE
+  END IF;
+  IF p_unit_price IS NOT NULL THEN
+    IF p_unit_price <= 0 THEN
+      RAISE EXCEPTION 'register_entry: el precio de compra debe ser > 0';
+    END IF;
+    v_price := p_unit_price;
+  ELSIF p_order_id IS NULL THEN
     SELECT pp.price INTO v_price
     FROM public.price_publications pp
     WHERE pp.product_id = p_product AND pp.store_id = p_store AND pp.is_active;
@@ -142,13 +144,9 @@ BEGIN
   IF p_qty IS NULL OR p_qty <= 0 THEN
     RAISE EXCEPTION 'register_exit: quantity debe ser > 0';
   END IF;
-  -- 0027: el precio de venta informado manda sobre la derivación anterior.
-  IF p_unit_price IS NOT NULL THEN
-    IF p_unit_price <= 0 THEN
-      RAISE EXCEPTION 'register_exit: el precio de venta debe ser > 0';
-    END IF;
-    v_price := p_unit_price;
-  ELSIF p_order_id IS NOT NULL THEN
+  -- 0027: el pedido (si viene) siempre valida su tienda y atribuye el
+  -- distribuidor; el precio informado solo pisa el unit_price al final.
+  IF p_order_id IS NOT NULL THEN
     SELECT o.distributor_id, o.store_id INTO v_dist, v_order_store
     FROM public.orders o WHERE o.id = p_order_id;
     IF NOT FOUND THEN
@@ -163,7 +161,13 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION 'producto % no pertenece al pedido %', p_product, p_order_id;
     END IF;
-  ELSE
+  END IF;
+  IF p_unit_price IS NOT NULL THEN
+    IF p_unit_price <= 0 THEN
+      RAISE EXCEPTION 'register_exit: el precio de venta debe ser > 0';
+    END IF;
+    v_price := p_unit_price;
+  ELSIF p_order_id IS NULL THEN
     SELECT pp.price INTO v_price
     FROM public.price_publications pp
     WHERE pp.product_id = p_product AND pp.store_id = p_store AND pp.is_active;

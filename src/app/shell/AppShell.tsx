@@ -25,7 +25,9 @@ export function AppShell() {
         : Promise.resolve({ data: [], error: null }),
     [showAlerts, location.pathname],
   );
-  const alertCount = alerts.data?.length ?? 0;
+  // El badge cuenta las NO leídas para alinearse con «N abiertas» de la
+  // página de Alertas; se refresca al navegar (sin realtime).
+  const alertCount = alerts.data?.filter((alert) => alert.read_at === null).length ?? 0;
   // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
   // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
   // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la

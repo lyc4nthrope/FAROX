@@ -100,6 +100,13 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
           type: "order_late",
           message: "Pedido atrasado",
           created_at: "2026-10-28T10:00:00Z",
+          read_at: "2026-10-28T11:00:00Z",
+        },
+        {
+          id: 4,
+          type: "credit_overdue",
+          message: "Fiado vencido",
+          created_at: "2026-10-28T10:00:00Z",
           read_at: null,
         },
       ],
@@ -108,6 +115,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
 
     renderShell("operador");
 
+    // Cuenta solo las NO leídas (3 de 4).
     const badge = await screen.findByLabelText("3 alertas");
     expect(badge).toHaveTextContent("3");
   });

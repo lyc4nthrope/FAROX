@@ -249,16 +249,17 @@ export function AddProductsPanel({
   }, [search, activeSearch, setQuery]);
 
   // El filtro cambia el WHERE del servidor: se refetchea al activarlo y cuando
-  // termina de cargar el estado real de la tienda.
-  const refetch = list.refetch;
+  // termina de cargar el estado real de la tienda. Se vuelve a la página 0
+  // (con el filtro puesto, la página actual puede quedar vacía).
+  const setPageZero = list.setQuery;
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
       return;
     }
-    refetch();
-  }, [onlyUnassigned, assignedIds, refetch]);
+    setPageZero({ page: 0 });
+  }, [onlyUnassigned, assignedIds, setPageZero]);
 
   function isAssigned(productId: number): boolean {
     return target.kind === "store"
@@ -295,6 +296,8 @@ export function AddProductsPanel({
     if (error === null) {
       setQuantities((current) => ({ ...current, [product.id]: "0" }));
       setPrices((current) => ({ ...current, [product.id]: "" }));
+      if (target.kind === "store") storeStock.reload();
+      else distributorIds.reload();
       onAdded();
     }
     setBusyId(null);
