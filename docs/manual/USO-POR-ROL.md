@@ -57,7 +57,9 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Quiero… | Dónde | Cómo |
 |---|---|---|
 | Vincularme a una tienda | Vincular tienda | Tocá “Escanear QR” y permití la cámara, o escribí el código manualmente. Si la cámara falla, el código sigue disponible |
-| Ver mi ruta de hoy | Mi ruta | Paradas en orden y "Abrir recorrido en Google Maps" |
+| Ver mi ruta de hoy | Mi ruta | Mapa + lista de tiendas con solicitudes abiertas; las paradas asignadas quedan debajo |
+| Elegir tiendas para el recorrido | Mi ruta | Marcá las tiendas de la lista; solo las marcadas aparecen en el mapa y se numeran igual en ambos lados |
+| Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora |

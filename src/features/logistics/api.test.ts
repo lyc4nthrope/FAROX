@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import { googleMapsUrl, markStop, saveRoute, updateRouteStatus } from "./api";
+import { googleMapsUrl, markStop, saveRoute, updateRouteStatus, fetchStoresWithRequests } from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: { rpc: vi.fn(), from: vi.fn() },
 }));
 
 const rpc = supabase.rpc as unknown as ReturnType<typeof vi.fn>;
+const from = supabase.from as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -35,6 +36,65 @@ describe("logistics api", () => {
     expect(rpc).toHaveBeenCalledWith("mark_stop", { p_stop: 8, p_status: "arrived" });
     await updateRouteStatus(4, "completed");
     expect(rpc).toHaveBeenCalledWith("update_route_status", { p_route: 4, p_status: "completed" });
+  });
+});
+
+describe("fetchStoresWithRequests", () => {
+  it("agrupa pedidos por tienda, toma la próxima entrega y une coordenadas", async () => {
+    const orders = {
+      select: vi.fn(),
+      in: vi.fn(),
+      limit: vi.fn().mockResolvedValue({
+        data: [
+          {
+            store_id: 1,
+            expected_at: "2026-10-30T12:00:00Z",
+            store: { id: 1, name: "Tienda Centro", address: "Calle 1", city: "Bogotá" },
+          },
+          {
+            store_id: 1,
+            expected_at: "2026-10-29T12:00:00Z",
+            store: { id: 1, name: "Tienda Centro", address: "Calle 1", city: "Bogotá" },
+          },
+          {
+            store_id: 2,
+            expected_at: null,
+            store: { id: 2, name: "Tienda Sin Geo", address: null, city: "Bogotá" },
+          },
+        ],
+        error: null,
+      }),
+    };
+    orders.select.mockReturnValue(orders);
+    orders.in.mockReturnValue(orders);
+
+    const geo = {
+      select: vi.fn(),
+      in: vi.fn().mockResolvedValue({
+        data: [{ id: 1, lat: 4.6, lng: -74.1 }],
+        error: null,
+      }),
+    };
+    geo.select.mockReturnValue(geo);
+    from.mockReturnValueOnce(orders).mockReturnValueOnce(geo);
+
+    const result = await fetchStoresWithRequests();
+
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual([
+      {
+        id: 1,
+        name: "Tienda Centro",
+        address: "Calle 1",
+        city: "Bogotá",
+        lat: 4.6,
+        lng: -74.1,
+        orderCount: 2,
+        nextExpectedAt: "2026-10-29T12:00:00Z",
+      },
+    ]);
+    expect(orders.in).toHaveBeenCalledWith("status", ["pending", "in_route"]);
+    expect(geo.in).toHaveBeenCalledWith("id", [1, 2]);
   });
 });
 
