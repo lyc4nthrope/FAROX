@@ -35,11 +35,11 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Quiero… | Dónde | Cómo |
 |---|---|---|
 | Ver el stock y su estado | Inventario → mi tienda → Productos | OK / Bajo / Agotado según el umbral |
-| Agregar productos a mi tienda | Inventario → mi tienda → Productos → Agregar productos | Buscá en el registro; cada fila agrega (el botón queda como referencia) y el stepper − / + define la cantidad inicial |
+| Agregar productos a mi tienda | Inventario → mi tienda → Productos → Agregar productos | Buscá en el registro; la columna «En la tienda» muestra el stock actual y bloquea los ya asignados. Cada fila agrega (el botón queda como referencia) y el stepper − / + define la cantidad inicial |
 | Editar cantidad y umbral | Inventario → mi tienda → Productos → Editar | Se abre un modal; los cambios se guardan una sola vez y sin registrar movimiento |
 | Marcar o quitar un faltante | Inventario → mi tienda → Productos | Acción ámbar para marcar y esmeralda para resolver; se refleja en `/faltantes` |
 | Quitar un producto de mi tienda | Inventario → mi tienda → Productos → Quitar | Botón rojo; con stock pide doble confirmación y descarta las existencias |
-| Registrar una venta o una compra | Inventario → Registrar entrada o salida | Tipo, producto, cantidad, motivo (y vencimiento en entradas). **Requiere Premium** |
+| Registrar una venta o una compra | Inventario → Registrar entrada o salida | Buscá el producto por nombre o marca, elegilo de la lista, ajustá la cantidad con − / + y poné el motivo (y vencimiento en entradas). **Requiere Premium** |
 | Ver qué se está agotando | Alertas | Marcar leída cuando la revise |
 | Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados |
 | Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |

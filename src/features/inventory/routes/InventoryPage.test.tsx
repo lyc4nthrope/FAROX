@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -164,10 +164,10 @@ describe("InventoryPage · acciones en botones", () => {
       name: "Registrar entrada o salida",
     });
     expect(within(dialog).getByRole("group", { name: "Tipo de movimiento" })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Producto")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Buscar producto")).toBeInTheDocument();
   });
 
-  it("el selector de producto filtra por marca y cantidad en stock", async () => {
+  it("el movimiento se busca por marca y se registra con el stepper", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
       data: [
         { product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 12 },
@@ -179,6 +179,7 @@ describe("InventoryPage · acciones en botones", () => {
       data: [{ id: 1, name: "Compra", suggested_type: "entry" }],
       error: null,
     });
+    vi.mocked(inventoryApi.registerMovement).mockResolvedValue({ error: null });
 
     renderPage();
     const user = userEvent.setup();
@@ -188,13 +189,26 @@ describe("InventoryPage · acciones en botones", () => {
     });
 
     await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
-    expect(within(dialog).queryByRole("option", { name: /Arroz Diana/ })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("option", { name: /Leche Alpina/ })).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: /Arroz Diana/ }),
+    ).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Leche Alpina" }),
+    );
+    await user.selectOptions(within(dialog).getByLabelText("Motivo"), "1");
+    await user.click(within(dialog).getByRole("button", { name: "Registrar entrada" }));
 
-    await user.clear(within(dialog).getByLabelText("Buscar producto"));
-    await user.type(within(dialog).getByLabelText("Cantidad mínima en stock"), "20");
-    expect(within(dialog).getByRole("option", { name: /Leche Alpina/ })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("option", { name: /Arroz Diana/ })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(inventoryApi.registerMovement).toHaveBeenCalledWith({
+        type: "entry",
+        storeId: 10,
+        productId: 2,
+        quantity: 2,
+        motiveId: 1,
+        expiryDate: null,
+      }),
+    );
   });
 
   it("sin premium: el mismo botón explica el candado en vez de esconderlo", async () => {

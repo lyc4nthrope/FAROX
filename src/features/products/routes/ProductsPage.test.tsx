@@ -30,6 +30,8 @@ vi.mock("../api", () => ({
   fetchActiveProductsForCatalog: vi.fn(),
   addStoreProduct: vi.fn(),
   removeStoreCatalogProduct: vi.fn(),
+  fetchStoreStock: vi.fn(),
+  fetchDistributorProductIds: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   removeDistributorCatalogProduct: vi.fn(),
   setStoreProductQuantity: vi.fn(),
@@ -137,6 +139,8 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       error: null,
     });
     vi.mocked(productsApi.addStoreProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({ data: [], error: null });
+    vi.mocked(productsApi.fetchDistributorProductIds).mockResolvedValue({ data: [], error: null });
     vi.mocked(productsApi.removeStoreCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.addDistributorCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.removeDistributorCatalogProduct).mockResolvedValue({ error: null });
@@ -253,6 +257,24 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
 
     await waitFor(() => expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 1));
     expect(within(dialog).getByRole("button", { name: "Agregar" })).toBeInTheDocument();
+  });
+
+  it("S11/0026: un producto ya asignado muestra su stock y no se agrega otra vez", async () => {
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({
+      data: [{ product_id: 2, quantity: 7 }],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+
+    expect(await within(dialog).findByText("En tienda · 7")).toBeInTheDocument();
+    const yaEsta = within(dialog).getByRole("button", { name: "Ya está" });
+    expect(yaEsta).toBeDisabled();
+    await user.click(within(dialog).getByText("Arroz blanco"));
+    expect(productsApi.addStoreProduct).not.toHaveBeenCalled();
   });
 
   it("S2: el alta es una ventana emergente y Escape la cierra", async () => {

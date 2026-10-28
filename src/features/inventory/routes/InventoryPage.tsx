@@ -14,7 +14,7 @@ import {
   runAction,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
-import { EmptyState, PremiumLock, ProductPicker, type ProductPickerOption } from "../../../shared/ui";
+import { EmptyState, PremiumLock, ProductPicker, QuantityStepper, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
 import {
@@ -177,6 +177,13 @@ function movementIcon(tone: keyof typeof MOVEMENT_TONES): ReactNode {
   );
 }
 
+function normalizeSearch(value: string): string {
+  return value
+    .toLocaleLowerCase("es")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
 function segmentClass(active: boolean, tone: "entry" | "exit"): string {
   const base =
     "rounded-lg px-4 py-1.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900";
@@ -302,6 +309,7 @@ export function InventoryPage() {
     motiveId: "",
     expiry: "",
   });
+  const [movementSearch, setMovementSearch] = useState("");
   async function onMovement(event: FormEvent) {
     event.preventDefault();
     if (mov.productId === "" || mov.motiveId === "" || Number(mov.quantity) <= 0) {
@@ -322,6 +330,7 @@ export function InventoryPage() {
     );
     if (success) {
       setMov({ type: "entry", productId: "", quantity: "", motiveId: "", expiry: "" });
+      setMovementSearch("");
       setModal(null);
     }
   }
@@ -361,6 +370,11 @@ export function InventoryPage() {
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
   const selectedStock =
     stockOptions.data?.find((row) => row.product_id === Number(mov.productId)) ?? null;
+  const movementProducts = (stockOptions.data ?? []).filter((row) =>
+    normalizeSearch(`${row.product_name} ${row.brand ?? ""}`).includes(
+      normalizeSearch(movementSearch),
+    ),
+  );
   const selectedPrice =
     prices.data?.find((row) => row.product_id === Number(price.productId)) ?? null;
   const sortedPrices = [...(prices.data ?? [])].sort((a, b) =>
@@ -395,35 +409,83 @@ export function InventoryPage() {
         </div>
       </div>
 
-      <ProductPicker
-        label="Producto"
-        value={mov.productId}
-        onChange={(value) => setMov({ ...mov, productId: value })}
-        options={stockPickerOptions}
-        loading={stockOptions.loading}
-        error={stockOptions.error}
-        required
-        showQuantityFilter
-        autoFocusSearch
-        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
-      />
-      {selectedStock !== null && (
-        <p className="-mt-3 mb-3 text-xs text-gray-500">
-          Stock actual:{" "}
-          <span className="font-medium text-gray-900">{formatQty(selectedStock.quantity)}</span>
-        </p>
-      )}
-      <Field label="Cantidad">
-        <input
-          className={inputClass}
-          type="number"
-          min="0.001"
-          step="0.001"
-          value={mov.quantity}
-          onChange={(e) => setMov({ ...mov, quantity: e.target.value })}
-          required
-        />
-      </Field>
+      <div className="mb-4">
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="text-xs font-semibold tracking-wide text-gray-600">Producto</span>
+          <input
+            className={inputClass}
+            type="search"
+            placeholder="Nombre o marca…"
+            aria-label="Buscar producto"
+            autoFocus
+            value={movementSearch}
+            onChange={(event) => setMovementSearch(event.target.value)}
+          />
+        </label>
+        <Status loading={stockOptions.loading} error={stockOptions.error} />
+        <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-gray-100">
+          {movementProducts.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-gray-500">
+              {stockOptions.data?.length === 0
+                ? "La tienda no tiene productos asignados. Usá «Agregar productos» primero."
+                : "Ningún producto coincide con la búsqueda."}
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {movementProducts.map((row) => {
+                const selected = String(row.product_id) === mov.productId;
+                return (
+                  <li key={row.product_id}>
+                    <button
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() =>
+                        setMov({
+                          ...mov,
+                          productId: String(row.product_id),
+                          quantity: mov.quantity === "" ? "1" : mov.quantity,
+                        })
+                      }
+                      className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition ${
+                        selected ? "bg-gray-900 text-white" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{row.product_name}</span>
+                        <span
+                          className={`block truncate text-xs ${
+                            selected ? "text-gray-300" : "text-gray-500"
+                          }`}
+                        >
+                          {row.brand ?? "Sin marca"} · Stock: {formatQty(row.quantity)}
+                        </span>
+                      </span>
+                      {selected && (
+                        <span aria-hidden="true" className="text-xs font-semibold">
+                          Elegido
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <span className="block text-xs font-semibold tracking-wide text-gray-600">
+          Cantidad
+        </span>
+        <div className="mt-1.5">
+          <QuantityStepper
+            label={selectedStock?.product_name ?? "movimiento"}
+            value={mov.quantity}
+            onChange={(quantity) => setMov({ ...mov, quantity })}
+          />
+        </div>
+      </div>
 
       <Status loading={motives.loading} error={motives.error} />
       <Field label="Motivo">

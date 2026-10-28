@@ -19,6 +19,8 @@ vi.mock("../api", () => ({
   createProduct: vi.fn(),
   fetchBrands: vi.fn(),
   fetchUnitTypes: vi.fn(),
+  fetchStoreStock: vi.fn(),
+  fetchDistributorProductIds: vi.fn(),
 }));
 
 const ROW: CatalogEntry = {
@@ -55,6 +57,11 @@ beforeEach(() => {
   vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
     rows: [],
     count: 0,
+    error: null,
+  });
+  vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({ data: [], error: null });
+  vi.mocked(productsApi.fetchDistributorProductIds).mockResolvedValue({
+    data: [],
     error: null,
   });
 });

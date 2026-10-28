@@ -1,16 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
+import { formatQty } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import {
+  Badge,
   Status,
   buttonClass,
   inputClass,
   runAction,
 } from "../../../shared/ui/Box";
-import { QuantityStepper } from "../../../shared/ui";
+import { EmptyState, ErrorBanner, QuantityStepper } from "../../../shared/ui";
 import { Pager } from "../../../shared/ui/Pager";
 import {
   addDistributorCatalogProduct,
@@ -18,11 +20,12 @@ import {
   createProduct,
   fetchActiveProductsForCatalog,
   fetchBrands,
+  fetchDistributorProductIds,
   fetchProductCategories,
+  fetchStoreStock,
   fetchUnitTypes,
 } from "../api";
 import { ProductForm, type ProductFormErrors } from "./ProductForm";
-import { ProductList } from "./ProductList";
 import { productSchema, type ProductFormValues } from "../schemas";
 import type { CatalogQuery, CatalogRef, CatalogTarget, ProductListRow } from "../types";
 
@@ -198,12 +201,44 @@ export function AddProductsPanel({
     return () => clearTimeout(timer);
   }, [search, activeSearch, setQuery]);
 
+  // 0026: estado real de la entidad para reemplazar la columna «Estado» (que
+  // solo decía Activo) por algo útil: qué ya está asignado y con cuánto stock.
+  const storeStock = useLoad(
+    () =>
+      target.kind === "store"
+        ? fetchStoreStock(target.id)
+        : Promise.resolve({ data: [] as { product_id: number; quantity: number }[], error: null }),
+    [target.kind, target.id],
+  );
+  const distributorIds = useLoad(
+    () =>
+      target.kind === "distribuidor"
+        ? fetchDistributorProductIds()
+        : Promise.resolve({ data: [] as number[], error: null }),
+    [target.kind],
+  );
+  const stockByProduct = useMemo(
+    () => new Map((storeStock.data ?? []).map((row) => [row.product_id, row.quantity])),
+    [storeStock.data],
+  );
+  const distributorSet = useMemo(
+    () => new Set(distributorIds.data ?? []),
+    [distributorIds.data],
+  );
+  const assignedError = storeStock.error ?? distributorIds.error;
+
+  function isAssigned(productId: number): boolean {
+    return target.kind === "store"
+      ? stockByProduct.has(productId)
+      : distributorSet.has(productId);
+  }
+
   function quantityOf(productId: number): string {
     return quantities[productId] ?? "0";
   }
 
   async function agregar(product: ProductListRow): Promise<void> {
-    if (busyId === product.id) return;
+    if (busyId === product.id || isAssigned(product.id)) return;
     setBusyId(product.id);
     const raw = Number(quantityOf(product.id));
     const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;
@@ -223,7 +258,7 @@ export function AddProductsPanel({
   // Sin marco propio: lo envuelve el <Modal> de la pantalla.
   return (
     <>
-      <Status error={msg.error} ok={msg.ok} />
+      <Status error={msg.error ?? assignedError} ok={msg.ok} />
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <div className="w-full max-w-xs">
@@ -284,35 +319,100 @@ export function AddProductsPanel({
         />
       )}
 
-      <ProductList
-        rows={list.rows}
-        loading={list.loading}
-        error={list.error}
-        emptyTitle="No hay productos que coincidan con la búsqueda"
-        emptyHint="Probá con otro nombre, otra categoría o pasá a la página siguiente."
-        onRowClick={(row) => void agregar(row)}
-        renderAction={(row) => (
-          <span className="flex flex-wrap items-center justify-end gap-2">
-            {target.kind === "store" && (
-              <QuantityStepper
-                label={row.name}
-                value={quantityOf(row.id)}
-                onChange={(value) =>
-                  setQuantities((current) => ({ ...current, [row.id]: value }))
-                }
-              />
-            )}
-            <button
-              className={`${buttonClass} whitespace-normal text-center leading-tight`}
-              type="button"
-              disabled={busyId === row.id}
-              onClick={() => void agregar(row)}
-            >
-              Agregar
-            </button>
-          </span>
-        )}
-      />
+      {list.error !== null && <ErrorBanner message={list.error} />}
+      {list.error === null && list.loading && (
+        <p className="mt-4 text-sm text-gray-600">Cargando…</p>
+      )}
+      {list.error === null && !list.loading && list.rows.length === 0 && (
+        <div className="mt-4">
+          <EmptyState
+            title="No hay productos que coincidan con la búsqueda"
+            hint="Probá con otro nombre, otra categoría o pasá a la página siguiente."
+          />
+        </div>
+      )}
+      {list.error === null && !list.loading && list.rows.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[640px] table-fixed border-collapse text-left text-sm">
+            <colgroup>
+              <col className="w-[46%]" />
+              <col className="w-[22%]" />
+              <col className="w-[32%]" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-600">
+                <th className="py-2 pr-3 font-medium">Producto</th>
+                <th className="py-2 pr-3 font-medium">
+                  {target.kind === "store" ? "En la tienda" : "En el catálogo"}
+                </th>
+                <th className="py-2 text-right font-medium">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.rows.map((row) => {
+                const assigned = isAssigned(row.id);
+                const quantity = stockByProduct.get(row.id) ?? 0;
+                const meta = [row.brand?.name, row.unit?.name, row.category?.name]
+                  .filter((value): value is string => value !== null && value !== undefined)
+                  .join(" · ");
+                return (
+                  <tr
+                    key={row.id}
+                    onClick={() => {
+                      if (!assigned) void agregar(row);
+                    }}
+                    className={`border-b border-gray-100 align-top ${
+                      assigned
+                        ? ""
+                        : "cursor-pointer transition-colors hover:bg-gray-50"
+                    }`}
+                  >
+                    <td className="min-w-0 py-2 pr-3 align-top">
+                      <p className="break-words font-medium text-gray-900">{row.name}</p>
+                      {meta !== "" && (
+                        <p className="break-words text-xs text-gray-500">{meta}</p>
+                      )}
+                    </td>
+                    <td className="py-2 pr-3 align-top">
+                      {assigned ? (
+                        <Badge tone="green">
+                          {target.kind === "store"
+                            ? `En tienda · ${formatQty(quantity)}`
+                            : "En catálogo"}
+                        </Badge>
+                      ) : (
+                        <Badge tone="gray">Sin asignar</Badge>
+                      )}
+                    </td>
+                    <td className="py-2 align-top" onClick={(event) => event.stopPropagation()}>
+                      <span className="flex items-center justify-end gap-2 whitespace-nowrap">
+                        {target.kind === "store" && !assigned && (
+                          <QuantityStepper
+                            label={row.name}
+                            value={quantityOf(row.id)}
+                            onChange={(value) =>
+                              setQuantities((current) => ({ ...current, [row.id]: value }))
+                            }
+                          />
+                        )}
+                        <button
+                          className={`${buttonClass} whitespace-nowrap px-2.5 py-1.5 text-center text-xs leading-tight`}
+                          type="button"
+                          disabled={assigned || busyId === row.id}
+                          title={assigned ? "Ya está asignado; editalo desde la tabla" : undefined}
+                          onClick={() => void agregar(row)}
+                        >
+                          {assigned ? "Ya está" : busyId === row.id ? "Agregando…" : "Agregar"}
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <Pager list={list} />
     </>
   );

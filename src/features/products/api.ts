@@ -468,6 +468,39 @@ export async function fetchActiveProductsForCatalog(
   return { rows, count, error: null };
 }
 
+// 0026 — stock actual por producto para el alta: permite mostrar «En tienda»
+// y no ofrecer otra vez un producto ya asignado.
+export interface StoreStockRow {
+  product_id: number;
+  quantity: number;
+}
+
+export async function fetchStoreStock(storeId: number): Promise<LoadResult<StoreStockRow[]>> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select("product_id,quantity")
+    .eq("store_id", storeId)
+    .limit(1000);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) => ({
+    product_id: normalizeId(raw.product_id),
+    quantity: normalizeQuantity(raw.quantity),
+  }));
+  return { data: rows, error };
+}
+
+// 0026 — ids del catálogo del distribuidor autenticado (RLS por
+// my_distributor_id) para marcar «En catálogo» en el alta.
+export async function fetchDistributorProductIds(): Promise<LoadResult<number[]>> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select("product_id")
+    .limit(1000);
+  const ids = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
+    normalizeId(raw.product_id),
+  );
+  return { data: ids, error };
+}
+
 // 0026 — alta de un producto en la tienda con cantidad inicial en UNA llamada.
 // Si ya estaba asignado, la RPC no pisa la cantidad existente.
 export async function addStoreProduct(
