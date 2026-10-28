@@ -10,12 +10,11 @@ vi.mock("../api", () => ({
   fetchProductCategories: vi.fn(),
   fetchStoreCatalog: vi.fn(),
   removeStoreProduct: vi.fn(),
-  setStoreProductQuantity: vi.fn(),
   setStoreProductShortage: vi.fn(),
-  setStoreProductThreshold: vi.fn(),
+  updateStoreProduct: vi.fn(),
   // AddProductsPanel (montado dentro del modal) usa estas.
   fetchActiveProductsForCatalog: vi.fn(),
-  addStoreCatalogProduct: vi.fn(),
+  addStoreProduct: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   createProduct: vi.fn(),
   fetchBrands: vi.fn(),
@@ -50,8 +49,7 @@ beforeEach(() => {
     count: 1,
     error: null,
   });
-  vi.mocked(productsApi.setStoreProductQuantity).mockResolvedValue({ error: null });
-  vi.mocked(productsApi.setStoreProductThreshold).mockResolvedValue({ error: null });
+  vi.mocked(productsApi.updateStoreProduct).mockResolvedValue({ error: null });
   vi.mocked(productsApi.setStoreProductShortage).mockResolvedValue({ error: null });
   vi.mocked(productsApi.removeStoreProduct).mockResolvedValue({ error: null });
   vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
@@ -71,8 +69,8 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
 
     expect(await screen.findByText("Arroz Diana")).toBeInTheDocument();
     expect(screen.getByText("Diana")).toBeInTheDocument();
-    expect(screen.getByLabelText("Cantidad de Arroz Diana")).toHaveValue(12);
-    expect(screen.getByLabelText("Umbral de Arroz Diana")).toHaveValue(5);
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("2026-12-31")).toBeInTheDocument();
     expect(screen.getByText("OK")).toBeInTheDocument();
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledWith(10, {
@@ -84,35 +82,43 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     });
   });
 
-  it("guarda la cantidad editada sin registrar un movimiento", async () => {
+  it("edita cantidad y umbral en un modal y guarda con UNA sola RPC", async () => {
     renderPanel();
     const user = userEvent.setup();
 
-    const input = await screen.findByLabelText("Cantidad de Arroz Diana");
-    await user.clear(input);
-    await user.type(input, "20");
-    await user.click(within(input.parentElement as HTMLElement).getByRole("button", { name: "Guardar" }));
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
+    );
+    const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
+    await user.clear(umbral);
+    await user.type(umbral, "8");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() =>
-      expect(productsApi.setStoreProductQuantity).toHaveBeenCalledWith(10, 1, 20),
+      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 13, 8, false),
     );
-    expect(await screen.findByText('Cantidad de "Arroz Diana" actualizada.')).toBeInTheDocument();
+    expect(productsApi.updateStoreProduct).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('"Arroz Diana" actualizado.')).toBeInTheDocument();
   });
 
-  it("guarda y limpia el umbral con set_stock_threshold", async () => {
+  it("cancelar la edición no guarda nada", async () => {
     renderPanel();
     const user = userEvent.setup();
 
-    const input = await screen.findByLabelText("Umbral de Arroz Diana");
-    await user.clear(input);
-    await user.click(within(input.parentElement as HTMLElement).getByRole("button", { name: "Guardar" }));
-
-    await waitFor(() =>
-      expect(productsApi.setStoreProductThreshold).toHaveBeenCalledWith(10, 1, null),
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
     );
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+
+    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
   });
 
-  it("marca el faltante del producto", async () => {
+  it("marca el faltante del producto con su acción propia", async () => {
     renderPanel();
     const user = userEvent.setup();
 

@@ -14,6 +14,7 @@ import {
 } from "../../../shared/ui/Box";
 import { fetchShortageProducts } from "../../products/api";
 import type { ShortageRow } from "../../products/types";
+import { QuantityStepper } from "../../../shared/ui";
 import {
   fetchStoreDistributorProducts,
   fetchLinkedDistributorOptions,
@@ -25,7 +26,6 @@ import {
   fetchStoreProducts,
   type Option,
 } from "../api";
-import { QuantityStepper } from "../components/QuantityStepper";
 
 interface Line {
   productId: string;
@@ -394,7 +394,12 @@ export function NewOrderPage() {
                     return (
                       <li
                         key={product.id}
-                        className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                        onClick={() => {
+                          if (!added) addProduct(product.id);
+                        }}
+                        className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2 ${
+                          added ? "" : "cursor-pointer transition-colors hover:bg-gray-50"
+                        }`}
                       >
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-gray-900">
@@ -403,11 +408,14 @@ export function NewOrderPage() {
                           <p className="truncate text-xs text-gray-500">{productMeta(product)}</p>
                         </div>
                         <button
-                          className={`${secondaryButtonClass} px-2.5 py-1.5 text-xs`}
+                          className={`${secondaryButtonClass} whitespace-normal px-2.5 py-1.5 text-center text-xs leading-tight`}
                           type="button"
                           aria-label={`Agregar ${product.name}`}
                           disabled={added}
-                          onClick={() => addProduct(product.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            addProduct(product.id);
+                          }}
                         >
                           {added ? "Agregado" : "Agregar"}
                         </button>
@@ -481,7 +489,7 @@ export function NewOrderPage() {
                   </p>
                 </div>
                 <button
-                  className={secondaryButtonClass}
+                  className={`${secondaryButtonClass} whitespace-normal text-center leading-tight`}
                   type="button"
                   disabled={distributorId === ""}
                   onClick={addAllShortages}
@@ -496,21 +504,31 @@ export function NewOrderPage() {
                   return (
                     <li
                       key={row.product_id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-sm"
+                      onClick={() => {
+                        if (requestable && !added) addProduct(row.product_id);
+                      }}
+                      className={`flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-2 text-sm ${
+                        requestable && !added
+                          ? "cursor-pointer transition-colors hover:bg-amber-50/60"
+                          : ""
+                      }`}
                     >
                       <ShortageLabel row={row} />
                       <span className="flex flex-wrap items-center gap-2">
                         {!requestable && (
-                          <span className="text-xs text-gray-500">
+                          <span className="whitespace-normal text-xs text-gray-500">
                             No está en el catálogo del distribuidor
                           </span>
                         )}
                         <button
-                          className={secondaryButtonClass}
+                          className={`${secondaryButtonClass} whitespace-normal px-2.5 py-1.5 text-center text-xs leading-tight`}
                           type="button"
                           aria-label={`Agregar faltante ${row.name}`}
                           disabled={!requestable || added}
-                          onClick={() => addProduct(row.product_id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            addProduct(row.product_id);
+                          }}
                         >
                           {added ? "Agregado" : "Agregar"}
                         </button>

@@ -28,7 +28,7 @@ vi.mock("../api", () => ({
   fetchStoreCatalog: vi.fn(),
   fetchDistributorCatalog: vi.fn(),
   fetchActiveProductsForCatalog: vi.fn(),
-  addStoreCatalogProduct: vi.fn(),
+  addStoreProduct: vi.fn(),
   removeStoreCatalogProduct: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   removeDistributorCatalogProduct: vi.fn(),
@@ -136,7 +136,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       count: 1,
       error: null,
     });
-    vi.mocked(productsApi.addStoreCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.addStoreProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.removeStoreCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.addDistributorCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.removeDistributorCatalogProduct).mockResolvedValue({ error: null });
@@ -232,10 +232,27 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
     await user.click(await within(dialog).findByRole("button", { name: "Agregar" }));
 
-    await waitFor(() => expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2));
+    await waitFor(() => expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 0));
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
     // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S2/0026: la fila del registro agrega y el stepper define la cantidad inicial", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz blanco" }),
+    );
+    // La fila entera agrega; el botón sigue existiendo como referencia.
+    await user.click(within(dialog).getByText("Arroz blanco"));
+
+    await waitFor(() => expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 1));
+    expect(within(dialog).getByRole("button", { name: "Agregar" })).toBeInTheDocument();
   });
 
   it("S2: el alta es una ventana emergente y Escape la cierra", async () => {

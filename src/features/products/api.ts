@@ -281,8 +281,8 @@ export async function deleteProduct(
 // Catálogo por rol (0019) — la vista general es SOLO del admin.
 //
 // · Tienda (operador): su catálogo es la asignación stock (producto ↔ tienda).
-//   El alta usa assign_product_to_store (0011:361-381); la baja usa
-//   unassign_product_from_store (0019), que solo borra con quantity = 0.
+//   El alta usa add_store_product (0026, cantidad inicial en una llamada); la
+//   baja usa unassign_product_from_store (0019), que solo borra con quantity = 0.
 // · Distribuidor: catálogo propio en distributor_products + RPCs de 0019; el
 //   alcance sale del JWT en la DB, nunca de un parámetro del cliente.
 // · El registro global sigue siendo legible por todos (products_select USING
@@ -468,14 +468,38 @@ export async function fetchActiveProductsForCatalog(
   return { rows, count, error: null };
 }
 
-export async function addStoreCatalogProduct(
+// 0026 — alta de un producto en la tienda con cantidad inicial en UNA llamada.
+// Si ya estaba asignado, la RPC no pisa la cantidad existente.
+export async function addStoreProduct(
   storeId: number,
   productId: number,
+  quantity: number,
+  threshold: number | null = null,
 ): Promise<{ error: { message: string } | null }> {
-  const { error } = await supabase.rpc("assign_product_to_store", {
+  const { error } = await supabase.rpc("add_store_product", {
     p_product: productId,
     p_store: storeId,
-    p_threshold: null,
+    p_quantity: quantity,
+    p_threshold: threshold,
+  });
+  return { error };
+}
+
+// 0026 — edición del producto de la tienda en UNA llamada: cantidad, umbral y
+// faltante. Reemplaza la edición inline con un «Guardar» por celda.
+export async function updateStoreProduct(
+  storeId: number,
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  shortage: boolean | null = null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_store_product", {
+    p_product: productId,
+    p_store: storeId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_shortage: shortage,
   });
   return { error };
 }
@@ -532,21 +556,6 @@ export async function setStoreProductShortage(
     p_product: productId,
     p_store: storeId,
     p_shortage: shortage,
-  });
-  return { error };
-}
-
-// 0024 — umbral de alerta editable desde el inventario unificado. Acepta null
-// para dejarlo sin umbral (assign_product_to_store conserva el anterior).
-export async function setStoreProductThreshold(
-  storeId: number,
-  productId: number,
-  threshold: number | null,
-): Promise<{ error: { message: string } | null }> {
-  const { error } = await supabase.rpc("set_stock_threshold", {
-    p_product: productId,
-    p_store: storeId,
-    p_threshold: threshold,
   });
   return { error };
 }

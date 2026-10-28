@@ -11,3 +11,4 @@ export { PremiumLock } from "./PremiumLock";
 export type { PremiumLockProps } from "./PremiumLock";
 export { ProductPicker } from "./ProductPicker";
 export type { ProductPickerOption, ProductPickerProps } from "./ProductPicker";
+export { QuantityStepper } from "./QuantityStepper";

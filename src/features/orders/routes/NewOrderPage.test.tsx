@@ -217,6 +217,16 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(screen.getAllByLabelText("Cantidad de Arroz")).toHaveLength(1);
   });
 
+  it("la fila del resultado también agrega el producto", async () => {
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText("Buscar producto"), "arroz");
+    await user.click(await screen.findByText("Arroz"));
+
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1);
+  });
+
   it("operador con todos los productos sin precio: igual puede solicitar", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [

@@ -4,22 +4,19 @@ import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { formatQty } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
-import { DataTable, type DataTableColumn } from "../../../shared/ui";
-import { Badge, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { DataTable, QuantityStepper, type DataTableColumn } from "../../../shared/ui";
+import { Badge, Status, buttonClass, inputClass, runAction, secondaryButtonClass } from "../../../shared/ui/Box";
 import { Modal } from "../../../shared/ui/Modal";
 import { Pager } from "../../../shared/ui/Pager";
 import {
   fetchProductCategories,
   fetchStoreCatalog,
   removeStoreProduct,
-  setStoreProductQuantity,
   setStoreProductShortage,
-  setStoreProductThreshold,
+  updateStoreProduct,
 } from "../api";
 import type { CatalogEntry, CatalogQuery, CatalogRef } from "../types";
 import { AddProductsPanel } from "./AddProductsPanel";
-import { QuantityEditor } from "./QuantityEditor";
-import { ThresholdEditor } from "./ThresholdEditor";
 
 interface Msg {
   error: string | null;
@@ -36,7 +33,17 @@ const INITIAL_QUERY: CatalogQuery = {
   onlyShortage: false,
 };
 
-type RowAction = "quantity" | "threshold" | "shortage" | "remove";
+type RowAction = "shortage" | "remove";
+
+// 0026: acciones con tonos suaves, distintos entre sí y coherentes con el
+// tema. Quitar es rojo; faltante ámbar (marcar) / esmeralda (resolver);
+// editar es el único azul.
+const ACTION_BASE =
+  "inline-flex items-center justify-center gap-1.5 whitespace-normal rounded-lg border bg-white px-2.5 py-1 text-center text-xs font-medium leading-tight shadow-sm transition";
+const ACTION_EDIT = `${ACTION_BASE} border-sky-200 text-sky-700 hover:bg-sky-50`;
+const ACTION_SHORTAGE_ON = `${ACTION_BASE} border-amber-200 text-amber-800 hover:bg-amber-50`;
+const ACTION_SHORTAGE_OFF = `${ACTION_BASE} border-emerald-200 text-emerald-700 hover:bg-emerald-50`;
+const ACTION_REMOVE = `${ACTION_BASE} border-red-200 text-red-700 hover:bg-red-50`;
 
 function StockBadge({ row }: { row: CatalogEntry }) {
   if (row.quantity === null || row.quantity === 0) return <Badge tone="red">Agotado</Badge>;
@@ -50,9 +57,9 @@ function StockBadge({ row }: { row: CatalogEntry }) {
  * Catálogo + asignación de UNA tienda (S2). Es la pestaña «Productos» del
  * inventario unificado: reemplaza la antigua vista /products del operador.
  *
- * Todo vive en el servidor: búsqueda, categoría, faltantes y paginación. Las
- * mutaciones refetchean la página actual (cero realtime) y avisan a la página
- * para que refresque los selectores de movimientos y precios.
+ * 0026: la cantidad y el umbral se editan en un MODAL y se guardan con una
+ * sola RPC (`update_store_product`). La tabla ya no tiene un «Guardar» por
+ * celda ni dispara requests por cada cambio.
  */
 export function StoreCatalogPanel({
   storeId,
@@ -68,6 +75,10 @@ export function StoreCatalogPanel({
 }) {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<CatalogEntry | null>(null);
+  const [editDraft, setEditDraft] = useState({ quantity: "", threshold: "" });
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [busy, setBusy] = useState<{ id: number; action: RowAction } | null>(null);
   const [msg, setMsg] = useState<Msg>(NO_MSG);
 
@@ -114,24 +125,6 @@ export function StoreCatalogPanel({
     setBusy(null);
   }
 
-  function guardarCantidad(row: CatalogEntry, quantity: number): void {
-    void mutate(
-      row,
-      "quantity",
-      () => setStoreProductQuantity(storeId, row.id, quantity),
-      `Cantidad de "${row.name}" actualizada.`,
-    );
-  }
-
-  function guardarUmbral(row: CatalogEntry, threshold: number | null): void {
-    void mutate(
-      row,
-      "threshold",
-      () => setStoreProductThreshold(storeId, row.id, threshold),
-      `Umbral de "${row.name}" actualizado.`,
-    );
-  }
-
   function alternarFaltante(row: CatalogEntry): void {
     const shortage = !row.is_shortage;
     void mutate(
@@ -166,6 +159,43 @@ export function StoreCatalogPanel({
     );
   }
 
+  function openEdit(row: CatalogEntry): void {
+    setEditing(row);
+    setEditError(null);
+    setEditDraft({
+      quantity: String(row.quantity ?? 0),
+      threshold: row.threshold == null ? "" : String(row.threshold),
+    });
+  }
+
+  async function saveEdit(): Promise<void> {
+    const row = editing;
+    if (row === null) return;
+    const quantity = Number(editDraft.quantity);
+    const threshold = editDraft.threshold.trim() === "" ? null : Number(editDraft.threshold);
+    if (!Number.isFinite(quantity) || quantity < 0) {
+      setEditError("La cantidad no puede ser negativa.");
+      return;
+    }
+    if (threshold !== null && (!Number.isFinite(threshold) || threshold < 0)) {
+      setEditError("El umbral no puede ser negativo.");
+      return;
+    }
+    setSavingEdit(true);
+    const error = await runAction(() =>
+      updateStoreProduct(storeId, row.id, quantity, threshold, row.is_shortage),
+    );
+    setSavingEdit(false);
+    if (error !== null) {
+      setEditError(error);
+      return;
+    }
+    setEditing(null);
+    setMsg({ error: null, ok: `"${row.name}" actualizado.` });
+    refetch();
+    onChanged?.();
+  }
+
   const filtered =
     list.query.q !== "" || list.query.categoryId !== null || list.query.onlyShortage;
 
@@ -184,26 +214,18 @@ export function StoreCatalogPanel({
       key: "quantity",
       header: "Cantidad",
       render: (row) => (
-        <QuantityEditor
-          productName={row.name}
-          value={row.quantity ?? 0}
-          saving={busy?.id === row.id && busy.action === "quantity"}
-          disabled={row.quantity === null}
-          onSave={(quantity) => guardarCantidad(row, quantity)}
-        />
+        <span className="tabular-nums text-gray-900">{formatQty(row.quantity ?? 0)}</span>
       ),
     },
     {
       key: "threshold",
       header: "Umbral",
-      render: (row) => (
-        <ThresholdEditor
-          productName={row.name}
-          value={row.threshold ?? null}
-          saving={busy?.id === row.id && busy.action === "threshold"}
-          onSave={(threshold) => guardarUmbral(row, threshold)}
-        />
-      ),
+      render: (row) =>
+        row.threshold == null ? (
+          <span className="text-gray-400">—</span>
+        ) : (
+          <span className="tabular-nums text-gray-900">{formatQty(row.threshold)}</span>
+        ),
     },
     {
       key: "expiry",
@@ -226,8 +248,11 @@ export function StoreCatalogPanel({
       header: "Acciones",
       render: (row) => (
         <span className="flex flex-wrap gap-1.5">
+          <button className={ACTION_EDIT} type="button" onClick={() => openEdit(row)}>
+            Editar
+          </button>
           <button
-            className={buttonClass}
+            className={row.is_shortage ? ACTION_SHORTAGE_OFF : ACTION_SHORTAGE_ON}
             type="button"
             disabled={busy?.id === row.id}
             onClick={() => alternarFaltante(row)}
@@ -235,7 +260,7 @@ export function StoreCatalogPanel({
             {row.is_shortage ? "Quitar faltante" : "Marcar faltante"}
           </button>
           <button
-            className={buttonClass}
+            className={ACTION_REMOVE}
             type="button"
             disabled={busy?.id === row.id}
             onClick={() => quitar(row)}
@@ -255,14 +280,18 @@ export function StoreCatalogPanel({
             Productos de {storeName}
           </h2>
           <p className="text-xs text-gray-500">
-            Asigná productos a la tienda y ajustá cantidad, umbral y faltantes.
+            Asigná productos a la tienda y editá cantidad, umbral y faltantes.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-gray-500">
             {list.count === null ? "—" : `${list.count} productos`}
           </span>
-          <button className={buttonClass} type="button" onClick={() => setAdding(true)}>
+          <button
+            className={`${buttonClass} whitespace-normal text-center leading-tight`}
+            type="button"
+            onClick={() => setAdding(true)}
+          >
             Agregar productos
           </button>
         </div>
@@ -323,7 +352,9 @@ export function StoreCatalogPanel({
         loading={list.loading}
         error={list.error}
         emptyTitle={
-          filtered ? "Ningún producto coincide con el filtro" : "La tienda no tiene productos asignados"
+          filtered
+            ? "Ningún producto coincide con el filtro"
+            : "La tienda no tiene productos asignados"
         }
         emptyHint={
           filtered
@@ -343,6 +374,56 @@ export function StoreCatalogPanel({
               onChanged?.();
             }}
           />
+        </Modal>
+      )}
+
+      {editing !== null && (
+        <Modal title={`Editar ${editing.name}`} onClose={() => setEditing(null)}>
+          <Status error={editError} />
+          <div className="space-y-4">
+            <div>
+              <span className="block text-sm font-medium text-gray-700">Cantidad en stock</span>
+              <div className="mt-1.5">
+                <QuantityStepper
+                  label={editing.name}
+                  value={editDraft.quantity}
+                  onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Se ajusta sin registrar un movimiento.
+              </p>
+            </div>
+            <label className="block text-sm">
+              <span className="text-xs font-semibold tracking-wide text-gray-600">
+                Umbral de alerta (opcional)
+              </span>
+              <input
+                className={`mt-1 ${inputClass}`}
+                type="number"
+                min="0"
+                step="0.001"
+                placeholder="Sin umbral"
+                value={editDraft.threshold}
+                onChange={(event) =>
+                  setEditDraft({ ...editDraft, threshold: event.target.value })
+                }
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button className={buttonClass} type="button" disabled={savingEdit} onClick={() => void saveEdit()}>
+                {savingEdit ? "Guardando…" : "Guardar cambios"}
+              </button>
+              <button
+                className={secondaryButtonClass}
+                type="button"
+                disabled={savingEdit}
+                onClick={() => setEditing(null)}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

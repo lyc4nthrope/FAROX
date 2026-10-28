@@ -10,10 +10,11 @@ import {
   inputClass,
   runAction,
 } from "../../../shared/ui/Box";
+import { QuantityStepper } from "../../../shared/ui";
 import { Pager } from "../../../shared/ui/Pager";
 import {
   addDistributorCatalogProduct,
-  addStoreCatalogProduct,
+  addStoreProduct,
   createProduct,
   fetchActiveProductsForCatalog,
   fetchBrands,
@@ -122,7 +123,7 @@ function QuickCreateProduct({
         }
         const added = await runAction(() =>
           target.kind === "store"
-            ? addStoreCatalogProduct(target.id, productId)
+            ? addStoreProduct(target.id, productId, 0)
             : addDistributorCatalogProduct(productId),
         );
         onCreated();
@@ -184,6 +185,8 @@ export function AddProductsPanel({
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(NO_MSG);
+  // 0026: cantidad inicial por producto del registro (solo catálogo de tienda).
+  const [quantities, setQuantities] = useState<Record<number, string>>({});
 
   const list = useList<ProductListRow, CatalogQuery>(fetchActiveProductsForCatalog, INITIAL_QUERY);
 
@@ -195,15 +198,24 @@ export function AddProductsPanel({
     return () => clearTimeout(timer);
   }, [search, activeSearch, setQuery]);
 
+  function quantityOf(productId: number): string {
+    return quantities[productId] ?? "0";
+  }
+
   async function agregar(product: ProductListRow): Promise<void> {
     setBusyId(product.id);
+    const raw = Number(quantityOf(product.id));
+    const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;
     const error = await runAction(() =>
       target.kind === "store"
-        ? addStoreCatalogProduct(target.id, product.id)
+        ? addStoreProduct(target.id, product.id, quantity)
         : addDistributorCatalogProduct(product.id),
     );
     setMsg({ error, ok: error === null ? "Producto agregado al catálogo." : null });
-    if (error === null) onAdded();
+    if (error === null) {
+      setQuantities((current) => ({ ...current, [product.id]: "0" }));
+      onAdded();
+    }
     setBusyId(null);
   }
 
@@ -277,15 +289,27 @@ export function AddProductsPanel({
         error={list.error}
         emptyTitle="No hay productos que coincidan con la búsqueda"
         emptyHint="Probá con otro nombre, otra categoría o pasá a la página siguiente."
+        onRowClick={(row) => void agregar(row)}
         renderAction={(row) => (
-          <button
-            className={buttonClass}
-            type="button"
-            disabled={busyId === row.id}
-            onClick={() => void agregar(row)}
-          >
-            Agregar
-          </button>
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            {target.kind === "store" && (
+              <QuantityStepper
+                label={row.name}
+                value={quantityOf(row.id)}
+                onChange={(value) =>
+                  setQuantities((current) => ({ ...current, [row.id]: value }))
+                }
+              />
+            )}
+            <button
+              className={`${buttonClass} whitespace-normal text-center leading-tight`}
+              type="button"
+              disabled={busyId === row.id}
+              onClick={() => void agregar(row)}
+            >
+              Agregar
+            </button>
+          </span>
         )}
       />
       <Pager list={list} />

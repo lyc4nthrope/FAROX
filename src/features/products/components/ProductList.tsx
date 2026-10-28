@@ -28,6 +28,9 @@ export interface ProductListProps {
   // Acción por fila (catálogo propio: quitar/faltante). Sin esto la tabla es de
   // solo lectura.
   renderAction?: (row: ProductRowView) => ReactNode;
+  // 0026: la fila entera ejecuta la acción principal (agregar). El botón de la
+  // celda sigue existiendo como referencia accesible.
+  onRowClick?: (row: ProductRowView) => void;
   emptyTitle?: string;
   emptyHint?: string;
 }
@@ -42,6 +45,7 @@ export function ProductList({
   quantity = false,
   renderQuantity,
   renderAction,
+  onRowClick,
   emptyTitle = "No hay productos todavía",
   emptyHint = "Cuando haya productos, van a aparecer acá.",
 }: ProductListProps) {
@@ -68,11 +72,23 @@ export function ProductList({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100">
+              <tr
+                key={row.id}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`border-b border-gray-100 ${
+                  onRowClick === undefined
+                    ? ""
+                    : "cursor-pointer transition-colors hover:bg-gray-50"
+                }`}
+              >
                 <td className="py-2">
-                  <Link to={`/products/${row.id}`} className="text-gray-900 underline">
-                    {row.name}
-                  </Link>
+                  {onRowClick === undefined ? (
+                    <Link to={`/products/${row.id}`} className="text-gray-900 underline">
+                      {row.name}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-900">{row.name}</span>
+                  )}
                 </td>
                 <td className="py-2 text-gray-700">{row.brand?.name ?? "—"}</td>
                 <td className="py-2 text-gray-700">{row.unit?.name ?? "—"}</td>
@@ -94,7 +110,18 @@ export function ProductList({
                     {row.is_shortage === true && <Badge tone="amber">Faltante</Badge>}
                   </div>
                 </td>
-                {renderAction !== undefined && <td className="py-2">{renderAction(row)}</td>}
+                {renderAction !== undefined && (
+                  <td
+                    className="py-2"
+                    onClick={
+                      onRowClick === undefined
+                        ? undefined
+                        : (event) => event.stopPropagation()
+                    }
+                  >
+                    {renderAction(row)}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
