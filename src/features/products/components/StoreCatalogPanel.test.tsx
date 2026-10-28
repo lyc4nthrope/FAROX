@@ -118,6 +118,73 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
   });
 
+  it("tipear no dispara RPC: un solo Guardar hace UNA llamada", async () => {
+    renderPanel();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    const quantity = within(dialog).getByLabelText("Cantidad de Arroz Diana");
+    await user.clear(quantity);
+    await user.type(quantity, "20");
+    const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
+    await user.clear(umbral);
+    await user.type(umbral, "8");
+    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() =>
+      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 20, 8, false),
+    );
+    expect(productsApi.updateStoreProduct).toHaveBeenCalledTimes(1);
+  });
+
+  it("umbral vacío se guarda como null", async () => {
+    renderPanel();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    await user.clear(within(dialog).getByLabelText("Umbral de alerta (opcional)"));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() =>
+      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 12, null, false),
+    );
+  });
+
+  it("cantidad vacía no guarda 0 en silencio", async () => {
+    renderPanel();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    await user.clear(within(dialog).getByLabelText("Cantidad de Arroz Diana"));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+
+    expect(await within(dialog).findByText("Ingresá una cantidad.")).toBeInTheDocument();
+    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
+  });
+
+  it("la tabla no tiene Guardar ni inputs por celda", async () => {
+    renderPanel();
+
+    await screen.findByText("Arroz Diana");
+    expect(screen.queryByRole("button", { name: /^Guardar/ })).toBeNull();
+    expect(screen.queryByLabelText("Cantidad de Arroz Diana")).toBeNull();
+    expect(screen.queryByLabelText("Umbral de Arroz Diana")).toBeNull();
+  });
+
+  it("cada acción tiene un tono distinto y suave", async () => {
+    renderPanel();
+
+    expect((await screen.findByRole("button", { name: "Editar" })).className).toMatch(/text-sky-/);
+    expect(screen.getByRole("button", { name: "Marcar faltante" }).className).toMatch(
+      /text-amber-/,
+    );
+    expect(screen.getByRole("button", { name: "Quitar" }).className).toMatch(/text-red-/);
+  });
+
   it("marca el faltante del producto con su acción propia", async () => {
     renderPanel();
     const user = userEvent.setup();

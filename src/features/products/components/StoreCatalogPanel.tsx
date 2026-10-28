@@ -173,6 +173,10 @@ export function StoreCatalogPanel({
     if (row === null) return;
     const quantity = Number(editDraft.quantity);
     const threshold = editDraft.threshold.trim() === "" ? null : Number(editDraft.threshold);
+    if (editDraft.quantity.trim() === "") {
+      setEditError("Ingresá una cantidad.");
+      return;
+    }
     if (!Number.isFinite(quantity) || quantity < 0) {
       setEditError("La cantidad no puede ser negativa.");
       return;
@@ -387,6 +391,7 @@ export function StoreCatalogPanel({
                 <QuantityStepper
                   label={editing.name}
                   value={editDraft.quantity}
+                  min={0}
                   onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
                 />
               </div>

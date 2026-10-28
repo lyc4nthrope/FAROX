@@ -203,6 +203,7 @@ export function AddProductsPanel({
   }
 
   async function agregar(product: ProductListRow): Promise<void> {
+    if (busyId === product.id) return;
     setBusyId(product.id);
     const raw = Number(quantityOf(product.id));
     const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;

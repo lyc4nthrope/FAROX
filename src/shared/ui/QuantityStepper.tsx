@@ -7,17 +7,21 @@ export function QuantityStepper({
   label,
   value,
   onChange,
+  min = 1,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** Piso de los botones. En stock 0 es válido; en una línea de pedido no. */
+  min?: number;
 }) {
   const parsed = Number(value);
   const current = Number.isFinite(parsed) ? parsed : 0;
-  const canDecrease = Number.isFinite(parsed) && current > 1;
+  const canDecrease = Number.isFinite(parsed) && current > min;
+  const inputMin = min <= 0 ? "0" : "0.001";
 
   function step(delta: number): void {
-    const next = Math.max(1, Math.round((current + delta) * 1000) / 1000);
+    const next = Math.max(min, Math.round((current + delta) * 1000) / 1000);
     onChange(String(next));
   }
 
@@ -36,7 +40,7 @@ export function QuantityStepper({
         aria-label={`Cantidad de ${label}`}
         className="h-8 w-14 border-x border-gray-200 bg-white px-1 text-center text-sm text-gray-900 focus:outline-none"
         type="number"
-        min="0.001"
+        min={inputMin}
         step="any"
         value={value}
         onChange={(event) => onChange(event.target.value)}
