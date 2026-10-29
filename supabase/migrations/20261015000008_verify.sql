@@ -402,7 +402,8 @@ BEGIN
   SELECT count(*) INTO v_open FROM (
     SELECT 1 FROM public.alerts
     WHERE resolved_at IS NULL
-    GROUP BY type, coalesce(store_id,0), coalesce(product_id,0), coalesce(order_id,0)
+    GROUP BY type, coalesce(store_id,0), coalesce(product_id,0), coalesce(order_id,0),
+             coalesce(distributor_id,0)
     HAVING count(*) > 1
   ) d;
   IF v_open = 0 THEN

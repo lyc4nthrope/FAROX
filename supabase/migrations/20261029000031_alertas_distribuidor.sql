@@ -82,6 +82,15 @@ DECLARE
   v_name text;
   v_msg  text;
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.distributors d
+    WHERE d.id = p_distributor AND d.is_active
+  ) THEN
+    PERFORM public.internal_alert_resolve_distributor('stock_low', p_distributor, p_product);
+    PERFORM public.internal_alert_resolve_distributor('expiry_soon', p_distributor, p_product);
+    RETURN;
+  END IF;
+
   SELECT dp.quantity, dp.threshold, dp.expiry_date, p.name
     INTO v_qty, v_thr, v_exp, v_name
   FROM public.distributor_products dp
@@ -154,6 +163,16 @@ BEGIN
         AND dp.product_id = a.product_id
         AND dp.expiry_date <= CURRENT_DATE + c
         AND dp.quantity > 0);
+
+  -- Un distribuidor inactivo no conserva alertas abiertas (stock o caducidad).
+  UPDATE public.alerts a
+  SET resolved_at = now()
+  WHERE a.resolved_at IS NULL
+    AND a.store_id IS NULL
+    AND a.distributor_id IS NOT NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM public.distributors d
+      WHERE d.id = a.distributor_id AND d.is_active);
 END;
 $$;
 
@@ -326,6 +345,12 @@ REVOKE EXECUTE ON FUNCTION
   public.job_scan_distributor_expiry()
 FROM PUBLIC, anon, authenticated;
 
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'farox_distributor_expiry') THEN
+    PERFORM cron.unschedule('farox_distributor_expiry');
+  END IF;
+END $$;
 SELECT cron.schedule('farox_distributor_expiry', '0 11 * * *',
   $$SELECT public.job_scan_distributor_expiry();$$);
 

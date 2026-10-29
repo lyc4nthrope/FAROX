@@ -61,12 +61,12 @@ function StockBadge({ row }: { row: CatalogEntry }) {
   return <Badge tone="green">OK</Badge>;
 }
 
-// 0030: aviso visual de la relación del distribuidor. No crea filas en
-// `alerts` (ese motor es de tienda); el umbral/vencimiento se ven acá.
+// 0030/0031: aviso visual de la relación del distribuidor. Además, el umbral
+// (opt-in) y el vencimiento materializan alertas en /alertas desde 0031.
 function DistributorBadges({ row }: { row: CatalogEntry }) {
   const low = row.threshold != null && (row.quantity ?? 0) <= row.threshold;
   let expiryTone: "red" | "amber" | null = null;
-  if (row.expiry_date != null) {
+  if (row.expiry_date != null && (row.quantity ?? 0) > 0) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const expiry = new Date(`${row.expiry_date}T00:00:00`);
@@ -621,7 +621,7 @@ export function StoreCatalogPanel({
               <span className="mt-1 block text-xs text-gray-500">
                 {isStore
                   ? "Alimenta la alerta de caducidad de la tienda."
-                  : "Genera una alerta de caducidad en tu catálogo (15 días o menos) y el aviso «Vence»."}
+                  : "Genera una alerta de caducidad si tenés cantidad y vence en 15 días o menos; también muestra «Vence»."}
               </span>
             </label>
             {canSetPrice ? (

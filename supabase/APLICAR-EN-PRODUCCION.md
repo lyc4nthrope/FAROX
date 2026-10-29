@@ -162,7 +162,12 @@ UNION ALL SELECT '0031 alertas distribuidor',
    AND to_regprocedure('public.job_scan_distributor_expiry()') IS NOT NULL
    AND EXISTS (SELECT 1 FROM pg_indexes
                WHERE schemaname = 'public' AND indexname = 'uq_alert_open'
-                 AND indexdef LIKE '%distributor_id%'))::text
+                 AND indexdef LIKE '%distributor_id%')
+   AND COALESCE((SELECT position('is_active' in prosrc) > 0
+                 FROM pg_proc
+                 WHERE proname = 'internal_eval_distributor_alert'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false))::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
