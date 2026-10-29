@@ -602,7 +602,7 @@ export function StoreCatalogPanel({
               <span className="mt-1 block text-xs text-gray-500">
                 {isStore
                   ? "Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0. Con umbral, se activa cuando la cantidad es igual o menor."
-                  : "Se muestra como aviso «Bajo» en tu catálogo cuando la cantidad es igual o menor."}
+                  : "Con umbral, se genera una alerta de stock (y el aviso «Bajo» en tu catálogo) cuando la cantidad es igual o menor."}
               </span>
             </label>
             <label className="block text-sm">
@@ -621,7 +621,7 @@ export function StoreCatalogPanel({
               <span className="mt-1 block text-xs text-gray-500">
                 {isStore
                   ? "Alimenta la alerta de caducidad de la tienda."
-                  : "Se muestra como aviso «Vence» en tu catálogo (15 días o menos)."}
+                  : "Genera una alerta de caducidad en tu catálogo (15 días o menos) y el aviso «Vence»."}
               </span>
             </label>
             {canSetPrice ? (

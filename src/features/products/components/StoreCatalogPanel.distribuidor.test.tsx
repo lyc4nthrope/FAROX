@@ -124,6 +124,12 @@ describe("StoreCatalogPanel · modo distribuidor (S15/S21)", () => {
     expect(within(dialog).getByText("Cantidad que poseo")).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Nombre")).not.toBeInTheDocument();
     expect(
+      within(dialog).getByText(/genera una alerta de stock/),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/genera una alerta de caducidad/i),
+    ).toBeInTheDocument();
+    expect(
       within(dialog).getByText("Los precios de compra y venta son una función Premium."),
     ).toBeInTheDocument();
 
