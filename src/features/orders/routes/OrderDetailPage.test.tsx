@@ -200,6 +200,56 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
     expect(screen.queryByLabelText("Precio de Arroz")).not.toBeInTheDocument();
   });
 
+  it("el operador no Premium también ve la cotización del distribuidor", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
+      data: [{ product_id: 10, distributor_price: 2500 }],
+      error: null,
+    });
+
+    renderPage("operador");
+
+    expect(await screen.findByText(/2\.500/)).toBeInTheDocument();
+    expect(screen.getByText("Total cotizado por el distribuidor:")).toBeInTheDocument();
+  });
+
+  it("el distribuidor Premium ve el precio registrado como sugerencia", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          product_id: 10,
+          product_name: "Arroz",
+          quantity: 2,
+          received_quantity: null,
+          status: "pending",
+          unit_price: 3200,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
+      data: [{ product_id: 10, distributor_price: null }],
+      error: null,
+    });
+
+    renderPage("distribuidor", true);
+
+    const precio = await screen.findByLabelText("Precio de Arroz");
+    await waitFor(() => expect(precio).toHaveValue(3200));
+  });
+
+  it("el distribuidor devuelve un pedido en ruta a pendiente", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+    await user.click(await screen.findByRole("button", { name: "Volver a pendiente" }));
+
+    expect(ordersApi.updateOrderStatus).toHaveBeenCalledWith(5, "pending", null);
+  });
+
   it("un pedido ya en ruta no admite cotización", async () => {
     vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
 

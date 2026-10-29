@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { fetchOpenAlerts } from "../../features/inventory/alertsApi";
+import { fetchOpenOrdersCount } from "../../features/orders/api";
 import { useLoad } from "../../shared/hooks/useLoad";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
@@ -28,6 +29,17 @@ export function AppShell() {
   // El badge cuenta las NO leídas para alinearse con «N abiertas» de la
   // página de Alertas; se refresca al navegar (sin realtime).
   const alertCount = alerts.data?.filter((alert) => alert.read_at === null).length ?? 0;
+
+  // 0028: notificación de pedidos abiertos en «Pedidos» / «Mis pedidos».
+  const showOrders = items.some((item) => item.to === "/pedidos");
+  const openOrders = useLoad(
+    () =>
+      showOrders
+        ? fetchOpenOrdersCount()
+        : Promise.resolve({ data: 0, error: null }),
+    [showOrders, location.pathname],
+  );
+  const orderCount = openOrders.data ?? 0;
   // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
   // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
   // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la
@@ -184,6 +196,18 @@ export function AppShell() {
                 {({ isActive }) => (
                   <>
                     {item.label}
+                    {item.to === "/pedidos" && orderCount > 0 && (
+                      <span
+                        aria-label={`${orderCount} pedidos abiertos`}
+                        className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {orderCount > 99 ? "99+" : orderCount}
+                      </span>
+                    )}
                     {item.to === "/alertas" && alertCount > 0 && (
                       <span
                         aria-label={`${alertCount} alertas`}

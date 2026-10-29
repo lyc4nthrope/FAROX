@@ -116,6 +116,18 @@ export async function fetchOrder(orderId: number): Promise<LoadResult<OrderRow>>
   return { data: data ? toOrder(data as Record<string, unknown>) : null, error };
 }
 
+/**
+ * 0028: contador de pedidos abiertos para la notificación del nav. La RLS
+ * acota (distribuidor: los suyos; operador: sus tiendas; admin: todos).
+ */
+export async function fetchOpenOrdersCount(): Promise<LoadResult<number>> {
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pending", "in_route"]);
+  return { data: count ?? 0, error };
+}
+
 /** get_order_items omite unit_price para no Premium (D40). */
 export async function fetchOrderItems(orderId: number): Promise<LoadResult<OrderItemRow[]>> {
   const { data, error } = await supabase.rpc("get_order_items", { p_order: orderId });
@@ -234,7 +246,7 @@ export async function setOrderPrices(
 
 export async function updateOrderStatus(
   orderId: number,
-  status: "in_route" | "cancelled",
+  status: "pending" | "in_route" | "cancelled",
   reason: string | null,
 ): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("update_order_status", {
@@ -266,6 +278,24 @@ export async function confirmDelivery(
 ): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("confirm_delivery", { p_order: orderId, p_items: items });
   return { error };
+}
+
+/**
+ * 0028: entrega completa desde la lista de Mis pedidos. Lee las líneas (RPC
+ * get_order_items) y confirma todas con su cantidad pedida; el stock se suma
+ * en confirm_delivery. Para entregas parciales se usa el detalle.
+ */
+export async function confirmFullDelivery(orderId: number): Promise<{ error: Err }> {
+  const items = await fetchOrderItems(orderId);
+  if (items.error !== null) return { error: items.error };
+  const payload = (items.data ?? []).map((item) => ({
+    product_id: item.product_id,
+    received_quantity: item.quantity,
+  }));
+  if (payload.length === 0) {
+    return { error: { message: "El pedido no tiene líneas para entregar." } };
+  }
+  return confirmDelivery(orderId, payload);
 }
 
 // ---------------------------------------------------------------- fiado

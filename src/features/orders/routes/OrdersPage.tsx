@@ -11,9 +11,17 @@ import {
   Status,
   buttonClass,
   inputClass,
+  runAction,
+  secondaryButtonClass,
   type BadgeTone,
 } from "../../../shared/ui/Box";
-import { ORDER_STATUS_LABELS, fetchOrders, type OrderStatus } from "../api";
+import {
+  ORDER_STATUS_LABELS,
+  confirmFullDelivery,
+  fetchOrders,
+  updateOrderStatus,
+  type OrderStatus,
+} from "../api";
 
 const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
   pending: "amber",
@@ -28,6 +36,35 @@ export function OrdersPage() {
   const [status, setStatus] = useState<OrderStatus | "all">("all");
   const orders = useLoad(() => fetchOrders(status), [status]);
   const canCreate = role === "admin" || role === "operador";
+  const distributor = role === "distribuidor";
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
+
+  async function act(
+    orderId: number,
+    action: () => Promise<{ error: { message: string } | null }>,
+    ok: string,
+  ): Promise<void> {
+    setBusyId(orderId);
+    const error = await runAction(action);
+    setMsg({ error, ok: error === null ? ok : null });
+    if (error === null) orders.reload();
+    setBusyId(null);
+  }
+
+  function deliver(orderId: number): void {
+    if (
+      !window.confirm(
+        `¿Marcar el pedido #${orderId} como entregado y sumar todas las cantidades al stock?`,
+      )
+    ) {
+      return;
+    }
+    void act(orderId, () => confirmFullDelivery(orderId), "Pedido entregado.");
+  }
 
   return (
     <section>
@@ -86,6 +123,7 @@ export function OrdersPage() {
           )}
         </div>
         <Status loading={orders.loading} error={orders.error} />
+        <Status error={msg.error} ok={msg.ok} />
         {orders.data?.length === 0 && !orders.loading && (
           <EmptyState
             title="No hay pedidos"
@@ -102,6 +140,7 @@ export function OrdersPage() {
                   <th>Tienda</th>
                   <th>Distribuidor</th>
                   <th>Fecha prometida</th>
+                  {distributor && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +162,57 @@ export function OrdersPage() {
                     <td className="whitespace-nowrap">
                       {o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—"}
                     </td>
+                    {distributor && (
+                      <td>
+                        <span className="flex flex-wrap gap-1.5">
+                          {o.status === "pending" && (
+                            <button
+                              className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                              type="button"
+                              disabled={busyId === o.id}
+                              onClick={() =>
+                                void act(
+                                  o.id,
+                                  () => updateOrderStatus(o.id, "in_route", null),
+                                  "Pedido en ruta.",
+                                )
+                              }
+                            >
+                              En ruta
+                            </button>
+                          )}
+                          {o.status === "in_route" && (
+                            <>
+                              <button
+                                className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                                type="button"
+                                disabled={busyId === o.id}
+                                onClick={() =>
+                                  void act(
+                                    o.id,
+                                    () => updateOrderStatus(o.id, "pending", null),
+                                    "Pedido devuelto a pendiente.",
+                                  )
+                                }
+                              >
+                                Pendiente
+                              </button>
+                              <button
+                                className={`${buttonClass} px-2.5 py-1 text-xs`}
+                                type="button"
+                                disabled={busyId === o.id}
+                                onClick={() => deliver(o.id)}
+                              >
+                                Entregar
+                              </button>
+                            </>
+                          )}
+                          {o.status !== "pending" && o.status !== "in_route" && (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

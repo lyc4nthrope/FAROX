@@ -35,7 +35,7 @@ const LINE_LABELS: Record<string, string> = {
 /** /pedidos/:orderId — detalle, cambio de estado, confirmar entrega y fiado. */
 export function OrderDetailPage() {
   const orderId = Number(useParams().orderId);
-  const { role } = useAuth();
+  const { role, premium } = useAuth();
   const order = useLoad(() => fetchOrder(orderId), [orderId]);
   const items = useLoad(() => fetchOrderItems(orderId), [orderId]);
   // 0024: la cotización viaja por su propia RPC; get_order_items sigue sin
@@ -137,7 +137,13 @@ export function OrderDetailPage() {
     const draft = quoteDrafts[productId];
     if (draft !== undefined) return draft;
     const saved = savedQuotes.get(productId);
-    return saved === null || saved === undefined ? "" : String(saved);
+    if (saved !== null && saved !== undefined) return String(saved);
+    // 0028: si el distribuidor es Premium puede ver el precio registrado del
+    // producto (unit_price) y se usa como precio sugerido editable.
+    const registered = premium
+      ? (items.data ?? []).find((item) => item.product_id === productId)?.unit_price ?? null
+      : null;
+    return registered === null ? "" : String(registered);
   };
 
   function onQuote() {
@@ -430,6 +436,20 @@ export function OrderDetailPage() {
                 }
               >
                 Marcar en ruta
+              </button>
+            )}
+            {o.status === "in_route" && canDispatch && (
+              <button
+                className={secondaryButtonClass}
+                type="button"
+                onClick={() =>
+                  void act(
+                    () => updateOrderStatus(orderId, "pending", null),
+                    "Pedido devuelto a pendiente.",
+                  )
+                }
+              >
+                Volver a pendiente
               </button>
             )}
             <button className={buttonClass} type="button" onClick={onConfirm}>

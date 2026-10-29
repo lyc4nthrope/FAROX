@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RoleName } from "../../features/auth/types";
 import * as authApi from "../../features/auth/api";
 import * as alertsApi from "../../features/inventory/alertsApi";
+import * as ordersApi from "../../features/orders/api";
 import { AuthProvider } from "../providers/AuthProvider";
 import { AppShell } from "./AppShell";
 
@@ -18,6 +19,9 @@ vi.mock("../../features/auth/api", () => ({
 }));
 vi.mock("../../features/inventory/alertsApi", () => ({
   fetchOpenAlerts: vi.fn(),
+}));
+vi.mock("../../features/orders/api", () => ({
+  fetchOpenOrdersCount: vi.fn(),
 }));
 
 function renderShell(role: RoleName | null, premium = false) {
@@ -42,6 +46,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(alertsApi.fetchOpenAlerts).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchOpenOrdersCount).mockResolvedValue({ data: 0, error: null });
   });
 
   afterEach(() => {
@@ -76,6 +81,15 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+  });
+
+  it("Mis pedidos muestra la notificación de pedidos abiertos", async () => {
+    vi.mocked(ordersApi.fetchOpenOrdersCount).mockResolvedValue({ data: 2, error: null });
+
+    renderShell("distribuidor");
+
+    const badge = await screen.findByLabelText("2 pedidos abiertos");
+    expect(badge).toHaveTextContent("2");
   });
 
   it("Alertas muestra el número de alertas abiertas", async () => {
