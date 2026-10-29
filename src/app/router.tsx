@@ -4,7 +4,7 @@ import { CallbackPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswor
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
-import { AlertsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
+import { AlertsPage, DistributorMovementsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
 import { LandingPage } from "../features/landing";
 import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
@@ -269,6 +269,7 @@ export function AppRoutes() {
             <Route path="/rutas" element={<RequireRole roles={ADMIN_ONLY}><RoutesPage /></RequireRole>} />
             <Route path="/rutas/:routeId" element={<RequireRole roles={ADMIN_ONLY}><RouteDetailPage /></RequireRole>} />
             <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
+            <Route path="/movimientos" element={<RequireRole roles={DISTRIBUTOR_ONLY}><DistributorMovementsPage /></RequireRole>} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/tiendas/:storeId/qr" element={<RequireRole roles={ADMIN_OR_OPERATOR}><StoreQrPage /></RequireRole>} />
             <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />

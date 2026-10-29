@@ -59,14 +59,18 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Vincularme a una tienda | Vincular tienda | Tocá “Escanear QR” y permití la cámara, o escribí el código manualmente. Si la cámara falla, el código sigue disponible |
 | Ver mi ruta de hoy | Mi ruta | Mapa + lista de tiendas con solicitudes abiertas; las paradas asignadas quedan debajo |
 | Elegir tiendas para el recorrido | Mi ruta | Marcá las tiendas de la lista; solo las marcadas aparecen en el mapa y se numeran igual en ambos lados |
-| Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva |
+| Guardar la ruta de hoy | Mi ruta → Guardar ruta | Guarda las tiendas marcadas como paradas de la ruta de hoy y actualiza el resumen (rutas hoy, paradas, completadas) |
+| Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva (para eso está Guardar ruta) |
+| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro y quitar. Sin stock ni precio |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
-| Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora |
-| Cotizar un pedido | Mis pedidos → pedido pendiente → Cotización del distribuidor | Precio por producto; podés dejar líneas sin precio y completarlas luego |
-| Marcar un pedido en ruta | Mis pedidos → pedido → Marcar en ruta | Lo hace el distribuidor al que se le solicitó; el operador ya no puede |
+| Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora; el nav muestra cuántos pedidos abiertos hay |
+| Cotizar un pedido | Mis pedidos → pedido pendiente → Cotización del distribuidor | Precio por producto; si sos Premium se sugiere el precio registrado. El operador de la tienda ve la cotización aunque no sea Premium |
+| Marcar un pedido en ruta o devolverlo a pendiente | Mis pedidos → fila → En ruta / Pendiente | También desde el detalle del pedido |
+| Entregar un pedido completo | Mis pedidos → fila → Entregar | Pide confirmación y suma todas las cantidades al stock. Para entregas parciales usá el detalle |
 | Fijar la fecha prometida | Mis pedidos → pedido → Entrega y comunicación | Opcional; el operador la ve en el resumen. Podés cambiarla o quitarla mientras el pedido siga abierto |
 | Confirmar una entrega | Mis pedidos → pedido → Confirmar entrega | Cantidades entregadas por producto (puede ser parcial); el stock sube solo |
+| Ver mis movimientos | Movimientos | El mismo historial visual del operador, con la tienda de cada entrada/salida; filtros Entradas/Salidas |
 
 ## Guion corto de demo (H1 → H3)
 

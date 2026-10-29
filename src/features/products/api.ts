@@ -425,14 +425,19 @@ export async function fetchStoreCatalog(
 // Productos del catálogo del distribuidor autenticado (RLS por
 // my_distributor_id()). Paginado por el mismo motivo que el de tienda.
 export async function fetchDistributorCatalog(
-  query: ListQuery,
+  query: CatalogQuery,
 ): Promise<ListResult<CatalogEntry>> {
   const { from, to } = pageRange(query);
-  const { data, count, error } = await supabase
+  let request = supabase
     .from("distributor_products")
-    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" })
-    .order("product_id")
-    .range(from, to);
+    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" });
+  if (query.q.trim() !== "") {
+    request = request.ilike("product.name", likePattern(query.q));
+  }
+  if (query.categoryId !== null) {
+    request = request.eq("product.category_id", query.categoryId);
+  }
+  const { data, count, error } = await request.order("product_id").range(from, to);
   if (error !== null) {
     return { rows: [], count: null, error };
   }

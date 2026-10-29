@@ -26,6 +26,8 @@ export interface MovementRow {
   product_name: string;
   motive_name: string;
   reverso_of_id: number | null;
+  /** 0028: tienda del movimiento (solo la vista del distribuidor la muestra). */
+  store_name?: string | null;
 }
 export interface MotiveOption {
   id: number;
@@ -114,6 +116,31 @@ export async function fetchMovements(storeId: number): Promise<LoadResult<Moveme
     reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
     product_name: relName(r.product),
     motive_name: relName(r.motive),
+  }));
+  return { data: rows, error };
+}
+
+/**
+ * 0028: movimientos visibles para el distribuidor (RLS por distributor_id).
+ * Incluye la tienda para que el historial tenga contexto.
+ */
+export async function fetchDistributorMovements(): Promise<LoadResult<MovementRow[]>> {
+  const { data, error } = await supabase
+    .from("movements")
+    .select(
+      "id,type,quantity,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.id),
+    type: r.type as "entry" | "exit",
+    quantity: Number(r.quantity),
+    created_at: String(r.created_at),
+    reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
+    product_name: relName(r.product),
+    motive_name: relName(r.motive),
+    store_name: relName(r.store),
   }));
   return { data: rows, error };
 }

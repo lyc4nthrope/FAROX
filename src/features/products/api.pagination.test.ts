@@ -69,7 +69,7 @@ describe("catálogo: los tres fetchers paginan (S4)", () => {
   });
 
   it("fetchDistributorCatalog: pide el rango de la página", async () => {
-    expect(await fetchDistributorCatalog(SECOND_PAGE)).toEqual({
+    expect(await fetchDistributorCatalog({ ...SECOND_PAGE, ...NO_FILTERS })).toEqual({
       rows: [],
       count: 0,
       error: null,

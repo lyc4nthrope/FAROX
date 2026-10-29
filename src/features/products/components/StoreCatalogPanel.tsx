@@ -9,8 +9,10 @@ import { Badge, Status, buttonClass, inputClass, runAction, secondaryButtonClass
 import { Modal } from "../../../shared/ui/Modal";
 import { Pager } from "../../../shared/ui/Pager";
 import {
+  fetchDistributorCatalog,
   fetchProductCategories,
   fetchStoreCatalog,
+  removeDistributorCatalogProduct,
   removeStoreProduct,
   setStoreProductShortage,
   updateStoreProduct,
@@ -62,12 +64,14 @@ function StockBadge({ row }: { row: CatalogEntry }) {
  * celda ni dispara requests por cada cambio.
  */
 export function StoreCatalogPanel({
+  kind = "store",
   storeId,
   storeName,
   reloadToken = 0,
   canSetPrice = false,
   onChanged,
 }: {
+  kind?: "store" | "distribuidor";
   storeId: number;
   storeName: string;
   /** Sube desde la página tras un movimiento/precio para refrescar cantidades. */
@@ -76,6 +80,7 @@ export function StoreCatalogPanel({
   canSetPrice?: boolean;
   onChanged?: () => void;
 }) {
+  const isStore = kind === "store";
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<CatalogEntry | null>(null);
@@ -86,7 +91,8 @@ export function StoreCatalogPanel({
   const [msg, setMsg] = useState<Msg>(NO_MSG);
 
   const list = useList<CatalogEntry, CatalogQuery>(
-    (query) => fetchStoreCatalog(storeId, query),
+    (query) =>
+      isStore ? fetchStoreCatalog(storeId, query) : fetchDistributorCatalog(query),
     INITIAL_QUERY,
   );
 
@@ -141,6 +147,16 @@ export function StoreCatalogPanel({
   }
 
   function quitar(row: CatalogEntry): void {
+    if (!isStore) {
+      if (!window.confirm(`¿Quitar "${row.name}" del catálogo?`)) return;
+      void mutate(
+        row,
+        "remove",
+        () => removeDistributorCatalogProduct(row.id),
+        "Producto quitado del catálogo.",
+      );
+      return;
+    }
     const stock = row.quantity ?? 0;
     if (stock > 0) {
       const first = window.confirm(
@@ -217,55 +233,88 @@ export function StoreCatalogPanel({
         </div>
       ),
     },
-    {
-      key: "quantity",
-      header: "Cantidad",
-      render: (row) => (
-        <span className="tabular-nums text-gray-900">{formatQty(row.quantity ?? 0)}</span>
-      ),
-    },
-    {
-      key: "threshold",
-      header: "Umbral",
-      render: (row) =>
-        row.threshold == null ? (
-          <span className="text-gray-400">—</span>
-        ) : (
-          <span className="tabular-nums text-gray-900">{formatQty(row.threshold)}</span>
-        ),
-    },
-    {
-      key: "expiry",
-      header: "Vence",
-      render: (row) => <span className="whitespace-nowrap">{row.expiry_date ?? "—"}</span>,
-    },
+    ...(isStore
+      ? ([
+          {
+            key: "quantity",
+            header: "Cantidad",
+            render: (row) => (
+              <span className="tabular-nums text-gray-900">{formatQty(row.quantity ?? 0)}</span>
+            ),
+          },
+          {
+            key: "threshold",
+            header: "Umbral",
+            render: (row) =>
+              row.threshold == null ? (
+                <span className="text-gray-400">—</span>
+              ) : (
+                <span className="tabular-nums text-gray-900">{formatQty(row.threshold)}</span>
+              ),
+          },
+          {
+            key: "expiry",
+            header: "Vence",
+            render: (row) => (
+              <span className="whitespace-nowrap">{row.expiry_date ?? "—"}</span>
+            ),
+          },
+        ] satisfies DataTableColumn<CatalogEntry>[])
+      : ([
+          {
+            key: "unit",
+            header: "Unidad",
+            render: (row) => <span>{row.unit?.name ?? "—"}</span>,
+          },
+          {
+            key: "category",
+            header: "Categoría",
+            render: (row) => <span>{row.category?.name ?? "—"}</span>,
+          },
+        ] satisfies DataTableColumn<CatalogEntry>[])),
     {
       key: "status",
       header: "Estado",
-      render: (row) => (
-        <span className="flex flex-wrap items-center gap-1.5">
-          <StockBadge row={row} />
-          {!row.is_active && <Badge tone="gray">Inactivo</Badge>}
-          {row.is_shortage && <Badge tone="amber">Faltante</Badge>}
-        </span>
-      ),
+      render: (row) =>
+        isStore ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <StockBadge row={row} />
+            {!row.is_active && <Badge tone="gray">Inactivo</Badge>}
+            {row.is_shortage && <Badge tone="amber">Faltante</Badge>}
+          </span>
+        ) : (
+          <Badge tone={row.is_active ? "green" : "gray"}>
+            {row.is_active ? "En catálogo" : "Inactivo"}
+          </Badge>
+        ),
     },
     {
       key: "actions",
       header: "Acciones",
-      render: (row) => (
-        <span className="flex flex-wrap gap-1.5">
-          <button className={ACTION_EDIT} type="button" onClick={() => openEdit(row)}>
-            Editar
-          </button>
-          <button
-            className={row.is_shortage ? ACTION_SHORTAGE_OFF : ACTION_SHORTAGE_ON}
-            type="button"
-            disabled={busy?.id === row.id}
-            onClick={() => alternarFaltante(row)}
-          >
-            {row.is_shortage ? "Quitar faltante" : "Marcar faltante"}
-          </button>
+      render: (row) =>
+        isStore ? (
+          <span className="flex flex-wrap gap-1.5">
+            <button className={ACTION_EDIT} type="button" onClick={() => openEdit(row)}>
+              Editar
+            </button>
+            <button
+              className={row.is_shortage ? ACTION_SHORTAGE_OFF : ACTION_SHORTAGE_ON}
+              type="button"
+              disabled={busy?.id === row.id}
+              onClick={() => alternarFaltante(row)}
+            >
+              {row.is_shortage ? "Quitar faltante" : "Marcar faltante"}
+            </button>
+            <button
+              className={ACTION_REMOVE}
+              type="button"
+              disabled={busy?.id === row.id}
+              onClick={() => quitar(row)}
+            >
+              Quitar
+            </button>
+          </span>
+        ) : (
           <button
             className={ACTION_REMOVE}
             type="button"
@@ -274,8 +323,7 @@ export function StoreCatalogPanel({
           >
             Quitar
           </button>
-        </span>
-      ),
+        ),
     },
   ];
 
@@ -284,10 +332,12 @@ export function StoreCatalogPanel({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-gray-900">
-            Productos de {storeName}
+            {isStore ? `Productos de ${storeName}` : `Catálogo de ${storeName}`}
           </h2>
           <p className="text-xs text-gray-500">
-            Asigná productos a la tienda y editá cantidad, umbral y faltantes.
+            {isStore
+              ? "Asigná productos a la tienda y editá cantidad, umbral y faltantes."
+              : "Los productos que ofrecés a las tiendas vinculadas."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -342,14 +392,16 @@ export function StoreCatalogPanel({
             ))}
           </select>
         </div>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={list.query.onlyShortage}
-            onChange={(event) => setQuery({ onlyShortage: event.target.checked })}
-          />
-          Solo faltantes
-        </label>
+        {isStore && (
+          <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={list.query.onlyShortage}
+              onChange={(event) => setQuery({ onlyShortage: event.target.checked })}
+            />
+            Solo faltantes
+          </label>
+        )}
       </div>
 
       <DataTable
@@ -372,11 +424,18 @@ export function StoreCatalogPanel({
       />
 
       {adding && (
-        <Modal title="Agregar productos a la tienda" onClose={() => setAdding(false)}>
+        <Modal
+          title={isStore ? "Agregar productos a la tienda" : "Agregar productos al catálogo"}
+          onClose={() => setAdding(false)}
+        >
           <AddProductsPanel
-            target={{ kind: "store", id: storeId, name: storeName }}
+            target={
+              isStore
+                ? { kind: "store", id: storeId, name: storeName }
+                : { kind: "distribuidor", id: 0, name: storeName }
+            }
             categories={categories.data ?? []}
-            canSetPrice={canSetPrice}
+            canSetPrice={isStore && canSetPrice}
             onAdded={() => {
               refetch();
               onChanged?.();

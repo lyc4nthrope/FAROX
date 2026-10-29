@@ -3,6 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { SessionLoading } from "../../../app/guards/SessionLoading";
 import { AdminProductsPage } from "./AdminProductsPage";
+import { DistributorCatalogPage } from "./DistributorCatalogPage";
 import { MyCatalogPage } from "./MyCatalogPage";
 
 // Punto de entrada de /products. El admin es el ÚNICO con vista general (S1);
@@ -10,6 +11,7 @@ import { MyCatalogPage } from "./MyCatalogPage";
 // distribuidora, no un catálogo derivado del nombre del rol (S2/S3).
 // 0024: el operador ya no tiene una vista separada — el catálogo y la
 // asignación viven en /inventario/:storeId (pestaña «Productos»).
+// 0028: el distribuidor reutiliza el mismo panel de la tienda en modo catálogo.
 export function ProductsPage() {
   const { role, status } = useAuth();
 
@@ -18,5 +20,6 @@ export function ProductsPage() {
   if (status === "loading") return <SessionLoading />;
   if (role === "admin") return <AdminProductsPage />;
   if (role === "operador") return <Navigate to="/inventario" replace />;
+  if (role === "distribuidor") return <DistributorCatalogPage />;
   return <MyCatalogPage />;
 }

@@ -204,7 +204,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     renderPagina("distribuidor");
 
     expect(await screen.findByText("Catálogo de mi distribuidora")).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
+    expect(await screen.findByText("Café molido")).toBeInTheDocument();
     expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledWith({
       page: 0,
       pageSize: 25,
