@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -315,14 +316,19 @@ export function StoreCatalogPanel({
             </button>
           </span>
         ) : (
-          <button
-            className={ACTION_REMOVE}
-            type="button"
-            disabled={busy?.id === row.id}
-            onClick={() => quitar(row)}
-          >
-            Quitar
-          </button>
+          <span className="flex flex-wrap gap-1.5">
+            <Link className={ACTION_EDIT} to={`/products/${row.id}`}>
+              Editar
+            </Link>
+            <button
+              className={ACTION_REMOVE}
+              type="button"
+              disabled={busy?.id === row.id}
+              onClick={() => quitar(row)}
+            >
+              Quitar
+            </button>
+          </span>
         ),
     },
   ];
@@ -476,11 +482,16 @@ export function StoreCatalogPanel({
                 min="0"
                 step="0.001"
                 placeholder="Sin umbral"
+                aria-label="Umbral de alerta (opcional)"
                 value={editDraft.threshold}
                 onChange={(event) =>
                   setEditDraft({ ...editDraft, threshold: event.target.value })
                 }
               />
+              <span className="mt-1 block text-xs text-gray-500">
+                Sin umbral no se generan alertas de stock. Para productos de rotación lenta, dejalo
+                vacío o alto.
+              </span>
             </label>
             <div className="flex flex-wrap gap-2">
               <button className={buttonClass} type="button" disabled={savingEdit} onClick={() => void saveEdit()}>

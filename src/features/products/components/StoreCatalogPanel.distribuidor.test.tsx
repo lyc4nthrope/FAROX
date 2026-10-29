@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as productsApi from "../api";
@@ -62,7 +63,11 @@ afterEach(() => {
 });
 
 function renderPanel() {
-  return render(<StoreCatalogPanel kind="distribuidor" storeId={0} storeName="mi distribuidora" />);
+  return render(
+    <MemoryRouter>
+      <StoreCatalogPanel kind="distribuidor" storeId={0} storeName="mi distribuidora" />
+    </MemoryRouter>,
+  );
 }
 
 describe("StoreCatalogPanel · modo distribuidor (S15)", () => {

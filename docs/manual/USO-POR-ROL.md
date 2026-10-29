@@ -46,7 +46,9 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Ver mis distribuidores vinculados | Distribuidores | Elegí la tienda; si no hay ninguno, aparece el código y el QR para vincular uno |
 | Vincular un distribuidor | Distribuidores → Vincular otro distribuidor | Compartí el QR o dictá el código; el distribuidor lo escanea o lo escribe |
 | Pedir mercancía | Pedidos → Nuevo pedido | Tienda → distribuidor **vinculado** → buscá por nombre o marca: un solo buscador y los productos se acumulan abajo. La cantidad se ajusta con − / +. El **stock mínimo** es un filtro opcional dentro de «Filtros». No hace falta precio: el pedido queda pendiente y el distribuidor lo cotiza. Los **faltantes de la tienda** se agregan con un clic |
-| Seguir el pedido | Pedidos → pedido | El distribuidor lo marca en ruta y confirma la entrega; vos ves el estado y la fecha prometida |
+| Seguir el pedido | Pedidos → pedido | El distribuidor lo marca en ruta y confirma la entrega; vos ves el estado, la fecha prometida y el precio cotizado por el distribuidor |
+| Contactar a un distribuidor | Distribuidores → Contactar | Abre el WhatsApp/teléfono/email que el distribuidor configuró. Si no lo configuró, muestra «Sin contacto» |
+| Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
 | Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |
@@ -61,11 +63,15 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Elegir tiendas para el recorrido | Mi ruta | Marcá las tiendas de la lista; solo las marcadas aparecen en el mapa y se numeran igual en ambos lados |
 | Guardar la ruta de hoy | Mi ruta → Guardar ruta | Guarda las tiendas marcadas como paradas de la ruta de hoy y actualiza el resumen (rutas hoy, paradas, completadas) |
 | Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva (para eso está Guardar ruta) |
-| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro y quitar. Sin stock ni precio |
+| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro, editar y quitar. Sin stock ni precio |
+| Ver mis movimientos | Movimientos | Tus entregas/ventas aparecen como salidas con su precio; el stock de la tienda recibe la entrada. Filtros Entradas/Salidas |
+| Registrar una venta directa | Movimientos → Registrar venta | **Requiere Premium**: tienda vinculada, producto de tu catálogo, cantidad y precio de venta |
+| Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |
+| Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora; el nav muestra cuántos pedidos abiertos hay |
-| Cotizar un pedido | Mis pedidos → pedido pendiente → Cotización del distribuidor | Precio por producto; si sos Premium se sugiere el precio registrado. El operador de la tienda ve la cotización aunque no sea Premium |
+| Cotizar un pedido | Mis pedidos → pedido pendiente o en ruta → Cotización del distribuidor | Precio por producto; si sos Premium se sugiere el precio registrado. Se congela en el movimiento al confirmar la entrega. El operador de la tienda ve la cotización aunque no sea Premium |
 | Marcar un pedido en ruta o devolverlo a pendiente | Mis pedidos → fila → En ruta / Pendiente | También desde el detalle del pedido |
 | Entregar un pedido completo | Mis pedidos → fila → Entregar | Pide confirmación y suma todas las cantidades al stock. Para entregas parciales usá el detalle |
 | Fijar la fecha prometida | Mis pedidos → pedido → Entrega y comunicación | Opcional; el operador la ve en el resumen. Podés cambiarla o quitarla mientras el pedido siga abierto |
