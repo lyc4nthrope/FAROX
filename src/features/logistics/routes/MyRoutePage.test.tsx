@@ -191,6 +191,49 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     ).toBeInTheDocument();
   });
 
+  it("muestra rutas, paradas y completadas de la ruta de hoy", async () => {
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: {
+        id: 9,
+        route_date: "2026-10-28",
+        status: "active",
+        distributor_name: "Distribuidora Andes",
+        stops: [
+          {
+            id: 1,
+            stop_order: 1,
+            status: "completed",
+            estimated_time: null,
+            arrived_at: null,
+            store_id: 1,
+            store_name: "Tienda Centro",
+            lat: 4.6,
+            lng: -74.1,
+          },
+          {
+            id: 2,
+            stop_order: 2,
+            status: "pending",
+            estimated_time: null,
+            arrived_at: null,
+            store_id: 2,
+            store_name: "Tienda Norte",
+            lat: 4.7,
+            lng: -74.05,
+          },
+        ],
+      },
+      error: null,
+    });
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByText("Completadas").nextElementSibling).toHaveTextContent("1"),
+    );
+    expect(screen.getByText("Rutas hoy").nextElementSibling).toHaveTextContent("1");
+    expect(screen.getByText("Paradas").nextElementSibling).toHaveTextContent("2");
+  });
+
   it("sin solicitudes abiertas muestra el estado vacío", async () => {
     vi.mocked(logisticsApi.fetchStoresWithRequests).mockResolvedValue({ data: [], error: null });
     renderPage();

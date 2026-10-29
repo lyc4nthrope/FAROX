@@ -240,6 +240,29 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
     await waitFor(() => expect(precio).toHaveValue(3200));
   });
 
+  it("el distribuidor no Premium no precarga el precio registrado", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          product_id: 10,
+          product_name: "Arroz",
+          quantity: 2,
+          received_quantity: null,
+          status: "pending",
+          unit_price: 3200,
+        },
+      ],
+      error: null,
+    });
+
+    renderPage("distribuidor");
+
+    const precio = await screen.findByLabelText("Precio de Arroz");
+    await waitFor(() => expect(precio).toHaveValue(null));
+  });
+
   it("el distribuidor devuelve un pedido en ruta a pendiente", async () => {
     vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
     const user = userEvent.setup();

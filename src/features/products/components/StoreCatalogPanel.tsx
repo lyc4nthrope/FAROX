@@ -359,7 +359,7 @@ export function StoreCatalogPanel({
       <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label htmlFor="inventory-search" className="block text-sm font-medium text-gray-700">
-            Buscar en la tienda
+            {isStore ? "Buscar en la tienda" : "Buscar en el catálogo"}
           </label>
           <input
             id="inventory-search"
@@ -413,12 +413,16 @@ export function StoreCatalogPanel({
         emptyTitle={
           filtered
             ? "Ningún producto coincide con el filtro"
-            : "La tienda no tiene productos asignados"
+            : isStore
+              ? "La tienda no tiene productos asignados"
+              : "Tu catálogo está vacío"
         }
         emptyHint={
           filtered
             ? "Probá con otro nombre, otra categoría o quitá el filtro de faltantes."
-            : "Usá «Agregar productos» para sumar el primero al inventario."
+            : isStore
+              ? "Usá «Agregar productos» para sumar el primero al inventario."
+              : "Usá «Agregar productos» para sumar el primero al catálogo."
         }
         footer={<Pager list={list} />}
       />

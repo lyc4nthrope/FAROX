@@ -101,6 +101,18 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     confirm.mockRestore();
   });
 
+  it("cancelar el diálogo de entrega no llama a la RPC", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderPage("distribuidor");
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Entregar" }));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(ordersApi.confirmFullDelivery).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
   it("el operador no ve las acciones de estado", async () => {
     renderPage("operador");
 

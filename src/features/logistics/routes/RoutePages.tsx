@@ -264,6 +264,18 @@ export function MyRoutePage() {
       return;
     }
     setSavingRoute(true);
+    if (route.data !== null && (route.data.status === "completed" || route.data.status === "cancelled")) {
+      setRouteMsg({ error: "La ruta de hoy ya está cerrada; no se puede reemplazar.", ok: null });
+      setSavingRoute(false);
+      return;
+    }
+    if (
+      route.data?.status === "active" &&
+      !window.confirm("La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?")
+    ) {
+      setSavingRoute(false);
+      return;
+    }
     const distributor = await fetchMyDistributorId();
     if (distributor.error !== null || distributor.data === null) {
       setRouteMsg({ error: "No pudimos identificar tu distribuidora.", ok: null });
@@ -299,7 +311,8 @@ export function MyRoutePage() {
           <h1 className="text-2xl font-semibold tracking-tight">Ruta del día</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             Marcá las tiendas con solicitudes, ubicalas en el mapa y abrí el recorrido en Google
-            Maps. La ruta se arma en tu navegador, no guardamos el recorrido.
+            Maps. «Guardar ruta» registra esas paradas para hoy; el recorrido lo calcula Google
+            Maps.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

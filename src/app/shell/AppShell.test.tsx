@@ -81,6 +81,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    expect(ordersApi.fetchOpenOrdersCount).not.toHaveBeenCalled();
   });
 
   it("Mis pedidos muestra la notificación de pedidos abiertos", async () => {
