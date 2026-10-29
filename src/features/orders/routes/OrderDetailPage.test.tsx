@@ -25,6 +25,7 @@ vi.mock("../api", () => ({
   updateOrderStatus: vi.fn(),
   confirmDelivery: vi.fn(),
   createCredit: vi.fn(),
+  fetchDistributorSalePrices: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -70,6 +71,10 @@ describe("OrderDetailPage · fiado (0023)", () => {
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({ data: [], error: null });
     vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchDistributorSalePrices).mockResolvedValue({
+      data: new Map<number, number>(),
+      error: null,
+    });
     vi.mocked(ordersApi.createCredit).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.setOrderPrices).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });
@@ -137,6 +142,10 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
       data: [{ product_id: 10, distributor_price: null }],
       error: null,
     });
+    vi.mocked(ordersApi.fetchDistributorSalePrices).mockResolvedValue({
+      data: new Map<number, number>(),
+      error: null,
+    });
     vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
   });
@@ -194,6 +203,33 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
 
     await waitFor(() => expect(ordersApi.setOrderPrices).toHaveBeenCalled());
     expect(ordersApi.confirmDelivery).not.toHaveBeenCalled();
+  });
+
+  it("precarga la cotización con el precio de venta de la relación (0030)", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
+    vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          product_id: 10,
+          product_name: "Arroz",
+          quantity: 2,
+          received_quantity: null,
+          status: "pending",
+          unit_price: 2500,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(ordersApi.fetchDistributorSalePrices).mockResolvedValue({
+      data: new Map([[10, 3800]]),
+      error: null,
+    });
+
+    renderPage("distribuidor", true);
+
+    const input = await screen.findByLabelText("Precio de Arroz");
+    await waitFor(() => expect(input).toHaveValue(3800));
   });
 
   it("precarga la cotización ya guardada del distribuidor", async () => {
@@ -326,6 +362,10 @@ describe("OrderDetailPage · ciclo del pedido en manos del distribuidor (0025)",
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(ordersApi.fetchOrderItems).mockResolvedValue({ data: [], error: null });
     vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchDistributorSalePrices).mockResolvedValue({
+      data: new Map<number, number>(),
+      error: null,
+    });
     vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.confirmDelivery).mockResolvedValue({ error: null });
     vi.mocked(ordersApi.setOrderExpectedAt).mockResolvedValue({ error: null });

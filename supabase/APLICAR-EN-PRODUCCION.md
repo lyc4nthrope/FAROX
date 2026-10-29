@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. La **0025** traslada «marcar en ruta» y «confirmar entrega» al distribuidor y agrega `set_order_expected_at`: tampoco se ejecutó contra una base real. La **0026** agrega `update_store_product` / `add_store_product` para editar y dar de alta un producto de la tienda en una sola llamada: tampoco se ejecutó contra una base real. La **0027** permite a Premium publicar precios, agrega el precio opcional al alta y a los movimientos: tampoco se ejecutó contra una base real. La **0028** hace reversible in_route → pending y deja que el operador de la tienda lea la cotización sin Premium: tampoco se ejecutó contra una base real. La **0029** extiende la cotización a in_route, agrega la venta directa del distribuidor, la edición de la ficha de sus productos y el contacto entre partes vinculadas: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. La **0025** traslada «marcar en ruta» y «confirmar entrega» al distribuidor y agrega `set_order_expected_at`: tampoco se ejecutó contra una base real. La **0026** agrega `update_store_product` / `add_store_product` para editar y dar de alta un producto de la tienda en una sola llamada: tampoco se ejecutó contra una base real. La **0027** permite a Premium publicar precios, agrega el precio opcional al alta y a los movimientos: tampoco se ejecutó contra una base real. La **0028** hace reversible in_route → pending y deja que el operador de la tienda lea la cotización sin Premium: tampoco se ejecutó contra una base real. La **0029** extiende la cotización a in_route, agrega la venta directa del distribuidor y el contacto entre partes vinculadas: tampoco se ejecutó contra una base real. La **0030** corrige el alcance de edición (la ficha de `products` es solo del admin; cada parte edita su relación) y agrega precios de compra/venta por relación con prellenado de movimientos y cotizaciones: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -144,12 +144,19 @@ UNION ALL SELECT '0028 pedidos reversibles',
 UNION ALL SELECT '0029 ventas y contacto',
   (to_regprocedure('public.register_distributor_sale(bigint,bigint,numeric,numeric,date)') IS NOT NULL
    AND to_regprocedure('public.get_counterpart_contact(text,bigint)') IS NOT NULL
-   AND to_regprocedure('public.update_distributor_product(bigint,text,text,bigint,bigint,bigint,numeric,text)') IS NOT NULL
    AND COALESCE((SELECT position('in_route' in prosrc) > 0
                  FROM pg_proc
                  WHERE proname = 'set_order_prices'
                    AND pronamespace = 'public'::regnamespace
                  LIMIT 1), false))::text
+UNION ALL SELECT '0030 relaciones y precios',
+  (EXISTS (SELECT 1 FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_name = 'store_product_prices')
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'distributor_products'
+                 AND column_name = 'sale_price')
+   AND to_regprocedure('public.update_store_product_full(bigint,bigint,numeric,numeric,boolean,date,numeric,numeric)') IS NOT NULL
+   AND to_regprocedure('public.update_distributor_product_relation(bigint,numeric,numeric,date,numeric,numeric)') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -183,7 +190,8 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0026 | `20261027000026_inventario_edicion_y_alta.sql` | `0026 … = true` — **sin esta, el inventario no puede editar cantidad+umbral en un solo guardado ni dar de alta con cantidad inicial** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
 | 0027 | `20261028000027_precios_premium_y_movimientos.sql` | `0027 … = true` — **sin esta, Premium no puede publicar precios y los movimientos no guardan el precio de compra/venta** | ✅ (`CREATE OR REPLACE` + `DROP`/`CREATE` de las firmas con precio) |
 | 0028 | `20261028000028_pedidos_reversibles_y_precio_operador.sql` | `0028 … = true` — **sin esta, el distribuidor no puede devolver un pedido a pendiente y el operador no ve la cotización sin Premium** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
-| 0029 | `20261029000029_entregas_ventas_y_contacto.sql` | `0029 … = true` — **sin esta, no hay venta directa, la cotización no se ajusta en ruta, el distribuidor no edita su catálogo y no hay botón de contacto** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
+| 0029 | `20261029000029_entregas_ventas_y_contacto.sql` | `0029 … = true` — **sin esta, no hay venta directa, la cotización no se ajusta en ruta y no hay botón de contacto** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
+| 0030 | `20261029000030_relaciones_precios.sql` | `0030 … = true` — **sin esta, el distribuidor no puede ajustar su cantidad/precios, la ficha global quedaría editable por su creador y no hay prellenado de movimientos** | ✅ (`ALTER TABLE` + `CREATE OR REPLACE` + policies) |
 | seed | `supabase/demo-catalog.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
@@ -263,7 +271,9 @@ SELECT has_function_privilege('authenticated','public.get_order_quotes(bigint)',
 -- 0029: venta directa y contacto entre partes
 SELECT has_function_privilege('authenticated','public.register_distributor_sale(bigint,bigint,numeric,numeric,date)','EXECUTE');               -- true
 SELECT has_function_privilege('authenticated','public.get_counterpart_contact(text,bigint)','EXECUTE');                                          -- true
-SELECT has_function_privilege('authenticated','public.update_distributor_product(bigint,text,text,bigint,bigint,bigint,numeric,text)','EXECUTE'); -- true
+-- 0030: relaciones y precios
+SELECT has_function_privilege('authenticated','public.update_store_product_full(bigint,bigint,numeric,numeric,boolean,date,numeric,numeric)','EXECUTE'); -- true
+SELECT has_function_privilege('authenticated','public.update_distributor_product_relation(bigint,numeric,numeric,date,numeric,numeric)','EXECUTE');          -- true
 ```
 
 Y después:
@@ -284,7 +294,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0028, 0029. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0028, 0029, 0030. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas

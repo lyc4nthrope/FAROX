@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
+import * as productsApi from "../../products/api";
 import * as inventoryApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { InventoryPage } from "./InventoryPage";
@@ -23,6 +24,9 @@ vi.mock("../api", () => ({
 // que Inventario componga la pestaña «Productos».
 vi.mock("../../products/components/StoreCatalogPanel", () => ({
   StoreCatalogPanel: () => <p>Panel de productos de la tienda</p>,
+}));
+vi.mock("../../products/api", () => ({
+  fetchStorePurchasePrices: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -75,6 +79,10 @@ beforeEach(() => {
   vi.mocked(inventoryApi.fetchStoreName).mockResolvedValue({ data: "Prueba1", error: null });
   vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({ data: [], error: null });
   vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({ data: [], error: null });
+  vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
+    data: new Map<number, number>(),
+    error: null,
+  });
   vi.mocked(inventoryApi.fetchMotives).mockResolvedValue({ data: [], error: null });
   vi.mocked(inventoryApi.fetchMovements).mockResolvedValue({ data: [], error: null });
 });
@@ -197,6 +205,90 @@ describe("InventoryPage · acciones en botones", () => {
         quantity: 2,
         unitPrice: 4500,
         motiveId: 1,
+        expiryDate: null,
+      }),
+    );
+  });
+
+  it("prellena el precio de compra de la relación y calcula el total (0030)", async () => {
+    vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
+      data: [
+        {
+          product_id: 2,
+          product_name: "Leche Alpina",
+          brand: "Alpina",
+          quantity: 30,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
+      data: new Map([[2, 4500]]),
+      error: null,
+    });
+    vi.mocked(inventoryApi.fetchMotives).mockResolvedValue({
+      data: [{ id: 1, name: "Compra", suggested_type: "entry" }],
+      error: null,
+    });
+
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar entrada o salida",
+    });
+
+    await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
+    await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Leche Alpina" }),
+    );
+
+    expect(within(dialog).getByLabelText("Precio de compra (opcional)")).toHaveValue(4500);
+    expect(within(dialog).getByText(/Total estimado/)).toHaveTextContent("9.000");
+  });
+
+  it("en una salida prellena el precio de venta activo de la tienda (0030)", async () => {
+    vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
+      data: [{ product_id: 2, product_name: "Leche Alpina", brand: "Alpina", quantity: 30 }],
+      error: null,
+    });
+    vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({
+      data: [{ product_id: 2, product_name: "Leche Alpina", price: 3000, currency: "COP" }],
+      error: null,
+    });
+    vi.mocked(inventoryApi.fetchMotives).mockResolvedValue({
+      data: [{ id: 2, name: "Venta", suggested_type: "exit" }],
+      error: null,
+    });
+    vi.mocked(inventoryApi.registerMovement).mockResolvedValue({ error: null });
+
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar entrada o salida",
+    });
+
+    await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
+    await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Salida" }));
+    const price = within(dialog).getByLabelText("Precio de venta (opcional)");
+    expect(price).toHaveValue(3000);
+
+    await user.clear(price);
+    await user.type(price, "3200");
+    await user.selectOptions(within(dialog).getByLabelText("Motivo"), "2");
+    await user.click(within(dialog).getByRole("button", { name: "Registrar salida" }));
+
+    await waitFor(() =>
+      expect(inventoryApi.registerMovement).toHaveBeenCalledWith({
+        type: "exit",
+        storeId: 10,
+        productId: 2,
+        quantity: 1,
+        unitPrice: 3200,
+        motiveId: 2,
         expiryDate: null,
       }),
     );

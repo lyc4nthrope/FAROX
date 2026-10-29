@@ -10,7 +10,6 @@ import {
   fetchProduct,
   fetchProductCategories,
   fetchUnitTypes,
-  updateDistributorProduct,
   updateProduct,
 } from "../api";
 import { ProductForm, type ProductFormErrors } from "../components/ProductForm";
@@ -52,12 +51,11 @@ export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  // 0019/S7: el catálogo GLOBAL lo administra el admin; tienda y distribuidor
-  // eligen del registro. 0029: el distribuidor SÍ edita la ficha de los
-  // productos de su catálogo — la RPC update_distributor_product valida el
-  // vínculo en la DB; acá solo se habilita el formulario de edición.
+  // 0019/S7 + 0030: la ficha GLOBAL de products la edita solo el admin. Tienda
+  // y distribuidor crean productos y después ajustan su RELACIÓN (stock o
+  // catálogo); no modifican la ficha compartida.
   const isEdit = id !== undefined;
-  const canWrite = role === "admin" || (role === "distribuidor" && isEdit);
+  const canWrite = role === "admin";
   const productId = id === undefined ? null : Number(id);
 
   const [values, setValues] = useState<ProductFormValues>(EMPTY_VALUES);
@@ -160,9 +158,7 @@ export function ProductFormPage() {
         const result =
           productId === null
             ? await createProduct(parsed.data)
-            : role === "distribuidor"
-              ? await updateDistributorProduct(productId, parsed.data)
-              : await updateProduct(productId, parsed.data);
+            : await updateProduct(productId, parsed.data);
         if (result.error !== null) {
           setFormError(mapError(result.error)); // mapError en el call site (B3)
           return;

@@ -230,6 +230,30 @@ export async function fetchOrderQuotes(orderId: number): Promise<LoadResult<Orde
 }
 
 /**
+ * 0030: precio de venta que el distribuidor configuró en su catálogo, para
+ * estimar la cotización del pedido. Solo él puede leer su relación.
+ */
+export async function fetchDistributorSalePrices(
+  productIds: readonly number[],
+): Promise<LoadResult<Map<number, number>>> {
+  if (productIds.length === 0) {
+    return { data: new Map<number, number>(), error: null };
+  }
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select("product_id,sale_price")
+    .in("product_id", productIds)
+    .not("sale_price", "is", null)
+    .limit(500);
+  const prices = new Map<number, number>();
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    if (row.sale_price == null) continue;
+    prices.set(Number(row.product_id), Number(row.sale_price));
+  }
+  return { data: prices, error };
+}
+
+/**
  * 0024 — el distribuidor del pedido cotiza las líneas mientras sigue
  * pendiente. El backend valida alcance, estado y pertenencia de cada producto.
  */

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -13,10 +12,12 @@ import {
   fetchDistributorCatalog,
   fetchProductCategories,
   fetchStoreCatalog,
+  fetchStoreRelationPrices,
   removeDistributorCatalogProduct,
   removeStoreProduct,
   setStoreProductShortage,
-  updateStoreProduct,
+  updateDistributorProductRelation,
+  updateStoreProductFull,
 } from "../api";
 import type { CatalogEntry, CatalogQuery, CatalogRef } from "../types";
 import { AddProductsPanel } from "./AddProductsPanel";
@@ -35,6 +36,10 @@ const INITIAL_QUERY: CatalogQuery = {
   categoryId: null,
   onlyShortage: false,
 };
+
+const EMPTY_EDIT = { quantity: "", threshold: "", expiry: "", purchasePrice: "", salePrice: "" };
+
+type EditDraft = typeof EMPTY_EDIT;
 
 type RowAction = "shortage" | "remove";
 
@@ -56,13 +61,37 @@ function StockBadge({ row }: { row: CatalogEntry }) {
   return <Badge tone="green">OK</Badge>;
 }
 
+// 0030: aviso visual de la relación del distribuidor. No crea filas en
+// `alerts` (ese motor es de tienda); el umbral/vencimiento se ven acá.
+function DistributorBadges({ row }: { row: CatalogEntry }) {
+  const low = row.threshold != null && (row.quantity ?? 0) <= row.threshold;
+  let expiryTone: "red" | "amber" | null = null;
+  if (row.expiry_date != null) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(`${row.expiry_date}T00:00:00`);
+    const days = Math.round((expiry.getTime() - today.getTime()) / 86_400_000);
+    if (days < 0) expiryTone = "red";
+    else if (days <= 15) expiryTone = "amber";
+  }
+  return (
+    <>
+      {low && <Badge tone="amber">Bajo</Badge>}
+      {expiryTone !== null && (
+        <Badge tone={expiryTone}>{expiryTone === "red" ? "Vencido" : "Vence"}</Badge>
+      )}
+    </>
+  );
+}
+
 /**
  * Catálogo + asignación de UNA tienda (S2). Es la pestaña «Productos» del
  * inventario unificado: reemplaza la antigua vista /products del operador.
  *
- * 0026: la cantidad y el umbral se editan en un MODAL y se guardan con una
- * sola RPC (`update_store_product`). La tabla ya no tiene un «Guardar» por
- * celda ni dispara requests por cada cambio.
+ * 0026/0030: la cantidad, el umbral, el vencimiento y los precios de la
+ * relación se editan en un MODAL y se guardan con UNA sola RPC. La tabla no
+ * tiene un «Guardar» por celda ni dispara requests por cada cambio. La ficha
+ * global del producto NO se edita acá (solo admin, /products/:id).
  */
 export function StoreCatalogPanel({
   kind = "store",
@@ -77,7 +106,7 @@ export function StoreCatalogPanel({
   storeName: string;
   /** Sube desde la página tras un movimiento/precio para refrescar cantidades. */
   reloadToken?: number;
-  /** 0027: Premium/admin puede fijar el precio al agregar un producto. */
+  /** 0027/0030: Premium/admin puede editar los precios de la relación. */
   canSetPrice?: boolean;
   onChanged?: () => void;
 }) {
@@ -85,7 +114,7 @@ export function StoreCatalogPanel({
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<CatalogEntry | null>(null);
-  const [editDraft, setEditDraft] = useState({ quantity: "", threshold: "" });
+  const [editDraft, setEditDraft] = useState<EditDraft>(EMPTY_EDIT);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [busy, setBusy] = useState<{ id: number; action: RowAction } | null>(null);
@@ -95,6 +124,16 @@ export function StoreCatalogPanel({
     (query) =>
       isStore ? fetchStoreCatalog(storeId, query) : fetchDistributorCatalog(query),
     INITIAL_QUERY,
+  );
+
+  // 0030: el precio de venta de la tienda vive en price_publications (histórico
+  // activo). Se carga aparte para el modal; el distribuidor lo trae en la fila.
+  const relationPrices = useLoad(
+    () =>
+      isStore
+        ? fetchStoreRelationPrices(storeId)
+        : Promise.resolve({ data: [], error: null }),
+    [isStore, storeId],
   );
 
   const categories = useLoad<CatalogRef[]>(async () => {
@@ -180,12 +219,29 @@ export function StoreCatalogPanel({
   }
 
   function openEdit(row: CatalogEntry): void {
+    const relation = relationPrices.data?.find((price) => price.product_id === row.id);
+    const activeSalePrice = isStore
+      ? (relation?.sale_price ?? null)
+      : (row.sale_price ?? null);
+    const purchasePrice = isStore
+      ? (relation?.purchase_price ?? null)
+      : (row.purchase_price ?? null);
     setEditing(row);
     setEditError(null);
     setEditDraft({
       quantity: String(row.quantity ?? 0),
       threshold: row.threshold == null ? "" : String(row.threshold),
+      expiry: row.expiry_date ?? "",
+      purchasePrice: purchasePrice == null ? "" : String(purchasePrice),
+      salePrice: activeSalePrice == null ? "" : String(activeSalePrice),
     });
+  }
+
+  function parsePrice(raw: string): number | null {
+    const trimmed = raw.trim();
+    if (trimmed === "") return null;
+    const value = Number(trimmed);
+    return Number.isFinite(value) && value > 0 ? value : null;
   }
 
   async function saveEdit(): Promise<void> {
@@ -205,9 +261,38 @@ export function StoreCatalogPanel({
       setEditError("El umbral no puede ser negativo.");
       return;
     }
+    const purchasePrice = canSetPrice ? parsePrice(editDraft.purchasePrice) : null;
+    const salePrice = canSetPrice ? parsePrice(editDraft.salePrice) : null;
+    if (canSetPrice && editDraft.purchasePrice.trim() !== "" && purchasePrice === null) {
+      setEditError("El precio de compra debe ser mayor a 0.");
+      return;
+    }
+    if (canSetPrice && editDraft.salePrice.trim() !== "" && salePrice === null) {
+      setEditError("El precio de venta debe ser mayor a 0.");
+      return;
+    }
+    const expiryDate = editDraft.expiry === "" ? null : editDraft.expiry;
     setSavingEdit(true);
     const error = await runAction(() =>
-      updateStoreProduct(storeId, row.id, quantity, threshold, row.is_shortage),
+      isStore
+        ? updateStoreProductFull(
+            storeId,
+            row.id,
+            quantity,
+            threshold,
+            row.is_shortage,
+            expiryDate,
+            purchasePrice,
+            salePrice,
+          )
+        : updateDistributorProductRelation(
+            row.id,
+            quantity,
+            threshold,
+            expiryDate,
+            purchasePrice,
+            salePrice,
+          ),
     );
     setSavingEdit(false);
     if (error !== null) {
@@ -217,6 +302,7 @@ export function StoreCatalogPanel({
     setEditing(null);
     setMsg({ error: null, ok: `"${row.name}" actualizado.` });
     refetch();
+    relationPrices.reload();
     onChanged?.();
   }
 
@@ -263,6 +349,13 @@ export function StoreCatalogPanel({
         ] satisfies DataTableColumn<CatalogEntry>[])
       : ([
           {
+            key: "quantity",
+            header: "Cantidad",
+            render: (row) => (
+              <span className="tabular-nums text-gray-900">{formatQty(row.quantity ?? 0)}</span>
+            ),
+          },
+          {
             key: "unit",
             header: "Unidad",
             render: (row) => <span>{row.unit?.name ?? "—"}</span>,
@@ -284,9 +377,12 @@ export function StoreCatalogPanel({
             {row.is_shortage && <Badge tone="amber">Faltante</Badge>}
           </span>
         ) : (
-          <Badge tone={row.is_active ? "green" : "gray"}>
-            {row.is_active ? "En catálogo" : "Inactivo"}
-          </Badge>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Badge tone={row.is_active ? "green" : "gray"}>
+              {row.is_active ? "En catálogo" : "Inactivo"}
+            </Badge>
+            <DistributorBadges row={row} />
+          </span>
         ),
     },
     {
@@ -295,7 +391,12 @@ export function StoreCatalogPanel({
       render: (row) =>
         isStore ? (
           <span className="flex flex-wrap gap-1.5">
-            <button className={ACTION_EDIT} type="button" onClick={() => openEdit(row)}>
+            <button
+              className={ACTION_EDIT}
+              type="button"
+              disabled={relationPrices.loading || relationPrices.error !== null}
+              onClick={() => openEdit(row)}
+            >
               Editar
             </button>
             <button
@@ -317,9 +418,9 @@ export function StoreCatalogPanel({
           </span>
         ) : (
           <span className="flex flex-wrap gap-1.5">
-            <Link className={ACTION_EDIT} to={`/products/${row.id}`}>
+            <button className={ACTION_EDIT} type="button" onClick={() => openEdit(row)}>
               Editar
-            </Link>
+            </button>
             <button
               className={ACTION_REMOVE}
               type="button"
@@ -457,9 +558,14 @@ export function StoreCatalogPanel({
       {editing !== null && (
         <Modal title={`Editar ${editing.name}`} onClose={() => setEditing(null)}>
           <Status error={editError} />
+          {isStore && (
+            <Status loading={relationPrices.loading} error={relationPrices.error} />
+          )}
           <div className="space-y-4">
             <div>
-              <span className="block text-sm font-medium text-gray-700">Cantidad en stock</span>
+              <span className="block text-sm font-medium text-gray-700">
+                {isStore ? "Cantidad en stock" : "Cantidad que poseo"}
+              </span>
               <div className="mt-1.5">
                 <QuantityStepper
                   label={editing.name}
@@ -469,12 +575,14 @@ export function StoreCatalogPanel({
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Se ajusta sin registrar un movimiento.
+                {isStore
+                  ? "Se ajusta sin registrar un movimiento."
+                  : "Es la existencia propia de tu distribuidora, no la de la tienda."}
               </p>
             </div>
             <label className="block text-sm">
               <span className="text-xs font-semibold tracking-wide text-gray-600">
-                Umbral de alerta (opcional)
+                {isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"}
               </span>
               <input
                 className={`mt-1 ${inputClass}`}
@@ -482,19 +590,87 @@ export function StoreCatalogPanel({
                 min="0"
                 step="0.001"
                 placeholder="Sin umbral"
-                aria-label="Umbral de alerta (opcional)"
+                aria-label={
+                  isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"
+                }
                 value={editDraft.threshold}
                 onChange={(event) =>
                   setEditDraft({ ...editDraft, threshold: event.target.value })
                 }
               />
               <span className="mt-1 block text-xs text-gray-500">
-                Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0. Con
-                umbral, se activa cuando la cantidad es igual o menor.
+                {isStore
+                  ? "Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0. Con umbral, se activa cuando la cantidad es igual o menor."
+                  : "Se muestra como aviso «Bajo» en tu catálogo cuando la cantidad es igual o menor."}
               </span>
             </label>
+            <label className="block text-sm">
+              <span className="text-xs font-semibold tracking-wide text-gray-600">
+                Vencimiento (opcional)
+              </span>
+              <input
+                className={`mt-1 ${inputClass}`}
+                type="date"
+                aria-label="Vencimiento (opcional)"
+                value={editDraft.expiry}
+                onChange={(event) =>
+                  setEditDraft({ ...editDraft, expiry: event.target.value })
+                }
+              />
+              <span className="mt-1 block text-xs text-gray-500">
+                {isStore
+                  ? "Alimenta la alerta de caducidad de la tienda."
+                  : "Se muestra como aviso «Vence» en tu catálogo (15 días o menos)."}
+              </span>
+            </label>
+            {canSetPrice ? (
+              <div className="grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="text-xs font-semibold tracking-wide text-gray-600">
+                    Precio de compra (COP)
+                  </span>
+                  <input
+                    className={`mt-1 ${inputClass}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Opcional"
+                    aria-label="Precio de compra (COP)"
+                    value={editDraft.purchasePrice}
+                    onChange={(event) =>
+                      setEditDraft({ ...editDraft, purchasePrice: event.target.value })
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="text-xs font-semibold tracking-wide text-gray-600">
+                    Precio de venta (COP)
+                  </span>
+                  <input
+                    className={`mt-1 ${inputClass}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Opcional"
+                    aria-label="Precio de venta (COP)"
+                    value={editDraft.salePrice}
+                    onChange={(event) =>
+                      setEditDraft({ ...editDraft, salePrice: event.target.value })
+                    }
+                  />
+                </label>
+                <p className="text-xs text-gray-500 sm:col-span-2">
+                  Se usan para estimar el precio al registrar movimientos o pedidos; siempre podés
+                  cambiarlo en esa operación.
+                </p>
+              </div>
+            ) : (
+              <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">
+                Los precios de compra y venta son una función Premium.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
-              <button className={buttonClass} type="button" disabled={savingEdit} onClick={() => void saveEdit()}>
+              <button className={buttonClass} type="button" disabled={savingEdit || relationPrices.error !== null || (isStore && relationPrices.loading)} onClick={() => void saveEdit()}>
                 {savingEdit ? "Guardando…" : "Guardar cambios"}
               </button>
               <button

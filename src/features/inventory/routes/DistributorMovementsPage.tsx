@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
+import { formatCOP } from "../../../shared/lib/format";
 import {
   EmptyState,
   ProductPicker,
@@ -59,6 +60,7 @@ export function DistributorMovementsPage() {
         id: row.id,
         name: row.name,
         brand: row.brand?.name ?? null,
+        price: row.sale_price ?? null,
       })),
       error: result.error,
     };
@@ -240,7 +242,14 @@ export function DistributorMovementsPage() {
             <ProductPicker
               label="Producto de mi catálogo"
               value={sale.productId}
-              onChange={(value) => setSale({ ...sale, productId: value })}
+              onChange={(value) => {
+                const option = products.data?.find((product) => String(product.id) === value);
+                setSale((current) => ({
+                  ...current,
+                  productId: value,
+                  price: option?.price == null ? "" : String(option.price),
+                }));
+              }}
               options={products.data ?? []}
               loading={products.loading}
               error={products.error}
@@ -273,6 +282,17 @@ export function DistributorMovementsPage() {
                 required
               />
             </Field>
+            <p className="-mt-2 mb-3 text-xs text-gray-500">
+              Se completa con el precio de venta de tu catálogo; podés cambiarlo.
+            </p>
+            {sale.price.trim() !== "" && Number(sale.price) > 0 && Number(sale.quantity) > 0 && (
+              <p className="-mt-3 mb-3 text-xs text-gray-500">
+                Total estimado:{" "}
+                <span className="font-medium text-gray-900">
+                  {formatCOP(Number(sale.quantity) * Number(sale.price))}
+                </span>
+              </p>
+            )}
             <Field label="Vencimiento (opcional)">
               <input
                 className={inputClass}

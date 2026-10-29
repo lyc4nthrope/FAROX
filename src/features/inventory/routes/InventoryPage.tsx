@@ -17,6 +17,7 @@ import { MovementList } from "../components/MovementList";
 import { EmptyState, PremiumLock, ProductPicker, QuantityStepper, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
+import { fetchStorePurchasePrices } from "../../products/api";
 import {
   fetchMotives,
   fetchMovements,
@@ -201,6 +202,8 @@ export function InventoryPage() {
   const stockOptions = useLoad(() => fetchStockOptions(storeId), [storeId]);
   const movements = useLoad(() => fetchMovements(storeId), [storeId]);
   const prices = useLoad(() => fetchPrices(storeId), [storeId]);
+  // 0030: coste privado de la tienda (tabla con RLS operator/admin).
+  const purchasePrices = useLoad(() => fetchStorePurchasePrices(storeId), [storeId]);
   const motives = useLoad(() => fetchMotives(), []);
 
   const stockPickerOptions = useMemo<ProductPickerOption[]>(
@@ -318,6 +321,18 @@ export function InventoryPage() {
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
   const selectedStock =
     stockOptions.data?.find((row) => row.product_id === Number(mov.productId)) ?? null;
+
+  // 0030: estimación inmediata desde la relación. Nunca pisa lo que el usuario
+  // escribió después; se recalcula al elegir producto o cambiar el tipo.
+  function estimatePrice(type: "entry" | "exit", productId: string): string {
+    if (!premium || productId === "") return "";
+    if (type === "entry") {
+      const purchase = purchasePrices.data?.get(Number(productId));
+      return purchase == null ? "" : String(purchase);
+    }
+    const sale = prices.data?.find((priceRow) => priceRow.product_id === Number(productId));
+    return sale === undefined ? "" : String(sale.price);
+  }
   const movementProducts = (stockOptions.data ?? []).filter((row) =>
     normalizeSearch(`${row.product_name} ${row.brand ?? ""}`).includes(
       normalizeSearch(movementSearch),
@@ -342,7 +357,14 @@ export function InventoryPage() {
             type="button"
             aria-pressed={mov.type === "entry"}
             className={segmentClass(mov.type === "entry", "entry")}
-            onClick={() => setMov({ ...mov, type: "entry", motiveId: "" })}
+            onClick={() =>
+              setMov({
+                ...mov,
+                type: "entry",
+                motiveId: "",
+                unitPrice: estimatePrice("entry", mov.productId),
+              })
+            }
           >
             Entrada
           </button>
@@ -350,7 +372,14 @@ export function InventoryPage() {
             type="button"
             aria-pressed={mov.type === "exit"}
             className={segmentClass(mov.type === "exit", "exit")}
-            onClick={() => setMov({ ...mov, type: "exit", motiveId: "" })}
+            onClick={() =>
+              setMov({
+                ...mov,
+                type: "exit",
+                motiveId: "",
+                unitPrice: estimatePrice("exit", mov.productId),
+              })
+            }
           >
             Salida
           </button>
@@ -392,6 +421,7 @@ export function InventoryPage() {
                           ...mov,
                           productId: String(row.product_id),
                           quantity: mov.quantity === "" ? "1" : mov.quantity,
+                          unitPrice: estimatePrice(mov.type, String(row.product_id)),
                         })
                       }
                       className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition ${
@@ -454,6 +484,22 @@ export function InventoryPage() {
           />
         </Field>
       )}
+      {premium && (
+        <p className="-mt-2 mb-3 text-xs text-gray-500">
+          Se completa con el precio de la relación; podés cambiarlo para esta operación.
+        </p>
+      )}
+      {premium &&
+        mov.unitPrice.trim() !== "" &&
+        Number(mov.quantity) > 0 &&
+        Number(mov.unitPrice) > 0 && (
+          <p className="-mt-3 mb-3 text-xs text-gray-500">
+            Total estimado:{" "}
+            <span className="font-medium text-gray-900">
+              {formatCOP(Number(mov.quantity) * Number(mov.unitPrice))}
+            </span>
+          </p>
+        )}
 
       <Status loading={motives.loading} error={motives.error} />
       <Field label="Motivo">

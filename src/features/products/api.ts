@@ -15,10 +15,9 @@ import type {
 
 // products tiene CRUD DIRECTO por tabla (T6.1 / PROD-1, spec #483 S5): la
 // tabla NO está en el REVOKE RPC-only (0006:351-357) y no existe RPC propio.
-// Políticas verificadas a mano en 0006:144-158: SELECT de todos los roles
-// (USING true) · INSERT admin u operador con has_scope (D37) · UPDATE admin o
-// creador con has_scope (D36, WITH CHECK impide transferir la propiedad) ·
-// DELETE admin SOLO sobre filas ya inactivas (soft → purge).
+// 0030: SELECT de todos los roles (USING true) · INSERT admin/operador/
+// distribuidor con has_scope (crear sí) · UPDATE SOLO admin (la ficha global
+// no la modifica quien la creó) · DELETE admin SOLO sobre filas ya inactivas.
 
 // PostgREST NO rinde error cuando RLS filtra TODAS las filas de un
 // UPDATE/DELETE: responde 0 filas afectadas. Sin esta guarda, una operación
@@ -207,9 +206,8 @@ export async function createProduct(
   return { error: null, id: normalizeId(created.id) };
 }
 
-// created_by NUNCA viaja en el update: el WITH CHECK de products_update
-// (0006:154-155) exige que la propiedad siga siendo del operador (D36 — un
-// operador no puede transferirse el registro). Un update denegado por RLS
+// created_by NUNCA viaja en el update. 0030: products_update es SOLO admin;
+// la ficha global no la modifica ni su creador. Un update denegado por RLS
 // responde 0 filas ⇒ guarda RLS_NO_ROWS (nunca un falso éxito).
 export async function updateProduct(
   id: number,
@@ -237,23 +235,24 @@ export async function updateProduct(
   return { error: null };
 }
 
-// 0029: el distribuidor edita la ficha de un producto de SU catálogo. La RLS
-// de products_update lo dejaría fuera (solo admin o creador), y la tabla es
-// compartida: la RPC valida el vínculo distributor_products y limita las
-// columnas (is_active/created_by no se tocan desde acá).
-export async function updateDistributorProduct(
-  id: number,
-  values: ProductFormValues,
+// 0030: el distribuidor edita SOLO su relación con el producto (cantidad que
+// posee, umbral/vencimiento y precios de compra/venta). La ficha global es del
+// admin; la RLS de products_update ya no permite al creador modificarla.
+export async function updateDistributorProductRelation(
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  expiryDate: string | null,
+  purchasePrice: number | null,
+  salePrice: number | null,
 ): Promise<{ error: { message: string } | null }> {
-  const { error } = await supabase.rpc("update_distributor_product", {
-    p_product: id,
-    p_name: values.name,
-    p_description: values.description === "" ? null : values.description,
-    p_category: Number(values.category_id),
-    p_brand: Number(values.brand_id),
-    p_unit: Number(values.unit_type_id),
-    p_base_quantity: Number(values.base_quantity),
-    p_barcode: values.barcode === "" ? null : values.barcode,
+  const { error } = await supabase.rpc("update_distributor_product_relation", {
+    p_product: productId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_expiry_date: expiryDate,
+    p_purchase_price: purchasePrice,
+    p_sale_price: salePrice,
   });
   return { error };
 }
@@ -330,6 +329,8 @@ function normalizeCatalogEntry(
   is_shortage: boolean,
   threshold: number | null = null,
   expiryDate: string | null = null,
+  purchasePrice: number | null = null,
+  salePrice: number | null = null,
 ): CatalogEntry {
   const embedded = raw.product;
   const product =
@@ -343,7 +344,21 @@ function normalizeCatalogEntry(
           unit: null,
           category: null,
         };
-  return { ...product, quantity, is_shortage, threshold, expiry_date: expiryDate };
+  return {
+    ...product,
+    quantity,
+    is_shortage,
+    threshold,
+    expiry_date: expiryDate,
+    purchase_price: purchasePrice,
+    sale_price: salePrice,
+  };
+}
+
+function normalizeOptionalPrice(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const price = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(price) && price > 0 ? price : null;
 }
 
 function normalizeShortageRow(raw: Record<string, unknown>): ShortageRow {
@@ -438,6 +453,8 @@ export async function fetchStoreCatalog(
         ? null
         : normalizeQuantity(raw.threshold),
       typeof raw.expiry_date === "string" ? raw.expiry_date : null,
+      null,
+      null,
     ),
   );
   return { rows, count, error: null };
@@ -451,7 +468,12 @@ export async function fetchDistributorCatalog(
   const { from, to } = pageRange(query);
   let request = supabase
     .from("distributor_products")
-    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" });
+    .select(
+      `product_id, quantity, threshold, expiry_date, purchase_price, sale_price, ${CATALOG_PRODUCT_SELECT}`,
+      {
+        count: "planned",
+      },
+    );
   if (query.q.trim() !== "") {
     request = request.ilike("product.name", likePattern(query.q));
   }
@@ -463,7 +485,17 @@ export async function fetchDistributorCatalog(
     return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
-    normalizeCatalogEntry(raw, null, false),
+    normalizeCatalogEntry(
+      raw,
+      normalizeQuantity(raw.quantity),
+      false,
+      raw.threshold === null || raw.threshold === undefined
+        ? null
+        : normalizeQuantity(raw.threshold),
+      typeof raw.expiry_date === "string" ? raw.expiry_date : null,
+      normalizeOptionalPrice(raw.purchase_price),
+      normalizeOptionalPrice(raw.sale_price),
+    ),
   );
   return { rows, count, error: null };
 }
@@ -570,6 +602,101 @@ export async function updateStoreProduct(
     p_shortage: shortage,
   });
   return { error };
+}
+
+// 0030 — relación de la tienda completa: cantidad, umbral, vencimiento,
+// faltante y precios (solo Premium). Una sola RPC para no dejar el modal a
+// medias si falla una segunda llamada.
+export async function updateStoreProductFull(
+  storeId: number,
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  shortage: boolean | null,
+  expiryDate: string | null,
+  purchasePrice: number | null,
+  salePrice: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_store_product_full", {
+    p_product: productId,
+    p_store: storeId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_shortage: shortage,
+    p_expiry_date: expiryDate,
+    p_purchase_price: purchasePrice,
+    p_sale_price: salePrice,
+  });
+  return { error };
+}
+
+export interface StoreRelationPriceRow {
+  product_id: number;
+  sale_price: number | null;
+  purchase_price: number | null;
+}
+
+/**
+ * 0030: precios de la relación tienda↔producto. La venta sale de
+ * price_publications (histórico activo) y la compra de store_product_prices
+ * (tabla privada de la tienda). Se piden juntos para el modal.
+ */
+export async function fetchStoreRelationPrices(
+  storeId: number,
+): Promise<LoadResult<StoreRelationPriceRow[]>> {
+  const [sales, purchases] = await Promise.all([
+    supabase
+      .from("price_publications")
+      .select("product_id,price")
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .limit(500),
+    supabase
+      .from("store_product_prices")
+      .select("product_id,purchase_price")
+      .eq("store_id", storeId)
+      .limit(500),
+  ]);
+  const error = sales.error ?? purchases.error;
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = new Map<number, StoreRelationPriceRow>();
+  for (const raw of (sales.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: normalizeOptionalPrice(raw.price),
+      purchase_price: null,
+    });
+  }
+  for (const raw of (purchases.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    const current = rows.get(productId);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: current?.sale_price ?? null,
+      purchase_price: normalizeOptionalPrice(raw.purchase_price),
+    });
+  }
+  return { data: [...rows.values()], error: null };
+}
+
+/** 0030: precio de compra de la tienda por producto (para estimar entradas). */
+export async function fetchStorePurchasePrices(
+  storeId: number,
+): Promise<LoadResult<Map<number, number>>> {
+  const { data, error } = await supabase
+    .from("store_product_prices")
+    .select("product_id,purchase_price")
+    .eq("store_id", storeId)
+    .limit(500);
+  const prices = new Map<number, number>();
+  for (const raw of (data ?? []) as Record<string, unknown>[]) {
+    const price = normalizeOptionalPrice(raw.purchase_price);
+    if (price !== null) prices.set(normalizeId(raw.product_id), price);
+  }
+  return { data: prices, error };
 }
 
 export async function removeStoreCatalogProduct(

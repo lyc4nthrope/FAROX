@@ -179,6 +179,8 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
           quantity: null,
           threshold: null,
           expiry_date: null,
+          purchase_price: 3000,
+          sale_price: 4500,
           is_shortage: false,
         },
       ],
@@ -194,7 +196,10 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     });
     await user.selectOptions(within(dialog).getByLabelText("Tienda vinculada"), "7");
     await user.selectOptions(within(dialog).getByLabelText("Producto de mi catálogo"), "1");
-    await user.type(within(dialog).getByLabelText("Precio de venta (COP)"), "4500");
+    const price = within(dialog).getByLabelText("Precio de venta (COP)");
+    expect(price).toHaveValue(4500);
+    await user.clear(price);
+    await user.type(price, "4800");
     await user.click(within(dialog).getByRole("button", { name: "Registrar venta" }));
 
     await waitFor(() =>
@@ -202,7 +207,7 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
         storeId: 7,
         productId: 1,
         quantity: 1,
-        unitPrice: 4500,
+        unitPrice: 4800,
         expiryDate: null,
       }),
     );

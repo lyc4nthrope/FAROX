@@ -36,10 +36,10 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 |---|---|---|
 | Ver el stock y su estado | Inventario → mi tienda → Productos | OK / Bajo / Agotado según el umbral |
 | Agregar productos a mi tienda | Inventario → mi tienda → Productos → Agregar productos | Buscá en el registro; «Solo no añadidos» oculta los ya asignados. La columna «En la tienda» muestra el stock actual y bloquea los ya asignados. Si sos **Premium**, podés cargar el precio de venta en la misma fila. Cada fila agrega y el stepper − / + define la cantidad inicial |
-| Editar cantidad y umbral | Inventario → mi tienda → Productos → Editar | Se abre un modal; los cambios se guardan una sola vez y sin registrar movimiento |
+| Editar cantidad, umbral, vencimiento y precios | Inventario → mi tienda → Productos → Editar | Se abre un modal; los cambios se guardan una sola vez y sin registrar movimiento. Con **Premium** cargás precio de compra y de venta de la relación |
 | Marcar o quitar un faltante | Inventario → mi tienda → Productos | Acción ámbar para marcar y esmeralda para resolver; se refleja en `/faltantes` |
 | Quitar un producto de mi tienda | Inventario → mi tienda → Productos → Quitar | Botón rojo; con stock pide doble confirmación y descarta las existencias |
-| Registrar una venta o una compra | Inventario → Registrar entrada o salida | Buscá el producto por nombre o marca, elegilo de la lista, ajustá la cantidad con − / + y poné el motivo (y vencimiento en entradas). **Requiere Premium**; si lo sos, podés indicar a cuánto se compró (entrada) o se vendió (salida) |
+| Registrar una venta o una compra | Inventario → Registrar entrada o salida | Buscá el producto por nombre o marca, elegilo de la lista, ajustá la cantidad con − / + y poné el motivo (y vencimiento en entradas). **Requiere Premium**; el precio de compra/venta se completa solo con el de la relación y podés cambiarlo |
 | Ver cuántas alertas tengo | Alertas | La pestaña muestra el número de alertas abiertas |
 | Ver qué se está agotando | Alertas | Marcar leída cuando la revise |
 | Pedir los faltantes al distribuidor | Faltantes → Solicitar faltantes | Elegí el distribuidor vinculado; el pedido abre con esos productos preseleccionados |
@@ -63,15 +63,15 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Elegir tiendas para el recorrido | Mi ruta | Marcá las tiendas de la lista; solo las marcadas aparecen en el mapa y se numeran igual en ambos lados |
 | Guardar la ruta de hoy | Mi ruta → Guardar ruta | Guarda las tiendas marcadas como paradas de la ruta de hoy y actualiza el resumen (rutas hoy, paradas, completadas) |
 | Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva (para eso está Guardar ruta) |
-| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro, editar la ficha de los productos que manejás y quitar. Sin stock ni precio |
+| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro, editar tu cantidad y —si sos **Premium**— tus precios de compra/venta, y quitar. La ficha global del producto la administra el administrador |
 | Ver mis movimientos | Movimientos | Tus entregas/ventas aparecen como salidas con su precio; el stock de la tienda recibe la entrada. Filtros Entradas/Salidas |
-| Registrar una venta directa | Movimientos → Registrar venta | **Requiere Premium**: tienda vinculada, producto de tu catálogo, cantidad y precio de venta |
+| Registrar una venta directa | Movimientos → Registrar venta | **Requiere Premium**: tienda vinculada, producto de tu catálogo, cantidad y precio de venta (se completa con tu precio de venta y podés cambiarlo) |
 | Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora; el nav muestra cuántos pedidos abiertos hay |
-| Cotizar un pedido | Mis pedidos → pedido pendiente o en ruta → Cotización del distribuidor | Precio por producto; si sos Premium se sugiere el precio registrado. Se congela en el movimiento al confirmar la entrega. El operador de la tienda ve la cotización aunque no sea Premium |
+| Cotizar un pedido | Mis pedidos → pedido pendiente o en ruta → Cotización del distribuidor | Precio por producto; si sos Premium se sugiere tu precio de venta del catálogo y podés ajustarlo. Se congela en el movimiento al confirmar la entrega. El operador de la tienda ve la cotización aunque no sea Premium |
 | Marcar un pedido en ruta o devolverlo a pendiente | Mis pedidos → fila → En ruta / Pendiente | También desde el detalle del pedido |
 | Entregar un pedido completo | Mis pedidos → fila → Entregar | Pide confirmación y suma todas las cantidades al stock. Para entregas parciales usá el detalle |
 | Fijar la fecha prometida | Mis pedidos → pedido → Entrega y comunicación | Opcional; el operador la ve en el resumen. Podés cambiarla o quitarla mientras el pedido siga abierto |

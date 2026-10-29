@@ -21,6 +21,7 @@ import {
   fetchOrder,
   fetchOrderItems,
   fetchOrderQuotes,
+  fetchDistributorSalePrices,
   setOrderExpectedAt,
   setOrderPrices,
   updateOrderStatus,
@@ -41,6 +42,15 @@ export function OrderDetailPage() {
   // 0024: la cotización viaja por su propia RPC; get_order_items sigue sin
   // exponer el precio privado de la tienda (D40/D41).
   const quoteRows = useLoad(() => fetchOrderQuotes(orderId), [orderId]);
+  // 0030: el Premium estima la cotización con SU precio de venta configurado
+  // en el catálogo; luego puede ajustarlo en cada línea.
+  const distributorSalePrices = useLoad(
+    () =>
+      role === "distribuidor" && premium
+        ? fetchDistributorSalePrices((items.data ?? []).map((item) => item.product_id))
+        : Promise.resolve({ data: new Map<number, number>(), error: null }),
+    [role, premium, items.data],
+  );
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
@@ -173,8 +183,13 @@ export function OrderDetailPage() {
     if (draft !== undefined) return draft;
     const saved = savedQuotes.get(productId);
     if (saved !== null && saved !== undefined) return String(saved);
-    // 0028: si el distribuidor es Premium puede ver el precio registrado del
-    // producto (unit_price) y se usa como precio sugerido editable.
+    // 0030: primero el precio de venta propio del distribuidor (su catálogo).
+    if (premium) {
+      const own = distributorSalePrices.data?.get(productId);
+      if (own !== undefined) return String(own);
+    }
+    // 0028: si no configuró precio, el precio registrado de la tienda sigue
+    // siendo una sugerencia editable para Premium.
     const registered = premium
       ? (items.data ?? []).find((item) => item.product_id === productId)?.unit_price ?? null
       : null;

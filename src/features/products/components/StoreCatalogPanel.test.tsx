@@ -9,9 +9,12 @@ import { StoreCatalogPanel } from "./StoreCatalogPanel";
 vi.mock("../api", () => ({
   fetchProductCategories: vi.fn(),
   fetchStoreCatalog: vi.fn(),
+  fetchStoreRelationPrices: vi.fn(),
   removeStoreProduct: vi.fn(),
   setStoreProductShortage: vi.fn(),
   updateStoreProduct: vi.fn(),
+  updateStoreProductFull: vi.fn(),
+  updateDistributorProductRelation: vi.fn(),
   // AddProductsPanel (montado dentro del modal) usa estas.
   fetchActiveProductsForCatalog: vi.fn(),
   addStoreProduct: vi.fn(),
@@ -57,7 +60,8 @@ beforeEach(() => {
     count: 1,
     error: null,
   });
-  vi.mocked(productsApi.updateStoreProduct).mockResolvedValue({ error: null });
+  vi.mocked(productsApi.updateStoreProductFull).mockResolvedValue({ error: null });
+  vi.mocked(productsApi.fetchStoreRelationPrices).mockResolvedValue({ data: [], error: null });
   vi.mocked(productsApi.setStoreProductShortage).mockResolvedValue({ error: null });
   vi.mocked(productsApi.removeStoreProduct).mockResolvedValue({ error: null });
   vi.mocked(productsApi.fetchActiveProductsForCatalog).mockResolvedValue({
@@ -117,10 +121,51 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() =>
-      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 13, 8, false),
+      expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
+        10,
+        1,
+        13,
+        8,
+        false,
+        "2026-12-31",
+        null,
+        null,
+      ),
     );
-    expect(productsApi.updateStoreProduct).toHaveBeenCalledTimes(1);
+    expect(productsApi.updateStoreProductFull).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('"Arroz Diana" actualizado.')).toBeInTheDocument();
+  });
+
+  it("Premium edita los precios de compra y venta de la relación de la tienda (0030)", async () => {
+    vi.mocked(productsApi.fetchStoreRelationPrices).mockResolvedValue({
+      data: [{ product_id: 1, sale_price: 2500, purchase_price: 1800 }],
+      error: null,
+    });
+    renderPanel(true);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    const purchase = within(dialog).getByLabelText("Precio de compra (COP)");
+    expect(purchase).toHaveValue(1800);
+    expect(within(dialog).getByLabelText("Precio de venta (COP)")).toHaveValue(2500);
+
+    await user.clear(purchase);
+    await user.type(purchase, "2000");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() =>
+      expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
+        10,
+        1,
+        12,
+        5,
+        false,
+        "2026-12-31",
+        2000,
+        2500,
+      ),
+    );
   });
 
   it("cancelar la edición no guarda nada", async () => {
@@ -134,7 +179,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     );
     await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
 
-    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
+    expect(productsApi.updateStoreProductFull).not.toHaveBeenCalled();
   });
 
   it("tipear no dispara RPC: un solo Guardar hace UNA llamada", async () => {
@@ -149,13 +194,22 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
     await user.clear(umbral);
     await user.type(umbral, "8");
-    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
+    expect(productsApi.updateStoreProductFull).not.toHaveBeenCalled();
 
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() =>
-      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 20, 8, false),
+      expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
+        10,
+        1,
+        20,
+        8,
+        false,
+        "2026-12-31",
+        null,
+        null,
+      ),
     );
-    expect(productsApi.updateStoreProduct).toHaveBeenCalledTimes(1);
+    expect(productsApi.updateStoreProductFull).toHaveBeenCalledTimes(1);
   });
 
   it("umbral vacío se guarda como null", async () => {
@@ -168,7 +222,16 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() =>
-      expect(productsApi.updateStoreProduct).toHaveBeenCalledWith(10, 1, 12, null, false),
+      expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
+        10,
+        1,
+        12,
+        null,
+        false,
+        "2026-12-31",
+        null,
+        null,
+      ),
     );
   });
 
@@ -182,7 +245,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
 
     expect(await within(dialog).findByText("Ingresá una cantidad.")).toBeInTheDocument();
-    expect(productsApi.updateStoreProduct).not.toHaveBeenCalled();
+    expect(productsApi.updateStoreProductFull).not.toHaveBeenCalled();
   });
 
   it("la tabla no tiene Guardar ni inputs por celda", async () => {

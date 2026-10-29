@@ -39,6 +39,11 @@ export interface CatalogEntry extends ProductListRow {
   // (el distribuidor no maneja inventario ⇒ ausentes/null).
   threshold?: number | null;
   expiry_date?: string | null;
+  // 0030: precios privados de la relación (nunca de la ficha global).
+  // Tienda: purchase_price en stock + precio de venta activo en
+  // price_publications (se carga aparte para el modal).
+  purchase_price?: number | null;
+  sale_price?: number | null;
   // stock.is_shortage (0022): el operador marcó que le falta este producto.
   // El catálogo del distribuidor no maneja inventario ⇒ siempre false.
   is_shortage: boolean;

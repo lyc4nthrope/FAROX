@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -31,7 +31,6 @@ vi.mock("../api", () => ({
   fetchProductCategories: vi.fn(),
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
-  updateDistributorProduct: vi.fn(),
   deactivateProduct: vi.fn(),
   deleteProduct: vi.fn(),
   fetchCatalogContext: vi.fn(),
@@ -142,7 +141,6 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     });
     vi.mocked(productsApi.createProduct).mockResolvedValue({ error: null, id: 1 });
     vi.mocked(productsApi.updateProduct).mockResolvedValue({ error: null });
-    vi.mocked(productsApi.updateDistributorProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.deactivateProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.deleteProduct).mockResolvedValue({ error: null });
   });
@@ -305,29 +303,17 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(productsApi.createProduct).not.toHaveBeenCalled();
   });
 
-  it("distribuidor en /products/:id: edita la ficha de un producto de su catálogo (0029)", async () => {
+  it("distribuidor en /products/:id: solo lectura — la ficha es del admin (0030)", async () => {
     vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
-    const user = userEvent.setup();
     renderRutas("/products/1", "distribuidor");
 
     expect(await screen.findByDisplayValue("Café molido")).toBeInTheDocument();
     expect(
-      screen.queryByText("Vista de solo lectura: no tenés permisos para editar productos."),
-    ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Nombre")).not.toBeDisabled();
-    // La baja sigue siendo exclusiva del admin (soft-delete global).
+      screen.getByText("Vista de solo lectura: no tenés permisos para editar productos."),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Nombre")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Desactivar producto" })).not.toBeInTheDocument();
-
-    await user.clear(screen.getByLabelText("Descripción"));
-    await user.type(screen.getByLabelText("Descripción"), "Tueste intenso");
-    await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
-
-    await waitFor(() =>
-      expect(productsApi.updateDistributorProduct).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({ name: "Café molido", description: "Tueste intenso" }),
-      ),
-    );
     expect(productsApi.updateProduct).not.toHaveBeenCalled();
   });
 });
