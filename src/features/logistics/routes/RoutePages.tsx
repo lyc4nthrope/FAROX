@@ -15,6 +15,7 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { StoreRouteMap } from "../components/StoreRouteMap";
+import { ContactButton } from "../../store-links";
 import {
   ROUTE_LABELS,
   STOP_LABELS,
@@ -379,14 +380,13 @@ export function MyRoutePage() {
                 const selected = selectedIds.has(store.id);
                 const index = orderIndex.get(store.id);
                 return (
-                  <li key={store.id}>
-                    <label
-                      className={`flex cursor-pointer items-start gap-3 border-l-4 px-3 py-3 transition-colors ${
-                        selected
-                          ? "border-gray-900 bg-gray-50"
-                          : "border-transparent hover:bg-gray-50"
-                      }`}
-                    >
+                  <li
+                    key={store.id}
+                    className={`flex items-start border-l-4 transition-colors ${
+                      selected ? "border-gray-900 bg-gray-50" : "border-transparent"
+                    }`}
+                  >
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3">
                       <input
                         type="checkbox"
                         className="mt-1 h-4 w-4 shrink-0 accent-gray-900"
@@ -423,6 +423,9 @@ export function MyRoutePage() {
                         </span>
                       </span>
                     </label>
+                    <div className="shrink-0 px-3 py-3">
+                      <ContactButton kind="store" id={store.id} name={store.name} />
+                    </div>
                   </li>
                 );
               })}

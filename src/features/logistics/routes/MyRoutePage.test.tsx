@@ -44,6 +44,9 @@ vi.mock("../components/StoreRouteMap", () => ({
     <p data-testid="map-count">{stores.length} en mapa</p>
   ),
 }));
+vi.mock("../../store-links", () => ({
+  ContactButton: () => <span>Contacto</span>,
+}));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
   subscribeToAuthChanges: vi.fn(),

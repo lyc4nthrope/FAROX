@@ -46,6 +46,44 @@ export interface RequestableProduct {
   price: number | null;
 }
 
+/** 0029: contacto de la contraparte vinculada. */
+export type ContactKind = "distribuidor" | "store";
+
+export interface CounterpartContact {
+  full_name: string;
+  phone_number: string | null;
+  email: string | null;
+  contact_preference: "whatsapp" | "phone" | "email";
+}
+
+export async function fetchCounterpartContact(
+  kind: ContactKind,
+  id: number,
+): Promise<LoadResult<CounterpartContact[]>> {
+  const { data, error } = await supabase.rpc("get_counterpart_contact", {
+    p_kind: kind,
+    p_id: id,
+  });
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = ((data ?? []) as Record<string, unknown>[]).map(
+    (row): CounterpartContact => {
+      const preference = row.contact_preference;
+      return {
+        full_name: typeof row.full_name === "string" ? row.full_name : "",
+        phone_number: typeof row.phone_number === "string" ? row.phone_number : null,
+        email: typeof row.email === "string" ? row.email : null,
+        contact_preference:
+          preference === "phone" || preference === "email"
+            ? (preference as "phone" | "email")
+            : "whatsapp",
+      };
+    },
+  );
+  return { data: rows, error: null };
+}
+
 /** URL que se codifica en el QR. */
 export function linkUrl(code: string): string {
   return `${window.location.origin}/vincular/${encodeURIComponent(code)}`;

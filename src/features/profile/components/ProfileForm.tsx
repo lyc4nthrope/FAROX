@@ -88,7 +88,7 @@ export function ProfileForm({
           htmlFor="profile-phone"
           className="block text-xs font-semibold tracking-wide text-gray-600"
         >
-          Teléfono
+          Teléfono / WhatsApp
         </label>
         <input
           id="profile-phone"
@@ -130,6 +130,10 @@ export function ProfileForm({
             </option>
           ))}
         </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Este es el medio con el que la tienda o el distribuidor te van a contactar. Completá el
+          teléfono para WhatsApp/Teléfono; si elegís Email se usa el email de tu cuenta.
+        </p>
       </div>
       <button type="submit" disabled={saving} className={buttonClass}>
         {saving ? "Guardando…" : "Guardar cambios"}
