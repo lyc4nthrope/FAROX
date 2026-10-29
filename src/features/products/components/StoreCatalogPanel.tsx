@@ -489,8 +489,8 @@ export function StoreCatalogPanel({
                 }
               />
               <span className="mt-1 block text-xs text-gray-500">
-                Sin umbral no se generan alertas de stock. Para productos de rotación lenta, dejalo
-                vacío o alto.
+                Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0. Con
+                umbral, se activa cuando la cantidad es igual o menor.
               </span>
             </label>
             <div className="flex flex-wrap gap-2">

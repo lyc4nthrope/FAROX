@@ -9,6 +9,9 @@
 --   3. get_counterpart_contact: operador ↔ distribuidor vinculados pueden leer
 --      el nombre, teléfono, email y medio preferido de la contraparte. Sin
 --      vínculo no hay lectura (SECURITY DEFINER con chequeo explícito).
+--   4. update_distributor_product: el distribuidor edita la ficha de un
+--      producto de SU catálogo (products es global; el alcance sale de
+--      distributor_products y las columnas editables son solo la ficha).
 --
 -- Reglas del repo: SECURITY DEFINER + SET search_path; alcance desde el JWT;
 -- GRANT explícito.
@@ -213,18 +216,89 @@ END;
 $$;
 
 -- ============================================================================
--- 4. Grants
+-- 4. update_distributor_product — ficha del producto editada por el
+--    distribuidor que lo maneja. products es una tabla compartida: el alcance
+--    es distributor_products y las columnas permitidas son solo la ficha
+--    (nunca is_active ni created_by, que romperían la propiedad/soft-delete).
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.update_distributor_product(
+  p_product       bigint,
+  p_name          text,
+  p_description   text,
+  p_category      bigint,
+  p_brand         bigint,
+  p_unit          bigint,
+  p_base_quantity numeric,
+  p_barcode       text
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  v_role  text := COALESCE(public.my_role(), '');
+  v_dist  bigint;
+  v_count integer;
+BEGIN
+  IF v_role <> 'distribuidor' THEN
+    RAISE EXCEPTION 'update_distributor_product: solo distribuidor';
+  END IF;
+  v_dist := public.my_distributor_id();
+  IF v_dist IS NULL THEN
+    RAISE EXCEPTION 'update_distributor_product: distribuidora no identificada';
+  END IF;
+  IF p_product IS NULL THEN
+    RAISE EXCEPTION 'update_distributor_product: producto requerido';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.distributor_products dp
+    WHERE dp.distributor_id = v_dist AND dp.product_id = p_product
+  ) THEN
+    RAISE EXCEPTION 'update_distributor_product: el producto % no está en tu catálogo', p_product;
+  END IF;
+  IF p_name IS NULL OR btrim(p_name) = '' THEN
+    RAISE EXCEPTION 'update_distributor_product: el nombre es obligatorio';
+  END IF;
+  IF p_base_quantity IS NULL OR p_base_quantity <= 0 THEN
+    RAISE EXCEPTION 'update_distributor_product: base_quantity debe ser > 0';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.product_categories c WHERE c.id = p_category) THEN
+    RAISE EXCEPTION 'update_distributor_product: categoría inexistente: %', p_category;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.brands b WHERE b.id = p_brand) THEN
+    RAISE EXCEPTION 'update_distributor_product: marca inexistente: %', p_brand;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.unit_types u WHERE u.id = p_unit) THEN
+    RAISE EXCEPTION 'update_distributor_product: unidad inexistente: %', p_unit;
+  END IF;
+  UPDATE public.products p
+  SET name = btrim(p_name),
+      description = NULLIF(btrim(COALESCE(p_description, '')), ''),
+      category_id = p_category,
+      brand_id = p_brand,
+      unit_type_id = p_unit,
+      base_quantity = p_base_quantity,
+      barcode = NULLIF(btrim(COALESCE(p_barcode, '')), '')
+  WHERE p.id = p_product;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  IF v_count = 0 THEN
+    RAISE EXCEPTION 'update_distributor_product: producto inexistente: %', p_product;
+  END IF;
+END;
+$$;
+
+-- ============================================================================
+-- 5. Grants
 -- ============================================================================
 REVOKE EXECUTE ON FUNCTION
   public.set_order_prices(bigint, jsonb),
   public.register_distributor_sale(bigint, bigint, numeric, numeric, date),
-  public.get_counterpart_contact(text, bigint)
+  public.get_counterpart_contact(text, bigint),
+  public.update_distributor_product(bigint, text, text, bigint, bigint, bigint, numeric, text)
   FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION
   public.set_order_prices(bigint, jsonb),
   public.register_distributor_sale(bigint, bigint, numeric, numeric, date),
-  public.get_counterpart_contact(text, bigint)
+  public.get_counterpart_contact(text, bigint),
+  public.update_distributor_product(bigint, text, text, bigint, bigint, bigint, numeric, text)
   TO authenticated, service_role;
 
 -- ============================================================================
@@ -234,9 +308,12 @@ GRANT EXECUTE ON FUNCTION
 --   · register_distributor_sale crea stock+movement entry con distributor_id y
 --     unit_price; la vista del distribuidor lo muestra como salida.
 --   · get_counterpart_contact sin vínculo ⇒ excepción; con vínculo ⇒ fila.
+--   · update_distributor_product sobre un producto de mi catálogo ⇒ OK;
+--     sobre un producto ajeno ⇒ excepción; is_active/created_by no cambian.
 -- ============================================================================
 
 -- INVERSE (inerte; descomentar a mano en UNA transacción para revertir):
 --   Restaurar set_order_prices desde 0024 (solo pending).
 --   DROP FUNCTION IF EXISTS public.register_distributor_sale(bigint, bigint, numeric, numeric, date);
 --   DROP FUNCTION IF EXISTS public.get_counterpart_contact(text, bigint);
+--   DROP FUNCTION IF EXISTS public.update_distributor_product(bigint, text, text, bigint, bigint, bigint, numeric, text);

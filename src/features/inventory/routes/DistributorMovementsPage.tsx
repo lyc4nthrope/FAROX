@@ -195,7 +195,7 @@ export function DistributorMovementsPage() {
             />
           </div>
         ) : (
-          <MovementList movements={rows} showStore />
+          <MovementList movements={rows} showStore showPrice={premium} />
         )}
         {rows.length > 0 && (
           <div className="mt-4 flex justify-end">

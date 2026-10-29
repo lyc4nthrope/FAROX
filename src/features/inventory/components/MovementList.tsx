@@ -83,12 +83,14 @@ function movementIcon(tone: keyof typeof MOVEMENT_TONES): ReactNode {
 export function MovementList({
   movements,
   showStore = false,
+  showPrice = true,
   canReverse = false,
   busy = false,
   onReverse,
 }: {
   movements: readonly MovementRow[];
   showStore?: boolean;
+  showPrice?: boolean;
   canReverse?: boolean;
   busy?: boolean;
   onReverse?: (movement: MovementRow) => void;
@@ -140,12 +142,16 @@ export function MovementList({
                     ? movement.motive_name
                     : `Reverso de #${movement.reverso_of_id}`}
                 </span>
-                {movement.unit_price !== null && movement.unit_price !== undefined && (
+                {showPrice &&
+                  movement.unit_price !== null &&
+                  movement.unit_price !== undefined && (
                   <>
-                    <span aria-hidden="true">·</span>
-                    <span className="tabular-nums">Precio: {formatCOP(movement.unit_price)}</span>
-                  </>
-                )}
+                      <span aria-hidden="true">·</span>
+                      <span className="tabular-nums">
+                        Precio: {formatCOP(movement.unit_price)}
+                      </span>
+                    </>
+                  )}
                 {reversed.has(movement.id) && <Badge tone="amber">Revertido</Badge>}
               </div>
             </div>

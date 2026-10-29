@@ -89,6 +89,13 @@ describe("StoreCatalogPanel · modo distribuidor (S15)", () => {
     });
   });
 
+  it("ofrece Editar hacia el formulario del producto", async () => {
+    renderPanel();
+
+    await screen.findByText("Arroz Diana");
+    expect(screen.getByRole("link", { name: "Editar" })).toHaveAttribute("href", "/products/1");
+  });
+
   it("filtra por categoría y quita con la RPC del distribuidor", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();

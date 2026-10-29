@@ -237,6 +237,27 @@ export async function updateProduct(
   return { error: null };
 }
 
+// 0029: el distribuidor edita la ficha de un producto de SU catálogo. La RLS
+// de products_update lo dejaría fuera (solo admin o creador), y la tabla es
+// compartida: la RPC valida el vínculo distributor_products y limita las
+// columnas (is_active/created_by no se tocan desde acá).
+export async function updateDistributorProduct(
+  id: number,
+  values: ProductFormValues,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_distributor_product", {
+    p_product: id,
+    p_name: values.name,
+    p_description: values.description === "" ? null : values.description,
+    p_category: Number(values.category_id),
+    p_brand: Number(values.brand_id),
+    p_unit: Number(values.unit_type_id),
+    p_base_quantity: Number(values.base_quantity),
+    p_barcode: values.barcode === "" ? null : values.barcode,
+  });
+  return { error };
+}
+
 // Paso 1 del borrado en dos pasos (PROD-2 "delete is admin soft-delete"): la
 // policy products_delete exige is_active = false (0006:156-158, "soft →
 // purge"), así que SIEMPRE se desactiva ANTES de borrar.

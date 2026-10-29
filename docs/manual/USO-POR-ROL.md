@@ -63,7 +63,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Elegir tiendas para el recorrido | Mi ruta | Marcá las tiendas de la lista; solo las marcadas aparecen en el mapa y se numeran igual en ambos lados |
 | Guardar la ruta de hoy | Mi ruta → Guardar ruta | Guarda las tiendas marcadas como paradas de la ruta de hoy y actualiza el resumen (rutas hoy, paradas, completadas) |
 | Abrir el recorrido en Google Maps | Mi ruta → Abrir en Google Maps | Usa las tiendas marcadas como origen, paradas y destino; no guarda una ruta nueva (para eso está Guardar ruta) |
-| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro, editar y quitar. Sin stock ni precio |
+| Gestionar mi catálogo | Productos | La misma vista de productos de la tienda: buscador, filtros, alta desde el registro, editar la ficha de los productos que manejás y quitar. Sin stock ni precio |
 | Ver mis movimientos | Movimientos | Tus entregas/ventas aparecen como salidas con su precio; el stock de la tienda recibe la entrada. Filtros Entradas/Salidas |
 | Registrar una venta directa | Movimientos → Registrar venta | **Requiere Premium**: tienda vinculada, producto de tu catálogo, cantidad y precio de venta |
 | Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |

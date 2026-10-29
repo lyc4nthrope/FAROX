@@ -79,6 +79,7 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["no está vinculado a la tienda", "Ese distribuidor no está vinculado a la tienda."],
   ["no está en el catálogo del distribuidor", "Ese producto no está disponible en el catálogo del distribuidor."],
   ["no está en el catálogo de la tienda", "Ese producto no está disponible en la tienda."],
+  ["no está en tu catálogo", "Ese producto no está en tu catálogo."],
   ["ningún item válido", "Agregá al menos un producto."],
 ];
 

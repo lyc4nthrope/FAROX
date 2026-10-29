@@ -92,6 +92,19 @@ function renderPage() {
   );
 }
 
+function renderNonPremium() {
+  vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({
+    role: "distribuidor",
+    premium: false,
+  });
+  return render(
+    <AuthProvider>
+      <DistributorMovementsPage />
+    </AuthProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
@@ -193,6 +206,14 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
         expiryDate: null,
       }),
     );
+  });
+
+  it("sin Premium no muestra el precio de la operación", async () => {
+    renderNonPremium();
+
+    expect(await screen.findByText("Leche Alpina")).toBeInTheDocument();
+    expect(screen.queryByText(/Precio:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/4\.500/)).not.toBeInTheDocument();
   });
 
   it("sin movimientos muestra el estado vacío", async () => {

@@ -107,6 +107,11 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
       within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
     );
     const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
+    expect(
+      within(dialog).getByText(
+        /Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0/,
+      ),
+    ).toBeInTheDocument();
     await user.clear(umbral);
     await user.type(umbral, "8");
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
