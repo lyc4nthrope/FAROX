@@ -28,6 +28,11 @@ export interface MovementRow {
   reverso_of_id: number | null;
   /** 0028: tienda del movimiento (solo la vista del distribuidor la muestra). */
   store_name?: string | null;
+  /** 0029: precio de la operación y pedido que la originó (si aplica). */
+  unit_price?: number | null;
+  order_id?: number | null;
+  /** 0029: dirección desde la perspectiva del usuario (venta del distribuidor). */
+  direction?: "entry" | "exit";
 }
 export interface MotiveOption {
   id: number;
@@ -128,21 +133,69 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,type,quantity,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
+      "id,type,quantity,unit_price,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
     )
     .order("created_at", { ascending: false })
     .limit(100);
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    id: Number(r.id),
-    type: r.type as "entry" | "exit",
-    quantity: Number(r.quantity),
-    created_at: String(r.created_at),
-    reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
-    product_name: relName(r.product),
-    motive_name: relName(r.motive),
-    store_name: relName(r.store),
-  }));
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => {
+    const type = r.type as "entry" | "exit";
+    return {
+      id: Number(r.id),
+      type,
+      // Venta/entrega para el distribuidor: la fila es entry para la tienda,
+      // pero desde su lado es una salida. Un reverso conserva su tono propio.
+      direction: type === "entry" ? ("exit" as const) : ("entry" as const),
+      quantity: Number(r.quantity),
+      unit_price: r.unit_price == null ? null : Number(r.unit_price),
+      order_id: r.order_id == null ? null : Number(r.order_id),
+      created_at: String(r.created_at),
+      reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
+      product_name: relName(r.product),
+      motive_name: relName(r.motive),
+      store_name: relName(r.store),
+    };
+  });
   return { data: rows, error };
+}
+
+/** 0029: tiendas vinculadas a la distribuidora (para la venta directa). */
+export interface DistributorStoreOption {
+  id: number;
+  name: string;
+}
+
+export async function fetchDistributorStores(): Promise<LoadResult<DistributorStoreOption[]>> {
+  const { data, error } = await supabase
+    .from("store_distributors")
+    .select("store_id,store:stores(name)")
+    .limit(200);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.store_id),
+    name: relName(r.store),
+  }));
+  return { data: rows.sort((a, b) => a.name.localeCompare(b.name, "es")), error };
+}
+
+export interface DistributorSaleInput {
+  storeId: number;
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  expiryDate: string | null;
+}
+
+/** 0029: venta directa del distribuidor a una tienda vinculada. */
+export async function registerDistributorSale(
+  input: DistributorSaleInput,
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("register_distributor_sale", {
+    p_product: input.productId,
+    p_store: input.storeId,
+    p_qty: input.quantity,
+    p_unit_price: input.unitPrice,
+    p_expiry_date: input.expiryDate,
+  });
+  return { error };
 }
 
 export async function fetchMotives(): Promise<LoadResult<MotiveOption[]>> {

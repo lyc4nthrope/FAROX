@@ -273,13 +273,13 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
     expect(ordersApi.updateOrderStatus).toHaveBeenCalledWith(5, "pending", null);
   });
 
-  it("un pedido ya en ruta no admite cotización", async () => {
+  it("un pedido en ruta todavía admite ajustar la cotización", async () => {
     vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
 
     renderPage("distribuidor");
 
-    expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
-    expect(screen.queryByText("Cotización del distribuidor")).not.toBeInTheDocument();
+    expect(await screen.findByText("Cotización del distribuidor")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar cotización" })).toBeInTheDocument();
   });
 });
 

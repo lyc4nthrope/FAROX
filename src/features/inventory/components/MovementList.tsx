@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { formatQty } from "../../../shared/lib/format";
+import { formatCOP, formatQty } from "../../../shared/lib/format";
 import { Badge, secondaryButtonClass } from "../../../shared/ui/Box";
 import type { MovementRow } from "../api";
 
@@ -32,7 +32,8 @@ const MOVEMENT_TONES = {
 };
 
 function movementTone(movement: MovementRow): keyof typeof MOVEMENT_TONES {
-  return movement.reverso_of_id === null ? movement.type : "reverse";
+  if (movement.reverso_of_id !== null) return "reverse";
+  return movement.direction ?? movement.type;
 }
 
 function Icon({ children }: { children: ReactNode }) {
@@ -101,6 +102,7 @@ export function MovementList({
       {movements.map((movement) => {
         const toneKey = movementTone(movement);
         const tone = MOVEMENT_TONES[toneKey];
+        const direction = movement.direction ?? movement.type;
         return (
           <li
             key={movement.id}
@@ -119,7 +121,7 @@ export function MovementList({
                   {movement.product_name}
                 </p>
                 <p className={`text-sm font-semibold tabular-nums ${tone.quantity}`}>
-                  {movement.type === "entry" ? "+" : "−"}
+                  {direction === "entry" ? "+" : "−"}
                   {formatQty(movement.quantity)}
                 </p>
               </div>
@@ -138,6 +140,12 @@ export function MovementList({
                     ? movement.motive_name
                     : `Reverso de #${movement.reverso_of_id}`}
                 </span>
+                {movement.unit_price !== null && movement.unit_price !== undefined && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="tabular-nums">Precio: {formatCOP(movement.unit_price)}</span>
+                  </>
+                )}
                 {reversed.has(movement.id) && <Badge tone="amber">Revertido</Badge>}
               </div>
             </div>

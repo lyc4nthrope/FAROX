@@ -83,7 +83,7 @@ export function OrderDetailPage() {
   const open = o !== null && (o.status === "pending" || o.status === "in_route");
   const showPrice = items.data?.some((i) => i.unit_price !== null) ?? false;
 
-  function onConfirm() {
+  async function onConfirm() {
     const payload = (items.data ?? []).map((i) => ({
       product_id: i.product_id,
       received_quantity: Number(received[i.product_id] ?? 0),
@@ -96,6 +96,39 @@ export function OrderDetailPage() {
     ) {
       setMsg({ error: "Cada cantidad recibida debe estar entre 0 y la pedida.", ok: null });
       return;
+    }
+    // 0029: si el distribuidor ajustó la cotización, se persiste antes de
+    // entregar para que el movimiento de salida registre ese precio de venta.
+    if (canQuote) {
+      const priced = (items.data ?? [])
+        .map((item) => ({
+          productId: item.product_id,
+          raw: quoteValue(item.product_id).trim(),
+        }))
+        .filter((entry) => entry.raw !== "");
+      if (
+        priced.some(
+          (entry) => !Number.isFinite(Number(entry.raw)) || Number(entry.raw) <= 0,
+        )
+      ) {
+        setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
+        return;
+      }
+      if (priced.length > 0) {
+        const priceError = await runAction(() =>
+          setOrderPrices(
+            orderId,
+            priced.map((entry) => ({
+              product_id: entry.productId,
+              distributor_price: Number(entry.raw),
+            })),
+          ),
+        );
+        if (priceError !== null) {
+          setMsg({ error: priceError, ok: null });
+          return;
+        }
+      }
     }
     void act(
       () => confirmDelivery(orderId, payload),
@@ -126,7 +159,9 @@ export function OrderDetailPage() {
   // 0024: el distribuidor cotiza lo que le cobra a la tienda mientras el
   // pedido sigue pendiente. El admin puede corregir la cotización.
   const canQuote =
-    o !== null && o.status === "pending" && (role === "admin" || role === "distribuidor");
+    o !== null &&
+    (o.status === "pending" || o.status === "in_route") &&
+    (role === "admin" || role === "distribuidor");
 
   // La cotización guardada es el valor por defecto; el borrador local gana
   // mientras el usuario edita (no hay carrera con el fetch).
@@ -345,8 +380,9 @@ export function OrderDetailPage() {
       {canQuote && (
         <Box title="Cotización del distribuidor">
           <p className="text-sm text-gray-600">
-            Definí cuánto le cobrás a la tienda por cada producto. Podés dejar líneas sin precio y
-            completarlas después, mientras el pedido siga pendiente.
+            Definí cuánto le cobrás a la tienda por cada producto. Podés ajustarlo mientras el
+            pedido siga abierto (pendiente o en ruta); el precio queda congelado en el movimiento
+            de la entrega.
           </p>
           <div className="mt-3 space-y-2">
             {items.data?.map((item) => (
@@ -393,8 +429,9 @@ export function OrderDetailPage() {
       {o && open && canDispatch && (
         <Box title="Entrega y comunicación">
           <p className="text-sm text-gray-600">
-            La fecha prometida es opcional y el operador la ve en el resumen. Podés ajustarla o
-            quitarla mientras el pedido siga abierto.
+            La fecha prometida es opcional y el operador la ve en el resumen. La alerta de pedido
+            atrasado se activa al pasar esta fecha: para plazos largos, elegí una fecha lejana; sin
+            fecha no se genera alerta.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <Field label="Fecha prometida (opcional)">
