@@ -124,9 +124,9 @@ export function AppRoutes() {
               }
             />
             <Route path="/products" element={<ProductsPage />} />
-            {/* Alta del catálogo GLOBAL: solo admin (0019/S7). Operador y
-                distribuidor ya no crean productos globales: eligen del
-                registro existente en su propio catálogo. */}
+            {/* Alta del catálogo GLOBAL por esta ruta: solo admin. Operador y
+                distribuidor crean desde el alta rápida de su catálogo (0030)
+                y después solo ajustan su relación; no modifican la ficha. */}
             <Route
               path="/products/new"
               element={

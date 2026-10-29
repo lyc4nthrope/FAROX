@@ -549,6 +549,7 @@ export function StoreCatalogPanel({
             canSetPrice={isStore && canSetPrice}
             onAdded={() => {
               refetch();
+              relationPrices.reload();
               onChanged?.();
             }}
           />

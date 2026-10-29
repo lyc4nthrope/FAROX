@@ -20,6 +20,14 @@
 -- ============================================================================
 
 -- ============================================================================
+-- 0. Higiene: si una 0029 anterior llegó a aplicarse, eliminar la RPC que
+--    editaba la ficha completa del producto desde el distribuidor.
+-- ============================================================================
+DROP FUNCTION IF EXISTS public.update_distributor_product(
+  bigint, text, text, bigint, bigint, bigint, numeric, text
+);
+
+-- ============================================================================
 -- 1. Columnas/tablas de relación.
 -- ============================================================================
 -- 0030: el precio de compra de la tienda NO vive en `stock` (el distribuidor
@@ -44,7 +52,7 @@ CREATE POLICY store_product_prices_select ON public.store_product_prices
          OR (public.my_role() = 'operador'
              AND store_id = ANY (public.my_store_ids())));
 
-REVOKE INSERT, UPDATE, DELETE ON public.store_product_prices FROM authenticated, anon;
+REVOKE ALL ON public.store_product_prices FROM authenticated, anon;
 GRANT SELECT ON public.store_product_prices TO authenticated;
 
 DROP TRIGGER IF EXISTS trg_store_product_prices_updated_at ON public.store_product_prices;

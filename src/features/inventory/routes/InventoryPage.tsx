@@ -230,6 +230,7 @@ export function InventoryPage() {
     stockOptions.reload();
     movements.reload();
     prices.reload();
+    purchasePrices.reload();
     setCatalogVersion((value) => value + 1);
   };
 
@@ -650,7 +651,7 @@ export function InventoryPage() {
             storeName={storeName.data ?? `Tienda #${storeId}`}
             reloadToken={catalogVersion}
             canSetPrice={premium}
-            onChanged={() => stockOptions.reload()}
+            onChanged={() => reloadAll()}
           />
         </section>
       )}
