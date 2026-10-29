@@ -23,6 +23,8 @@ vi.mock("../api", () => ({
   },
   fetchRouteDetail: vi.fn(),
   fetchStoresWithRequests: vi.fn(),
+  fetchMyDistributorId: vi.fn(),
+  saveRoute: vi.fn(),
   googleMapsUrl: (stores: { lat: number; lng: number }[]) => {
     if (stores.length === 0) return null;
     const params = new URLSearchParams({ api: "1" });
@@ -94,6 +96,8 @@ beforeEach(() => {
     data: STORES,
     error: null,
   });
+  vi.mocked(logisticsApi.fetchMyDistributorId).mockResolvedValue({ data: 7, error: null });
+  vi.mocked(logisticsApi.saveRoute).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -157,6 +161,36 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     expect(screen.getByTestId("map-count")).toHaveTextContent("2 en mapa");
   });
 
+  it("guarda la ruta de hoy con las tiendas marcadas", async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await screen.findByText("Tienda Centro");
+    await user.click(screen.getByRole("button", { name: "Guardar ruta" }));
+
+    const today = new Date().toLocaleDateString("en-CA");
+    await waitFor(() =>
+      expect(logisticsApi.saveRoute).toHaveBeenCalledWith(7, today, [
+        { store_id: 1, stop_order: 1, estimated_time: null },
+        { store_id: 2, stop_order: 2, estimated_time: null },
+      ]),
+    );
+    expect(await screen.findByText("Ruta de hoy guardada.")).toBeInTheDocument();
+  });
+
+  it("no guarda si no hay tiendas marcadas", async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Limpiar" }));
+    await user.click(screen.getByRole("button", { name: "Guardar ruta" }));
+
+    expect(logisticsApi.saveRoute).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Marcá al menos una tienda para guardar la ruta."),
+    ).toBeInTheDocument();
+  });
+
   it("sin solicitudes abiertas muestra el estado vacío", async () => {
     vi.mocked(logisticsApi.fetchStoresWithRequests).mockResolvedValue({ data: [], error: null });
     renderPage();
@@ -196,5 +230,8 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
 
     expect(await screen.findByText(/Ruta del/)).toBeInTheDocument();
     expect(screen.getByText("Pendiente")).toBeInTheDocument();
+    expect(screen.getByText("Rutas hoy")).toBeInTheDocument();
+    expect(screen.getByText("Paradas")).toBeInTheDocument();
+    expect(screen.getByText("Completadas")).toBeInTheDocument();
   });
 });

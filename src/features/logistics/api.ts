@@ -94,6 +94,12 @@ export async function fetchGeoStores(): Promise<LoadResult<GeoStore[]>> {
   return { data: (data ?? []) as GeoStore[], error };
 }
 
+/** 0028: id de la distribuidora del usuario (para guardar SU ruta). */
+export async function fetchMyDistributorId(): Promise<LoadResult<number>> {
+  const { data, error } = await supabase.rpc("my_distributor_id");
+  return { data: data == null ? null : Number(data), error };
+}
+
 export async function fetchDistributors(): Promise<LoadResult<{ id: number; name: string }[]>> {
   const { data, error } = await supabase
     .from("distributors")

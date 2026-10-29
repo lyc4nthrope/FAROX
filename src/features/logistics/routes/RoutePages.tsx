@@ -22,6 +22,7 @@ import {
   fetchGeoStores,
   fetchRouteDetail,
   fetchRoutes,
+  fetchMyDistributorId,
   fetchStoresWithRequests,
   googleMapsUrl,
   markStop,
@@ -217,6 +218,11 @@ export function MyRoutePage() {
   const route = useLoad(() => fetchRouteDetail(null, today), [today]);
   const requests = useLoad(fetchStoresWithRequests, []);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [routeMsg, setRouteMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
   const initialized = useRef(false);
 
   // Arrancan todas marcadas: el mapa se ve poblado y desmarcar es un clic.
@@ -251,6 +257,37 @@ export function MyRoutePage() {
   function clearAll(): void {
     setSelectedIds(new Set());
   }
+
+  async function saveTodayRoute(): Promise<void> {
+    if (selectedStores.length === 0) {
+      setRouteMsg({ error: "Marcá al menos una tienda para guardar la ruta.", ok: null });
+      return;
+    }
+    setSavingRoute(true);
+    const distributor = await fetchMyDistributorId();
+    if (distributor.error !== null || distributor.data === null) {
+      setRouteMsg({ error: "No pudimos identificar tu distribuidora.", ok: null });
+      setSavingRoute(false);
+      return;
+    }
+    const distributorId = distributor.data;
+    const stops = selectedStores.map((store, index) => ({
+      store_id: store.id,
+      stop_order: index + 1,
+      estimated_time: null,
+    }));
+    const error = await runAction(() => saveRoute(distributorId, today, stops));
+    setRouteMsg({ error, ok: error === null ? "Ruta de hoy guardada." : null });
+    if (error === null) {
+      route.reload();
+      requests.reload();
+    }
+    setSavingRoute(false);
+  }
+
+  const routeStops = route.data?.stops.length ?? 0;
+  const routeCompleted =
+    route.data?.stops.filter((stop) => stop.status === "completed").length ?? 0;
 
   return (
     <section>
@@ -388,33 +425,74 @@ export function MyRoutePage() {
           <span className="font-semibold text-gray-900">{selectedOrders}</span>{" "}
           {selectedOrders === 1 ? "solicitud" : "solicitudes"}
         </p>
-        {mapsUrl !== null ? (
-          <a
-            className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
-            href={mapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            className="inline-flex items-center gap-2 border border-gray-900 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={savingRoute}
+            onClick={() => void saveTodayRoute()}
           >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              viewBox="0 0 24 24"
+            {savingRoute ? "Guardando…" : "Guardar ruta"}
+          </button>
+          {mapsUrl !== null ? (
+            <a
+              className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <path d="M12 21s6-4.6 6-10a6 6 0 1 0-12 0c0 5.4 6 10 6 10Z" />
-              <circle cx="12" cy="11" r="2" />
-            </svg>
-            Abrir en Google Maps
-          </a>
-        ) : (
-          <span className="border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400">
-            Marcá al menos una tienda
-          </span>
-        )}
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 21s6-4.6 6-10a6 6 0 1 0-12 0c0 5.4 6 10 6 10Z" />
+                <circle cx="12" cy="11" r="2" />
+              </svg>
+              Abrir en Google Maps
+            </a>
+          ) : (
+            <span className="border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400">
+              Marcá al menos una tienda
+            </span>
+          )}
+        </div>
+      </div>
+
+      {(routeMsg.error !== null || routeMsg.ok !== null) && (
+        <div className="border-x border-b border-gray-300 bg-white px-4 py-2">
+          <Status error={routeMsg.error} ok={routeMsg.ok} />
+        </div>
+      )}
+
+      <div className="mt-6 grid grid-cols-3 divide-x divide-gray-300 border border-gray-300 bg-white">
+        <div className="px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+            Rutas hoy
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+            {route.data === null ? 0 : 1}
+          </p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+            Paradas
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{routeStops}</p>
+        </div>
+        <div className="px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+            Completadas
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+            {routeCompleted}
+          </p>
+        </div>
       </div>
 
       <div className="mt-8">
