@@ -214,6 +214,7 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(await screen.findByText("Leche Alpina")).toBeInTheDocument();
     expect(screen.queryByText(/Precio:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/4\.500/)).not.toBeInTheDocument();
+    expect(productsApi.fetchDistributorCatalog).not.toHaveBeenCalled();
   });
 
   it("sin movimientos muestra el estado vacío", async () => {

@@ -44,6 +44,9 @@ export function DistributorMovementsPage() {
   const movements = useLoad(fetchDistributorMovements, []);
   const stores = useLoad(fetchDistributorStores, []);
   const products = useLoad<ProductPickerOption[]>(async () => {
+    // Solo Premium abre el modal de venta directa: sin Premium no se pide el
+    // catálogo completo (500 filas) para una acción que no puede usar.
+    if (!premium) return { data: [], error: null };
     const result = await fetchDistributorCatalog({
       page: 0,
       pageSize: 500,
@@ -59,7 +62,7 @@ export function DistributorMovementsPage() {
       })),
       error: result.error,
     };
-  }, []);
+  }, [premium]);
   const [type, setType] = useState<TypeFilter>("all");
   const [saleOpen, setSaleOpen] = useState(false);
   const [sale, setSale] = useState({

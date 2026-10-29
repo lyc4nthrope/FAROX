@@ -160,6 +160,42 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
     ]);
   });
 
+  it("al confirmar la entrega persiste la cotización antes de confirmar (0029)", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+    vi.mocked(ordersApi.confirmDelivery).mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+
+    await user.type(await screen.findByLabelText("Precio de Arroz"), "2500");
+    await user.click(screen.getByRole("button", { name: "Confirmar entrega" }));
+
+    await waitFor(() => expect(ordersApi.confirmDelivery).toHaveBeenCalled());
+    expect(ordersApi.setOrderPrices).toHaveBeenCalledWith(5, [
+      { product_id: 10, distributor_price: 2500 },
+    ]);
+    expect(vi.mocked(ordersApi.setOrderPrices).mock.invocationCallOrder[0]!).toBeLessThan(
+      vi.mocked(ordersApi.confirmDelivery).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it("si la cotización falla, la entrega no se confirma (0029)", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+    vi.mocked(ordersApi.setOrderPrices).mockResolvedValue({
+      error: { message: "cotización rechazada" },
+    });
+    vi.mocked(ordersApi.confirmDelivery).mockResolvedValue({ error: null });
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+
+    await user.type(await screen.findByLabelText("Precio de Arroz"), "2500");
+    await user.click(screen.getByRole("button", { name: "Confirmar entrega" }));
+
+    await waitFor(() => expect(ordersApi.setOrderPrices).toHaveBeenCalled());
+    expect(ordersApi.confirmDelivery).not.toHaveBeenCalled();
+  });
+
   it("precarga la cotización ya guardada del distribuidor", async () => {
     vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("pending"), error: null });
     vi.mocked(ordersApi.fetchOrderQuotes).mockResolvedValue({
