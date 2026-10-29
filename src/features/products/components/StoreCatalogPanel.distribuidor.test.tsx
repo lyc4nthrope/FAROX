@@ -113,6 +113,20 @@ describe("StoreCatalogPanel · modo distribuidor (S15/S21)", () => {
     expect(screen.getByText("Vence")).toBeInTheDocument();
   });
 
+  it("no muestra «Vence» cuando la cantidad es 0", async () => {
+    const soon = new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10);
+    vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
+      rows: [{ ...ROW, quantity: 0, threshold: null, expiry_date: soon }],
+      count: 1,
+      error: null,
+    });
+
+    renderPanel();
+    expect(await screen.findByText("Arroz Diana")).toBeInTheDocument();
+    expect(screen.queryByText("Vence")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vencido")).not.toBeInTheDocument();
+  });
+
   it("Editar abre la relación (cantidad) y nunca la ficha del producto", async () => {
     renderPanel();
     const user = userEvent.setup();
