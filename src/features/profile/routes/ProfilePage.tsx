@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { Box } from "../../../shared/ui/Box";
+import { PremiumStatusCard } from "../../premium";
 import { fetchMyProfile, updateMyProfile } from "../api";
 import { ProfileForm, type ProfileFormErrors } from "../components/ProfileForm";
 import { profileSchema, type ProfileFormValues } from "../schemas";
@@ -102,6 +103,11 @@ export function ProfilePage() {
             de contacto.
           </p>
         </div>
+      </div>
+      <div className="mt-6">
+        <Box title="Plan">
+          <PremiumStatusCard />
+        </Box>
       </div>
       <div className="mt-6">
         <Box title="Datos de contacto">

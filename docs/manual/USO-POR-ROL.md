@@ -11,7 +11,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
   - **Mi tienda**: crea su tienda eligiendo la ubicación en el mapa y queda como operador de esa tienda.
   - **Trabajo en tienda**: espera a que el admin le asigne tiendas.
 - El **admin** no pasa por esa pregunta. El primer admin se crea a mano en la base de datos (ver `supabase/README.md`).
-- **Premium** lo activa el admin en Usuarios. Habilita: registrar entradas/salidas manuales, el dashboard y ver precios en los pedidos.
+- **Premium** se activa con una suscripción (cuando esté disponible el pago) o manualmente por el admin en Usuarios. Habilita: registrar entradas/salidas manuales, el dashboard, precios y hasta 3 tiendas. El perfil muestra el plan y su vigencia.
 
 ## Admin (configura y supervisa todo)
 
@@ -49,6 +49,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Seguir el pedido | Pedidos → pedido | El distribuidor lo marca en ruta y confirma la entrega; vos ves el estado, la fecha prometida y el precio cotizado por el distribuidor |
 | Contactar a un distribuidor | Distribuidores → Contactar | Abre el WhatsApp/teléfono/email que el distribuidor configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
+| Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
 | Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |
@@ -68,6 +69,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Registrar una venta directa | Movimientos → Registrar venta | **Requiere Premium**: tienda vinculada, producto de tu catálogo, cantidad y precio de venta (se completa con tu precio de venta y podés cambiarlo) |
 | Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
+| Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora; el nav muestra cuántos pedidos abiertos hay |

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as profileApi from "../api";
+import * as premiumApi from "../../premium/api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { ProfilePage } from "./ProfilePage";
 
@@ -12,6 +13,9 @@ import { ProfilePage } from "./ProfilePage";
 vi.mock("../api", () => ({
   fetchMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
+}));
+vi.mock("../../premium/api", () => ({
+  fetchMyPremiumStatus: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -46,10 +50,28 @@ describe("ProfilePage (§S2 fila /profile)", () => {
       error: null,
     });
     vi.mocked(profileApi.updateMyProfile).mockResolvedValue({ error: null });
+    vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({
+      data: {
+        premium: false,
+        premiumUntil: null,
+        premiumGraceUntil: null,
+        graceActive: false,
+        needsStoreChoice: false,
+        activeOwnedStores: 1,
+      },
+      error: null,
+    });
   });
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("muestra el plan actual en el perfil (0032)", async () => {
+    renderPerfil();
+
+    expect(await screen.findByText("Plan gratuito")).toBeInTheDocument();
+    expect(screen.getByText("Gratis")).toBeInTheDocument();
   });
 
   it("guarda enviando SOLO las 3 columnas de perfil (§S2 profile-column-limit)", async () => {
