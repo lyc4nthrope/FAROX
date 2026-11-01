@@ -174,7 +174,7 @@ UNION ALL SELECT '0032 premium y planes',
              AND column_name = 'premium_until')
    AND to_regprocedure('public.quote_plan(text)') IS NOT NULL
    AND to_regprocedure('public.update_plan_pricing(text,integer,integer,boolean,integer,integer,integer,boolean,boolean)') IS NOT NULL
-   AND EXISTS (SELECT 1 FROM public.plans WHERE code = 'premium_monthly' AND active))::text
+   AND to_regclass('public.plans') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;

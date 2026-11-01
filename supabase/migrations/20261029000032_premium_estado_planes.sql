@@ -161,9 +161,13 @@ ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payment_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS plans_select ON public.plans;
+DROP POLICY IF EXISTS plans_select_anon ON public.plans;
 CREATE POLICY plans_select ON public.plans
-  FOR SELECT TO anon, authenticated
+  FOR SELECT TO authenticated
   USING (active OR public.my_role() = 'admin');
+CREATE POLICY plans_select_anon ON public.plans
+  FOR SELECT TO anon
+  USING (active);
 
 DROP POLICY IF EXISTS plan_versions_select ON public.plan_versions;
 CREATE POLICY plan_versions_select ON public.plan_versions
@@ -222,6 +226,14 @@ CREATE OR REPLACE FUNCTION public.set_user_premium(
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   PERFORM public.assert_admin();
+  IF NOT p_value AND EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = p_user_id
+      AND premium_until IS NOT NULL
+      AND premium_until > now()
+  ) THEN
+    RAISE EXCEPTION 'set_user_premium: el usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período';
+  END IF;
   UPDATE public.users
   SET premium = p_value,
       premium_until = CASE
@@ -248,7 +260,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.activate_premium(
   p_user uuid,
   p_months integer,
-  p_payment bigint DEFAULT NULL
+  p_payment_id bigint DEFAULT NULL
 ) RETURNS timestamptz
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
@@ -262,20 +274,20 @@ BEGIN
     RAISE EXCEPTION 'activate_premium: meses fuera de rango (%)', p_months;
   END IF;
 
-  IF p_payment IS NOT NULL THEN
+  IF p_payment_id IS NOT NULL THEN
     SELECT status INTO v_status
     FROM public.payments
-    WHERE id = p_payment AND user_id = p_user
+    WHERE id = p_payment_id AND user_id = p_user
     FOR UPDATE;
     IF NOT FOUND THEN
-      RAISE EXCEPTION 'activate_premium: pago % no existe para el usuario', p_payment;
+      RAISE EXCEPTION 'activate_premium: pago % no existe para el usuario', p_payment_id;
     END IF;
     IF v_status = 'approved' THEN
       SELECT premium_until INTO v_until FROM public.users WHERE id = p_user;
       RETURN v_until;
     END IF;
     IF v_status <> 'pending' THEN
-      RAISE EXCEPTION 'activate_premium: el pago % no está pendiente (%)', p_payment, v_status;
+      RAISE EXCEPTION 'activate_premium: el pago % no está pendiente (%)', p_payment_id, v_status;
     END IF;
   END IF;
 
@@ -291,10 +303,10 @@ BEGIN
     RAISE EXCEPTION 'activate_premium: usuario inexistente: %', p_user;
   END IF;
 
-  IF p_payment IS NOT NULL THEN
+  IF p_payment_id IS NOT NULL THEN
     UPDATE public.payments
     SET status = 'approved', paid_at = now()
-    WHERE id = p_payment;
+    WHERE id = p_payment_id;
   END IF;
 
   RETURN v_until;
@@ -314,21 +326,29 @@ RETURNS TABLE (
   active_owned_stores bigint
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  WITH current_user_status AS (
+    SELECT
+      public.is_premium() AS is_premium,
+      u.premium_until,
+      CASE
+        WHEN public.is_premium() THEN NULL
+        ELSE COALESCE(u.premium_grace_until, u.premium_until + interval '7 days')
+      END AS grace_until,
+      (SELECT count(*) FROM public.stores s
+       WHERE s.created_by = auth.uid() AND s.is_active) AS active_owned_stores
+    FROM public.users u
+    WHERE u.id = auth.uid()
+  )
   SELECT
-    public.is_premium(),
-    u.premium_until,
-    COALESCE(u.premium_grace_until, u.premium_until + interval '7 days'),
-    COALESCE(
-      COALESCE(u.premium_grace_until, u.premium_until + interval '7 days') > now(),
-      false
-    ),
-    (NOT public.is_premium())
-      AND (SELECT count(*) FROM public.stores s
-           WHERE s.created_by = auth.uid() AND s.is_active) > 1,
-    (SELECT count(*) FROM public.stores s
-     WHERE s.created_by = auth.uid() AND s.is_active)
-  FROM public.users u
-  WHERE u.id = auth.uid();
+    is_premium,
+    premium_until,
+    grace_until,
+    COALESCE(NOT is_premium AND grace_until > now(), false),
+    (NOT is_premium)
+      AND active_owned_stores > 1
+      AND (grace_until IS NULL OR grace_until <= now()),
+    active_owned_stores
+  FROM current_user_status;
 $$;
 
 -- ============================================================================
@@ -373,16 +393,16 @@ BEGIN
 
   v_final := p.amount_cents;
   IF p.tax_included THEN
-    v_base := round(v_final * 10000.0 / (10000 + p.tax_rate_bps))::integer;
+    v_base := round(v_final::numeric * 10000 / (10000 + p.tax_rate_bps))::integer;
     v_tax := v_final - v_base;
   ELSE
     v_base := v_final;
-    v_tax := round(v_base * p.tax_rate_bps / 10000.0)::integer;
+    v_tax := round(v_base::numeric * p.tax_rate_bps / 10000)::integer;
     v_final := v_base + v_tax;
   END IF;
 
-  v_fee := round(v_final * p.mp_fee_bps / 10000.0)::integer + p.mp_fee_fixed_cents;
-  v_fee_tax := round(v_fee * p.mp_fee_tax_bps / 10000.0)::integer;
+  v_fee := round(v_final::numeric * p.mp_fee_bps / 10000)::integer + p.mp_fee_fixed_cents;
+  v_fee_tax := round(v_fee::numeric * p.mp_fee_tax_bps / 10000)::integer;
   v_fee := v_fee + v_fee_tax;
   v_net := v_final - v_tax - v_fee;
 
@@ -434,6 +454,12 @@ BEGIN
   IF p_fee_passed_to_customer IS NULL THEN
     RAISE EXCEPTION 'update_plan_pricing: fee_passed_to_customer requerido';
   END IF;
+  IF p_tax_included IS NULL THEN
+    RAISE EXCEPTION 'update_plan_pricing: tax_included requerido';
+  END IF;
+  IF p_active IS NULL THEN
+    RAISE EXCEPTION 'update_plan_pricing: active requerido';
+  END IF;
 
   SELECT * INTO v_plan FROM public.plans WHERE code = p_code FOR UPDATE;
   IF NOT FOUND THEN
@@ -457,7 +483,7 @@ BEGIN
       mp_fee_fixed_cents = p_mp_fee_fixed_cents,
       mp_fee_tax_bps = p_mp_fee_tax_bps,
       fee_passed_to_customer = p_fee_passed_to_customer,
-      active = COALESCE(p_active, true),
+      active = p_active,
       version = v_version,
       updated_at = now()
   WHERE id = v_plan.id;

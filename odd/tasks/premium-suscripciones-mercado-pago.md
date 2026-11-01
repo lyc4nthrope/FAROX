@@ -203,7 +203,7 @@ CREATE TABLE public.plan_versions (
   mp_fee_tax_bps integer NOT NULL,
   fee_passed_to_customer boolean NOT NULL,
   valid_from timestamptz NOT NULL DEFAULT now(),
-  created_by uuid NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  created_by uuid NULL REFERENCES public.users(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (plan_id, version)
 );
