@@ -140,6 +140,18 @@ describe("mapError · sdd/admin-console T-B1 (23503, 23505, «usuario inexistent
     );
   });
 
+  it("'período pago vigente' (set_user_premium no corta un pago activo)", () => {
+    expect(
+      mapError({
+        code: "P0001",
+        message:
+          "set_user_premium: el usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período",
+      }),
+    ).toBe(
+      "El usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período.",
+    );
+  });
+
   it("prevalencia T-B1: 23503/23505 ganan por SQLSTATE aunque el mensaje traiga otra pista", () => {
     expect(
       mapError({ code: "23503", message: "solo admin" }),
