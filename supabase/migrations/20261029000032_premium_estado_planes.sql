@@ -257,6 +257,7 @@ $$;
 -- ============================================================================
 -- 8. Activación pagada (service_role/Edge Function). Idempotente por pago.
 -- ============================================================================
+DROP FUNCTION IF EXISTS public.activate_premium(uuid, integer, bigint);
 CREATE OR REPLACE FUNCTION public.activate_premium(
   p_user uuid,
   p_months integer,

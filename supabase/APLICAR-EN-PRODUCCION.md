@@ -299,6 +299,9 @@ SELECT has_function_privilege('anon','public.quote_plan(text)','EXECUTE');      
 SELECT has_function_privilege('authenticated','public.quote_plan(text)','EXECUTE');                                                            -- true
 SELECT has_function_privilege('authenticated','public.my_premium_status()','EXECUTE');                                                         -- true
 SELECT has_function_privilege('service_role','public.activate_premium(uuid,integer,bigint)','EXECUTE');                                        -- true
+-- 0032: los dos planes deben existir y estar activos
+SELECT code, active, amount_cents FROM public.plans
+WHERE code IN ('premium_monthly', 'premium_annual') ORDER BY code;                                                                             -- 2 filas
 ```
 
 Y después:

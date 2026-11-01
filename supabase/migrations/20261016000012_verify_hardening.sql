@@ -1303,13 +1303,16 @@ BEGIN
   JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public' AND c.relkind = 'r'
     AND NOT (c.relname::text = ANY (v_tables));
-  -- Policy TO anon o TO PUBLIC (polroles vacío = PUBLIC) en public
+  -- Policy TO anon o TO PUBLIC (polroles vacío = PUBLIC) en public.
+  -- Excepción deliberada: plans_select_anon solo expone planes activos
+  -- (catálogo público de precios) y no llama my_role().
   SELECT string_agg(n.nspname || '.' || c.relname || '.' || p.polname, ', ') INTO v_anon_pol
   FROM pg_catalog.pg_policy p
   JOIN pg_catalog.pg_class c ON c.oid = p.polrelid
   JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname = 'public'
-    AND (p.polroles = '{}'::oid[] OR v_anon = ANY (p.polroles));
+    AND (p.polroles = '{}'::oid[] OR v_anon = ANY (p.polroles))
+    AND NOT (c.relname = 'plans' AND p.polname = 'plans_select_anon');
   IF v_missing <> '' OR v_no_rls <> '' THEN
     PERFORM pg_temp.v0012_rec('H4', 'H4.2', 'FAIL',
       format('RLS por nombre (las 25 de H1.5): ausentes=[%s] sin RLS=[%s] — re-run de V2/V3 de 0008',
