@@ -26,11 +26,14 @@ describe("0033 · invariantes de SQL", () => {
   });
 
   it("el job conserva la más antigua y pausa el resto", () => {
-    expect(sql).toMatch(/row_number\(\) OVER/);
-    expect(sql).toMatch(/ORDER BY s\.created_at, s\.id/);
-    expect(sql).toMatch(/c\.rn > 1/);
-    expect(sql).toMatch(/COALESCE\(u\.premium_grace_until, u\.premium_until \+ interval '7 days'\) <= now\(\)/);
-    expect(sql).toMatch(/s2\.created_by = v_user AND s2\.is_active\) > 1/);
-    expect(sql).toMatch(/pg_catalog\.pg_advisory_xact_lock/);
+    const start = sql.indexOf("FUNCTION public.job_scan_premium_downgrade");
+    const end = sql.indexOf("REVOKE EXECUTE ON FUNCTION public.job_scan_premium_downgrade");
+    const job = sql.slice(start, end);
+    expect(job).toMatch(/row_number\(\) OVER/);
+    expect(job).toMatch(/ORDER BY created_at, id/);
+    expect(job).toMatch(/c\.rn > 1/);
+    expect(job).toMatch(/COALESCE\(u\.premium_grace_until, u\.premium_until \+ interval '7 days'\) <= now\(\)/);
+    expect(job).toMatch(/s2\.created_by = v_user AND s2\.is_active\) > 1/);
+    expect(job).toMatch(/pg_catalog\.pg_advisory_xact_lock/);
   });
 });
