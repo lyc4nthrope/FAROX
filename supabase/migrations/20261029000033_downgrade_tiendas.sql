@@ -130,36 +130,53 @@ $$;
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.job_scan_premium_downgrade() RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  v_user uuid;
 BEGIN
-  WITH candidates AS (
-    SELECT s.id,
-           row_number() OVER (
-             PARTITION BY s.created_by
-             ORDER BY s.created_at, s.id
-           ) AS rn
+  -- Se recorren usuarios con tiendas activas y se toma el MISMO lock por
+  -- usuario que choose/reactivate. Así el job no pisa una elección concurrente.
+  FOR v_user IN
+    SELECT DISTINCT s.created_by
     FROM public.stores s
-    JOIN public.users u ON u.id = s.created_by
-    JOIN public.roles r ON r.id = u.role_id
-    WHERE s.is_active
-      AND u.is_active
-      AND r.name <> 'admin'
-      AND NOT (u.premium AND (u.premium_until IS NULL OR u.premium_until > now()))
-      AND (
-        (u.premium_until IS NULL AND u.premium_grace_until IS NULL)
-        OR COALESCE(u.premium_grace_until, u.premium_until + interval '7 days') <= now()
-      )
-  )
-  UPDATE public.stores s
-  SET is_active = false,
-      deactivated_reason = 'premium_expired',
-      deactivated_at = now()
-  FROM candidates c
-  WHERE s.id = c.id
-    AND c.rn > 1
-    -- No dejar al usuario sin ninguna tienda si otra pestaña ya eligió una
-    -- (el job y choose_store_for_free_plan pueden competir).
-    AND (SELECT count(*) FROM public.stores s2
-         WHERE s2.created_by = s.created_by AND s2.is_active) > 1;
+    WHERE s.is_active AND s.created_by IS NOT NULL
+  LOOP
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(v_user::text, 0)
+    );
+
+    -- Re-evaluar bajo lock: la fecha de gracia o el Premium pudieron cambiar.
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.users u
+      JOIN public.roles r ON r.id = u.role_id
+      WHERE u.id = v_user
+        AND u.is_active
+        AND r.name <> 'admin'
+        AND NOT (u.premium AND (u.premium_until IS NULL OR u.premium_until > now()))
+        AND (
+          (u.premium_until IS NULL AND u.premium_grace_until IS NULL)
+          OR COALESCE(u.premium_grace_until, u.premium_until + interval '7 days') <= now()
+        )
+    ) THEN
+      CONTINUE;
+    END IF;
+
+    UPDATE public.stores s
+    SET is_active = false,
+        deactivated_reason = 'premium_expired',
+        deactivated_at = now()
+    FROM (
+      SELECT id,
+             row_number() OVER (ORDER BY created_at, id) AS rn
+      FROM public.stores
+      WHERE created_by = v_user AND is_active
+    ) c
+    WHERE s.id = c.id
+      AND c.rn > 1
+      -- No dejar al usuario sin ninguna tienda si otra pestaña ya eligió una.
+      AND (SELECT count(*) FROM public.stores s2
+           WHERE s2.created_by = v_user AND s2.is_active) > 1;
+  END LOOP;
 END;
 $$;
 

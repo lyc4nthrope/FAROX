@@ -30,6 +30,7 @@ describe("0033 · invariantes de SQL", () => {
     expect(sql).toMatch(/ORDER BY s\.created_at, s\.id/);
     expect(sql).toMatch(/c\.rn > 1/);
     expect(sql).toMatch(/COALESCE\(u\.premium_grace_until, u\.premium_until \+ interval '7 days'\) <= now\(\)/);
-    expect(sql).toMatch(/s2\.created_by = s\.created_by AND s2\.is_active\) > 1/);
+    expect(sql).toMatch(/s2\.created_by = v_user AND s2\.is_active\) > 1/);
+    expect(sql).toMatch(/pg_catalog\.pg_advisory_xact_lock/);
   });
 });
