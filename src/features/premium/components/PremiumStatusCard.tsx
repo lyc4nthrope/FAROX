@@ -62,12 +62,20 @@ export function PremiumStatusCard() {
         </p>
       )}
 
-      <Link
-        to="/premium/tiendas"
-        className="inline-flex text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
-      >
-        Gestionar mis tiendas
-      </Link>
+      <div className="flex flex-wrap gap-4">
+        <Link
+          to="/premium"
+          className="inline-flex text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+        >
+          Ver planes
+        </Link>
+        <Link
+          to="/premium/tiendas"
+          className="inline-flex text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+        >
+          Gestionar mis tiendas
+        </Link>
+      </div>
     </div>
   );
 }

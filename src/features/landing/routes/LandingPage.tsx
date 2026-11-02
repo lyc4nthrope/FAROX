@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ExampleDashboard, type ExampleDashboardStat } from "../../../shared/ui";
+import { PremiumTeaser } from "../../premium";
 
 interface Feature {
   title: string;
@@ -263,6 +264,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <PremiumTeaser to="/register" />
 
         <section id="como-funciona" className="mx-auto max-w-6xl px-4 py-16">
           <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">

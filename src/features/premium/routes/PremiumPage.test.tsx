@@ -8,6 +8,7 @@ import { PremiumPage } from "./PremiumPage";
 
 vi.mock("../api", () => ({
   fetchPlanQuote: vi.fn(),
+  fetchMyPremiumStatus: vi.fn(),
 }));
 
 const MONTHLY: PlanQuote = {
@@ -43,6 +44,17 @@ beforeEach(() => {
     quote: code === "premium_annual" ? ANNUAL : MONTHLY,
     error: null,
   }));
+  vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({
+    data: {
+      premium: false,
+      premiumUntil: null,
+      premiumGraceUntil: null,
+      graceActive: false,
+      needsStoreChoice: false,
+      activeOwnedStores: 1,
+    },
+    error: null,
+  });
 });
 
 afterEach(() => {
@@ -59,9 +71,35 @@ describe("PremiumPage (0033)", () => {
 
     expect(await screen.findByText("Premium mensual")).toBeInTheDocument();
     expect(screen.getByText("Premium anual")).toBeInTheDocument();
-    expect(screen.getAllByText(/IVA incluido/).length).toBe(2);
+    expect(screen.getAllByText(/IVA incluido/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/Mercado Pago estimado/).length).toBe(2);
     expect(screen.getAllByText(/Neto FAROX/).length).toBe(2);
     expect(screen.getAllByText("Pago disponible próximamente").length).toBe(2);
+    expect(screen.getByText("Gratis vs Premium")).toBeInTheDocument();
+    expect(screen.getByText("Preguntas frecuentes")).toBeInTheDocument();
+    expect(screen.getByText("Hasta 3")).toBeInTheDocument();
+  });
+
+  it("si ya es Premium no ofrece pagar de nuevo", async () => {
+    vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({
+      data: {
+        premium: true,
+        premiumUntil: "2026-12-31T12:00:00Z",
+        premiumGraceUntil: null,
+        graceActive: false,
+        needsStoreChoice: false,
+        activeOwnedStores: 3,
+      },
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <PremiumPage />
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText(/Ya sos Premium/)).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText("Pago disponible próximamente")).not.toBeInTheDocument();
   });
 });

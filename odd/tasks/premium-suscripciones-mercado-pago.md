@@ -495,12 +495,24 @@ ALTER TABLE public.stores
 
 ## 10. Log
 
+
 - **L1 (2026-11-01):** «Me gusta tu plan, pero si el usuario tiene 3 tiendas, porque es premium, si deja de serlo perderia 2 tiendas, deberia estar la opcion de que escoja una tienda o que renueve el premium. Y lo de mercado pago me convence mas por la renovacion automatica. Una cosa a revisar, es la ley en colombia para las suscripciones y los terminos de mercado pago para implementar. Genera un plan lo mas completo posible para luego ir desarrollando fase a fase y disminuir los errores.»
 - **L2 (diseño):** Mercado Pago Suscripciones; `premium_until` + `premium_grace_until`; downgrade con elección/pausa; `my_store_ids` filtra activas; fases F0–F6; revisión legal y de comisiones pendiente.
 - **L3 (2026-11-01):** «Si, ademas me gustaria que se mostrara la lista de precios que agregan valor como el impuesto y el cobro que se lleva mercado pago. El precio mantenlo asi, pero que se modificable para cambiar segun la demanda y la oferta. La seleccion de la tienda que queda a manos del usuario, como una ventana emergente que muestre las 3 tiendas diciendo que cual desea conservar como principal o la opcion de renovar para mantener las 3 tiendas activas.»
 - **L4 (diseño):** desglose `quote_plan` (precio final, IVA incluido, comisión MP estimada, neto), precios editables por admin con `plan_versions` y grandfathering; modal de downgrade con las 3 tiendas, «Conservar como principal» y «Renovar para mantener las 3».
 
-## 11. Fuentes consultadas
+## 11. Backlog: edición, eliminación y transferencia de tiendas
+
+Solicitado por el usuario el 2026-11-02; **no se implementa en F3**.
+
+- **Editar tienda:** el dueño (`created_by`) o admin puede cambiar nombre, dirección, ciudad, teléfono y tipo; la RLS `stores_update` ya lo permite. La UI debe mostrarlo sin depender del admin.
+- **Desactivar/eliminar por el dueño:** permitir que el dueño pause una tienda voluntariamente (`is_active=false`, `deactivated_reason='user_removed'`, `deactivated_at`) para liberar un cupo o porque ya no la usa. No borra stock, pedidos, rutas ni créditos. El borrado duro/purga sigue siendo admin-only sobre una tienda ya inactiva (retención/auditoría).
+- **Transferir propiedad:** si la tienda ya no es del usuario, un admin debe transferirla (`created_by` + `user_stores`) en una RPC auditada; no debe quedar huérfana ni el dueño anterior conservar acceso. El tope de 3 cuenta tiendas activas del nuevo dueño.
+- **Menos tiendas:** al desactivar una tienda, el cupo se libera; al reactivarla, el trigger de tope sigue siendo la última defensa. Si la tienda está pausada por plan, el dueño puede eliminarla/transferirla sin esperar a Premium.
+- **UI:** acciones «Editar», «Desactivar» y «Eliminar» (admin) en la lista/detalle; confirmación; badge «Pausada por plan» vs «Inactiva»; auditoría.
+- **Tests:** RLS de dueño/admin, transferencia, cap, datos preservados, no acceso del dueño anterior.
+
+## 12. Fuentes consultadas
 
 - Ley 1480 de 2011 (Estatuto del Consumidor), arts. 26, 35, 41, 43.14: https://www.alcaldiabogota.gov.co/sisjur/normas/Norma1.jsp?i=44306
 - Ley 2439 de 2024 (comercio electrónico): https://www.alcaldiabogota.gov.co/sisjur/normas/Norma1.jsp?i=171718
