@@ -11,6 +11,7 @@ import { PremiumStoresPage } from "./PremiumStoresPage";
 
 vi.mock("../api", () => ({
   fetchMyOwnedStores: vi.fn(),
+  chooseStoreForFreePlan: vi.fn(),
   reactivatePremiumStores: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
@@ -65,6 +66,7 @@ beforeEach(() => {
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
   vi.mocked(authApi.signOut).mockResolvedValue(undefined);
   vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({ data: STORES, error: null });
+  vi.mocked(premiumApi.chooseStoreForFreePlan).mockResolvedValue({ error: null });
   vi.mocked(premiumApi.reactivatePremiumStores).mockResolvedValue({ error: null });
 });
 
@@ -88,6 +90,23 @@ describe("PremiumStoresPage (0033)", () => {
       expect(premiumApi.reactivatePremiumStores).toHaveBeenCalledWith([2]),
     );
     expect(await screen.findByText("Tienda reactivada.")).toBeInTheDocument();
+  });
+
+  it("sin Premium permite elegir la tienda principal desde la página", async () => {
+    vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({
+      data: [STORES[0], { ...STORES[1], isActive: true, deactivatedReason: null }, { ...STORES[2], isActive: true, deactivatedReason: null }],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage(false);
+
+    expect(await screen.findByText("Elegí tu tienda principal")).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Tienda Norte" }));
+    await user.click(screen.getByRole("button", { name: "Conservar esta tienda" }));
+
+    await waitFor(() =>
+      expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2),
+    );
   });
 
   it("sin Premium muestra la principal y el enlace para renovar", async () => {

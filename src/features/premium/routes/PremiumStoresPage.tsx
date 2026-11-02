@@ -1,17 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { EmptyState } from "../../../shared/ui";
 import { Badge, Status, buttonClass, runAction } from "../../../shared/ui/Box";
-import { fetchMyOwnedStores, reactivatePremiumStores } from "../api";
+import {
+  chooseStoreForFreePlan,
+  fetchMyOwnedStores,
+  reactivatePremiumStores,
+} from "../api";
 
 /** 0033: tiendas propias, activas y pausadas por plan. */
 export function PremiumStoresPage() {
   const { premium } = useAuth();
   const stores = useLoad(fetchMyOwnedStores, []);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [keepSelected, setKeepSelected] = useState<number | null>(null);
+  const [busyKeep, setBusyKeep] = useState(false);
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
@@ -21,6 +27,30 @@ export function PremiumStoresPage() {
   const paused = (stores.data ?? []).filter(
     (store) => !store.isActive && store.deactivatedReason === "premium_expired",
   );
+
+  useEffect(() => {
+    const current = (stores.data ?? []).filter((store) => store.isActive);
+    if (current.length > 0 && !current.some((store) => store.id === keepSelected)) {
+      setKeepSelected(current[0].id);
+    }
+  }, [stores.data, keepSelected]);
+
+  async function keepStore(): Promise<void> {
+    if (keepSelected === null) {
+      setMsg({ error: "Elegí una tienda.", ok: null });
+      return;
+    }
+    setBusyKeep(true);
+    setMsg({ error: null, ok: null });
+    const error = await runAction(() => chooseStoreForFreePlan(keepSelected));
+    setBusyKeep(false);
+    if (error !== null) {
+      setMsg({ error, ok: null });
+      return;
+    }
+    setMsg({ error: null, ok: "Tienda principal elegida." });
+    stores.reload();
+  }
 
   async function reactivate(id: number): Promise<void> {
     setBusyId(id);
@@ -46,6 +76,49 @@ export function PremiumStoresPage() {
 
       <Status loading={stores.loading} error={stores.error} />
       <Status error={msg.error} ok={msg.ok} />
+
+      {!premium && active.length > 1 && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-900">Elegí tu tienda principal</p>
+          <p className="mt-1 text-xs text-amber-800">
+            Las demás se pausan sin borrar datos. También podés renovar para mantener las{" "}
+            {active.length} activas.
+          </p>
+          <div className="mt-3 space-y-2">
+            {active.map((store) => (
+              <label
+                key={store.id}
+                className="flex cursor-pointer items-center gap-2 text-sm text-amber-950"
+              >
+                <input
+                  type="radio"
+                  name="keep-store"
+                  className="h-4 w-4 accent-gray-900"
+                  checked={keepSelected === store.id}
+                  onChange={() => setKeepSelected(store.id)}
+                />
+                {store.name}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              className={`${buttonClass} px-3 py-1.5 text-xs`}
+              type="button"
+              disabled={busyKeep}
+              onClick={() => void keepStore()}
+            >
+              {busyKeep ? "Guardando…" : "Conservar esta tienda"}
+            </button>
+            <Link
+              to="/premium"
+              className="text-xs font-medium text-amber-900 underline-offset-4 hover:underline"
+            >
+              Renovar y mantener las {active.length}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {stores.data !== null && stores.data.length === 0 && (
         <div className="mt-4">

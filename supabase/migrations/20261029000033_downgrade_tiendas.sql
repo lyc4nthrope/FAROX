@@ -59,6 +59,7 @@ BEGIN
   IF public.is_premium() THEN
     RAISE EXCEPTION 'choose_store_for_free_plan: todavía tenés Premium activo';
   END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(auth.uid()::text, 0));
   IF p_keep IS NULL THEN
     RAISE EXCEPTION 'choose_store_for_free_plan: elegí una tienda';
   END IF;
@@ -93,10 +94,11 @@ BEGIN
   IF NOT public.is_premium() THEN
     RAISE EXCEPTION 'reactivate_premium_stores: requiere Premium';
   END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(auth.uid()::text, 0));
   IF p_ids IS NULL OR array_length(p_ids, 1) IS NULL OR array_length(p_ids, 1) = 0 THEN
     RAISE EXCEPTION 'reactivate_premium_stores: elegí al menos una tienda';
   END IF;
-  v_ids := ARRAY(SELECT DISTINCT unnest(p_ids));
+  v_ids := p_ids;
 
   SELECT count(*) INTO v_count
   FROM public.stores

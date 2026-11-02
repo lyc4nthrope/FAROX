@@ -21,6 +21,8 @@ describe("0033 · invariantes de SQL", () => {
   it("reactivar exige Premium y respeta el tope de 3", () => {
     expect(sql).toMatch(/reactivate_premium_stores: requiere Premium/);
     expect(sql).toMatch(/v_active \+ array_length\(v_ids, 1\) > 3/);
+    expect(sql).not.toMatch(/ARRAY\(SELECT DISTINCT unnest\(p_ids\)\)/);
+    expect(sql).toMatch(/pg_advisory_xact_lock/);
   });
 
   it("el job conserva la más antigua y pausa el resto", () => {

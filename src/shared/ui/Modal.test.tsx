@@ -53,7 +53,8 @@ describe("Modal", () => {
     const onClose = vi.fn();
     render(
       <Modal title="Tu Premium venció" onClose={onClose} blocking>
-        <p>elegí una tienda</p>
+        <button type="button">Primero</button>
+        <button type="button">Último</button>
       </Modal>,
     );
 
@@ -61,6 +62,12 @@ describe("Modal", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     fireEvent.mouseDown(screen.getByRole("presentation"));
     expect(onClose).not.toHaveBeenCalled();
+
+    const first = screen.getByRole("button", { name: "Primero" });
+    const last = screen.getByRole("button", { name: "Último" });
+    last.focus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(first).toHaveFocus();
   });
 
   it("bloquea el scroll del body mientras está abierto y devuelve el foco al cerrar", () => {
