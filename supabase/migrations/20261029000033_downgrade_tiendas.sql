@@ -154,7 +154,12 @@ BEGIN
       deactivated_reason = 'premium_expired',
       deactivated_at = now()
   FROM candidates c
-  WHERE s.id = c.id AND c.rn > 1;
+  WHERE s.id = c.id
+    AND c.rn > 1
+    -- No dejar al usuario sin ninguna tienda si otra pestaña ya eligió una
+    -- (el job y choose_store_for_free_plan pueden competir).
+    AND (SELECT count(*) FROM public.stores s2
+         WHERE s2.created_by = s.created_by AND s2.is_active) > 1;
 END;
 $$;
 

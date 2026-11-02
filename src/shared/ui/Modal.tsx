@@ -82,12 +82,13 @@ export function Modal({
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       const active = document.activeElement;
+      const onDialog = active === dialog;
       if (event.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
+        if (onDialog || active === first || !dialog.contains(active)) {
           event.preventDefault();
           last.focus();
         }
-      } else if (active === last || !dialog.contains(active)) {
+      } else if (onDialog || active === last || !dialog.contains(active)) {
         event.preventDefault();
         first.focus();
       }

@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Modal } from "./Modal";
@@ -68,6 +69,24 @@ describe("Modal", () => {
     last.focus();
     fireEvent.keyDown(document, { key: "Tab" });
     expect(first).toHaveFocus();
+  });
+
+  it("blocking: Shift+Tab desde el foco inicial queda dentro", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <button type="button">bg</button>
+        <Modal title="Tu Premium venció" onClose={() => undefined} blocking>
+          <button type="button">Primero</button>
+          <button type="button">Último</button>
+        </Modal>
+      </>,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    dialog.focus();
+    await user.tab({ shift: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
   it("bloquea el scroll del body mientras está abierto y devuelve el foco al cerrar", () => {
