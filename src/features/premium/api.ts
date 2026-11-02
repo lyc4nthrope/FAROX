@@ -91,3 +91,9 @@ export async function reactivatePremiumStores(storeIds: readonly number[]): Prom
   const { error } = await supabase.rpc("reactivate_premium_stores", { p_ids: storeIds });
   return { error };
 }
+
+/** 0034: el dueño reactiva una tienda que él mismo había desactivado. */
+export async function reactivateStore(storeId: number): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("reactivate_store", { p_store: storeId });
+  return { error };
+}

@@ -42,8 +42,8 @@ const LIST_SELECT = "id, name, city, is_active, lat, lng";
 
 // El formulario SÍ necesita address/phone (solo los listados los excluyen);
 // location NO se pide de la tabla (STORE-2: las coordenadas se leen de
-// stores_geo) y created_by queda fuera (D4 — la policy resuelve el ownership).
-const FORM_SELECT = "id, name, store_type_id, address, city, phone";
+// stores_geo) y created_by se incluye para mostrar las acciones de dueño (0034).
+const FORM_SELECT = "id, name, store_type_id, address, city, phone, created_by";
 
 // stores.id / store_types.id son bigint/integer (0002:124-125): PostgREST los
 // serializa como número, pero se tolera también la forma string.
@@ -87,6 +87,7 @@ function normalizeRow(raw: Record<string, unknown>): StoreRow {
     address: typeof raw.address === "string" ? raw.address : null,
     city: typeof raw.city === "string" ? raw.city : null,
     phone: typeof raw.phone === "string" ? raw.phone : null,
+    created_by: typeof raw.created_by === "string" ? raw.created_by : null,
   };
 }
 
@@ -253,18 +254,20 @@ export async function updateStore(
 export async function deactivateStore(
   id: number,
 ): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("stores")
-    .update({ is_active: false })
-    .eq("id", id)
-    .select("id");
-  if (error !== null) {
-    return { error };
-  }
-  if (!Array.isArray(data) || data.length === 0) {
-    return { error: RLS_NO_ROWS };
-  }
-  return { error: null };
+  const { error } = await supabase.rpc("deactivate_store", { p_store: id });
+  return { error };
+}
+
+/** 0034: admin transfiere la propiedad a otro operador/admin activo. */
+export async function transferStore(
+  id: number,
+  newOwnerId: string,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("transfer_store", {
+    p_store: id,
+    p_new_owner: newOwnerId,
+  });
+  return { error };
 }
 
 // Paso 2: DELETE sobre la fila YA desactivada (0006:172-174, admin-only). Un

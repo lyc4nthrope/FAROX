@@ -20,8 +20,8 @@ export interface StoreFormProps {
   // por si el guard de la ruta cambia (idea:134: ocultar es UX, la DB manda).
   readOnly: boolean;
   // admin en modo edición (el borrado en dos pasos vive en el contenedor):
-  // SEC-01 idea:114 — operador crea/edita pero NO borra (idea:130 "sin
-  // destruir"); el DELETE es admin-only (0006:172-174).
+  // SEC-01 idea:114 - operador crea/edita. 0034 le permite desactivar su
+  // propia tienda (soft-delete); el DELETE duro sigue admin-only (0006:172-174).
   canDelete: boolean;
   submitLabel: string;
   storeTypes: StoreTypeRef[];

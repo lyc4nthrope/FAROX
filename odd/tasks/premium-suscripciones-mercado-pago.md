@@ -503,14 +503,14 @@ ALTER TABLE public.stores
 
 ## 11. Backlog: edición, eliminación y transferencia de tiendas
 
-Solicitado por el usuario el 2026-11-02; **no se implementa en F3**.
+Solicitado por el usuario el 2026-11-02; **implementado en F3.5** (`odd/tasks/tiendas-gestion.md`, migración 0034) salvo el borrado duro/purga, que sigue admin-only y no se expone en la UI.
 
 - **Editar tienda:** el dueño (`created_by`) o admin puede cambiar nombre, dirección, ciudad, teléfono y tipo; la RLS `stores_update` ya lo permite. La UI debe mostrarlo sin depender del admin.
 - **Desactivar/eliminar por el dueño:** permitir que el dueño pause una tienda voluntariamente (`is_active=false`, `deactivated_reason='user_removed'`, `deactivated_at`) para liberar un cupo o porque ya no la usa. No borra stock, pedidos, rutas ni créditos. El borrado duro/purga sigue siendo admin-only sobre una tienda ya inactiva (retención/auditoría).
 - **Transferir propiedad:** si la tienda ya no es del usuario, un admin debe transferirla (`created_by` + `user_stores`) en una RPC auditada; no debe quedar huérfana ni el dueño anterior conservar acceso. El tope de 3 cuenta tiendas activas del nuevo dueño.
 - **Menos tiendas:** al desactivar una tienda, el cupo se libera; al reactivarla, el trigger de tope sigue siendo la última defensa. Si la tienda está pausada por plan, el dueño puede eliminarla/transferirla sin esperar a Premium.
-- **UI:** acciones «Editar», «Desactivar» y «Eliminar» (admin) en la lista/detalle; confirmación; badge «Pausada por plan» vs «Inactiva»; auditoría.
-- **Tests:** RLS de dueño/admin, transferencia, cap, datos preservados, no acceso del dueño anterior.
+- **UI implementada:** «Editar» (dueño/admin), «Desactivar tienda» (dueño/admin), reactivación del dueño en Perfil → Gestionar mis tiendas y reactivación admin en el formulario; transferencia admin en la ficha. El borrado duro/purga no se expone.
+- **Tests:** contenido de la migración 0034, desactivación por dueño, panel de transferencia, reactivación del dueño y limpieza de la razón de desactivación.
 
 ## 12. Fuentes consultadas
 

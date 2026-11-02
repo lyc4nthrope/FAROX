@@ -24,6 +24,13 @@ export function ReactivateBanner({ table, id }: { table: ReactivatableTable; id:
 
   async function onReactivate() {
     const error = await runAction(async () => {
+      // 0034: en tiendas la reactivación pasa por RPC (limpia la razón de
+      // pausa y respeta el tope); el UPDATE directo quedó acotado a columnas
+      // de edición. Productos/distribuidores conservan el UPDATE de siempre.
+      if (table === "stores") {
+        const { error: rpcError } = await supabase.rpc("reactivate_store", { p_store: id });
+        return { error: rpcError };
+      }
       const { data, error: updateError } = await supabase
         .from(table)
         .update({ is_active: true })

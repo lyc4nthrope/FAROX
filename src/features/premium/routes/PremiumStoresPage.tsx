@@ -9,6 +9,7 @@ import {
   chooseStoreForFreePlan,
   fetchMyOwnedStores,
   reactivatePremiumStores,
+  reactivateStore,
 } from "../api";
 
 /** 0033: tiendas propias, activas y pausadas por plan. */
@@ -52,10 +53,14 @@ export function PremiumStoresPage() {
     stores.reload();
   }
 
-  async function reactivate(id: number): Promise<void> {
+  async function reactivate(id: number, reason: string | null): Promise<void> {
     setBusyId(id);
     setMsg({ error: null, ok: null });
-    const error = await runAction(() => reactivatePremiumStores([id]));
+    const error = await runAction(() =>
+      reason === "user_removed"
+        ? reactivateStore(id)
+        : reactivatePremiumStores([id]),
+    );
     setBusyId(null);
     if (error !== null) {
       setMsg({ error, ok: null });
@@ -130,6 +135,7 @@ export function PremiumStoresPage() {
         <ul className="mt-4 space-y-2">
           {stores.data.map((store) => {
             const isPaused = !store.isActive && store.deactivatedReason === "premium_expired";
+            const isRemoved = !store.isActive && store.deactivatedReason === "user_removed";
             const isPrincipal = store.isActive && !premium && active.length === 1;
             return (
               <li
@@ -144,6 +150,8 @@ export function PremiumStoresPage() {
                       <Badge tone="green">Activa</Badge>
                     ) : isPaused ? (
                       <Badge tone="amber">Pausada por plan</Badge>
+                    ) : isRemoved ? (
+                      <Badge tone="gray">Desactivada por vos</Badge>
                     ) : (
                       <Badge tone="gray">Inactiva</Badge>
                     )}
@@ -154,14 +162,14 @@ export function PremiumStoresPage() {
                       .join(" · ")}
                   </p>
                 </div>
-                {isPaused && (
+                {(isPaused || isRemoved) && (
                   <div className="shrink-0">
-                    {premium ? (
+                    {isRemoved || premium ? (
                       <button
                         className={`${buttonClass} px-3 py-1.5 text-xs`}
                         type="button"
                         disabled={busyId === store.id}
-                        onClick={() => void reactivate(store.id)}
+                        onClick={() => void reactivate(store.id, store.deactivatedReason)}
                       >
                         {busyId === store.id ? "Reactivando…" : "Reactivar"}
                       </button>

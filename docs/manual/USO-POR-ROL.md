@@ -28,7 +28,8 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Cancelar un pedido | Pedidos → pedido → Cancelar | Pide motivo |
 | Fiar un pedido entregado | Pedidos → pedido entregado → Fiado | Fecha de vencimiento opcional; luego se cobra en Fiado |
 | Ver quién cambió qué | Auditoría | Filtrar por tabla |
-| Reactivar algo desactivado | Producto / tienda / distribuidor → Reactivar | Solo admin |
+| Editar, desactivar o transferir una tienda | Tiendas → tienda | Editar nombre/dirección/teléfono; desactivar conserva stock, pedidos, rutas y créditos y se bloquea si hay pedidos abiertos; transferir la propiedad a otro operador/admin activo respeta el tope del nuevo dueño |
+| Reactivar algo desactivado | Producto / tienda / distribuidor → Reactivar | Producto y distribuidor: solo admin. Tienda: admin, o el dueño si la desactivó él mismo desde Perfil → Gestionar mis tiendas |
 
 ## Operador (día a día de sus tiendas)
 
@@ -50,7 +51,9 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Contactar a un distribuidor | Distribuidores → Contactar | Abre el WhatsApp/teléfono/email que el distribuidor configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
-| Gestionar mis tiendas | Perfil → Plan → Gestionar mis tiendas | Si el plan vence, elegí la tienda principal o renová; las demás se pausan sin borrar stock, pedidos, rutas ni créditos |
+| Gestionar mis tiendas | Perfil → Plan → Gestionar mis tiendas | Si el plan vence, elegí la tienda principal o renová; las demás se pausan sin borrar stock, pedidos, rutas ni créditos. También podés reactivar una tienda que desactivaste vos |
+| Editar mi tienda | Tiendas → mi tienda | Cambiar nombre, dirección, ciudad, teléfono y tipo. Los datos operativos no se tocan |
+| Desactivar mi tienda | Tiendas → mi tienda → Desactivar tienda | Queda oculta de las listas y conserva stock, pedidos, rutas y créditos. Se bloquea si hay pedidos pendientes o en ruta; entregalos o cancelalos primero. Podés reactivarla desde Perfil → Gestionar mis tiendas |
 | Conocer Premium | Perfil → Plan → Ver planes | Comparativa Gratis/Premium, precios con IVA y comisión, y preguntas frecuentes |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
@@ -72,7 +75,6 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
-| Gestionar mis tiendas | Perfil → Plan → Gestionar mis tiendas | Si el plan vence, elegí la tienda principal o renová; las demás se pausan sin borrar stock, pedidos, rutas ni créditos |
 | Conocer Premium | Perfil → Plan → Ver planes | Comparativa Gratis/Premium, precios con IVA y comisión, y preguntas frecuentes |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |

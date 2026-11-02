@@ -17,6 +17,7 @@ import { StoreForm, type StoreFormErrors } from "../components/StoreForm";
 import { storeSchema, type StoreFormValues } from "../schemas";
 import type { StoreTypeRef } from "../types";
 import { ReactivateBanner } from "../../../shared/ui/ReactivateBanner";
+import { TransferStorePanel } from "../components/TransferStorePanel";
 
 const EMPTY_VALUES: StoreFormValues = {
   name: "",
@@ -52,13 +53,14 @@ const EMPTY_VALUES: StoreFormValues = {
 export function StoreFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, userId } = useAuth();
   // SEC-01 (idea:114): admin y operador escriben (crear/editar sus tiendas);
-  // "sus" lo resuelve la policy en el backend (0006:166-171) — acá no se
-  // filtra ownership en el cliente (D2).
+  // "sus" lo resuelve la policy en el backend (0006:166-171). Acá created_by
+  // solo decide si se muestra la acción de desactivar al dueño (0034).
   const canWrite = role === "admin" || role === "operador";
   const isEdit = id !== undefined;
   const storeId = id === undefined ? null : Number(id);
+  const [storeOwner, setStoreOwner] = useState<string | null>(null);
 
   const [values, setValues] = useState<StoreFormValues>(EMPTY_VALUES);
   const [errors, setErrors] = useState<StoreFormErrors>({});
@@ -93,10 +95,12 @@ export function StoreFormPage() {
       // /stores/abc: nunca un crash ni un formulario de alta en una URL de
       // edición — estado "no encontrado" amigable (V0-4, D4).
       setFormError("No se encontró el registro.");
+      setStoreOwner(null);
       setLoading(false);
       return;
     }
     let cancelled = false;
+    setStoreOwner(null);
     setLoading(true);
     void (async () => {
       try {
@@ -136,6 +140,7 @@ export function StoreFormPage() {
           lat: String(geoResult.geo.lat),
           lng: String(geoResult.geo.lng),
         });
+        setStoreOwner(storeResult.row.created_by ?? null);
       } catch (thrown) {
         if (!cancelled) setFormError(mapError(thrown));
       } finally {
@@ -193,14 +198,14 @@ export function StoreFormPage() {
   function handleDelete(): void {
     if (storeId === null || !Number.isInteger(storeId)) return;
     const confirmed = window.confirm(
-      "¿Desactivar este registro? Quedará desactivada y oculto de las listas; un administrador puede reactivarlo.",
+      "¿Desactivar esta tienda? Quedará oculta de las listas y no se borran sus datos. Si no tiene pedidos abiertos, podés reactivarla desde Perfil → Gestionar mis tiendas.",
     );
     if (!confirmed) return;
     setFormError(null);
     setSaving(true);
     void (async () => {
       try {
-        // Paso 1: desactivar (la policy de DELETE exige is_active = false).
+        // 0034: soft-delete por RPC; conserva stock, pedidos, rutas y créditos.
         const deactivate = await deactivateStore(storeId);
         if (deactivate.error !== null) {
           setFormError(mapError(deactivate.error));
@@ -229,7 +234,11 @@ export function StoreFormPage() {
             formError={formError}
             saving={saving}
             readOnly={!canWrite}
-            canDelete={role === "admin" && isEdit}
+            canDelete={
+              isEdit &&
+              (role === "admin" ||
+                (role === "operador" && storeOwner !== null && storeOwner === userId))
+            }
             submitLabel={isEdit ? "Guardar cambios" : "Crear tienda"}
             storeTypes={storeTypes}
             onChange={setValues}
@@ -237,6 +246,13 @@ export function StoreFormPage() {
             onSubmit={handleSubmit}
             onDelete={handleDelete}
           />
+          {role === "admin" && typeof storeId === "number" && (
+            <TransferStorePanel
+              storeId={storeId}
+              currentOwnerId={storeOwner}
+              onTransferred={() => navigate("/stores")}
+            />
+          )}
         </div>
       )}
     </section>

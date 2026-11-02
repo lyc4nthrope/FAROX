@@ -45,6 +45,9 @@ vi.mock("../../auth/api", () => ({
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
 }));
+vi.mock("../components/TransferStorePanel", () => ({
+  TransferStorePanel: () => <p>transferir propiedad</p>,
+}));
 vi.mock("../../../shared/lib/geo/nominatim", () => ({
   reverseGeocode: vi.fn(),
 }));
@@ -424,6 +427,21 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     expect(await screen.findByRole("heading", { name: "Tiendas" })).toBeInTheDocument();
     expect(storesApi.deactivateStore).toHaveBeenCalledWith(1);
     expect(storesApi.deleteStore).not.toHaveBeenCalled();
+  });
+
+  it("dueño operador: puede desactivar su tienda (0034)", async () => {
+    vi.mocked(storesApi.fetchStore).mockResolvedValue({
+      row: { ...T1, created_by: "u1" },
+      error: null,
+    });
+    vi.mocked(storesApi.fetchStoreGeo).mockResolvedValue({ geo: GEO1, error: null });
+    const user = userEvent.setup();
+    renderRutas("/stores/1", "operador");
+
+    await user.click(await screen.findByRole("button", { name: "Desactivar tienda" }));
+
+    expect(await screen.findByRole("heading", { name: "Tiendas" })).toBeInTheDocument();
+    expect(storesApi.deactivateStore).toHaveBeenCalledWith(1);
   });
 
   it("si la desactivación falla, el error es amigable y no se navega", async () => {

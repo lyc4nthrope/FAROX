@@ -51,6 +51,15 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     ).toBe("Alcanzaste el tope de tiendas (1 activa; 3 con premium).");
   });
 
+  it("0034: desactivar tienda con pedidos abiertos", () => {
+    expect(
+      mapError({
+        message:
+          "deactivate_store: la tienda 3 tiene pedidos abiertos; entregalos o cancelalos primero",
+      }),
+    ).toBe("Entregá o cancelá los pedidos abiertos antes de desactivar la tienda.");
+  });
+
   it("23502 not_null (stores.location)", () => {
     expect(
       mapError({

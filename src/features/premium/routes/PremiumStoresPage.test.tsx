@@ -13,6 +13,7 @@ vi.mock("../api", () => ({
   fetchMyOwnedStores: vi.fn(),
   chooseStoreForFreePlan: vi.fn(),
   reactivatePremiumStores: vi.fn(),
+  reactivateStore: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -68,6 +69,7 @@ beforeEach(() => {
   vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({ data: STORES, error: null });
   vi.mocked(premiumApi.chooseStoreForFreePlan).mockResolvedValue({ error: null });
   vi.mocked(premiumApi.reactivatePremiumStores).mockResolvedValue({ error: null });
+  vi.mocked(premiumApi.reactivateStore).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -107,6 +109,53 @@ describe("PremiumStoresPage (0033)", () => {
     await waitFor(() =>
       expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2),
     );
+  });
+
+  it("el dueño reactiva una tienda que desactivó (0034)", async () => {
+    vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({
+      data: [
+        STORES[0],
+        {
+          id: 4,
+          name: "Tienda Propia",
+          city: "Bogotá",
+          createdAt: "2026-04-10T12:00:00Z",
+          isActive: false,
+          deactivatedReason: "user_removed",
+        },
+      ],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage(false);
+
+    expect(await screen.findByText("Desactivada por vos")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reactivar" }));
+
+    await waitFor(() => expect(premiumApi.reactivateStore).toHaveBeenCalledWith(4));
+    expect(await screen.findByText("Tienda reactivada.")).toBeInTheDocument();
+  });
+
+  it("no ofrece reactivar una inactiva sin razón conocida (legacy/admin)", async () => {
+    vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({
+      data: [
+        STORES[0],
+        {
+          id: 5,
+          name: "Tienda Legacy",
+          city: null,
+          createdAt: "2025-01-10T12:00:00Z",
+          isActive: false,
+          deactivatedReason: null,
+        },
+      ],
+      error: null,
+    });
+    renderPage(false);
+
+    expect(await screen.findByText("Tienda Legacy")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reactivar" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Renovar para reactivar")).not.toBeInTheDocument();
   });
 
   it("sin Premium muestra la principal y el enlace para renovar", async () => {

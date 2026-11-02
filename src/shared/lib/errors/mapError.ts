@@ -82,6 +82,8 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["no está en tu catálogo", "Ese producto no está en tu catálogo."],
   ["período pago vigente", "El usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período."],
   ["ningún item válido", "Agregá al menos un producto."],
+  // Gestión de tiendas (0034): no se puede desactivar con pedidos abiertos.
+  ["pedidos abiertos", "Entregá o cancelá los pedidos abiertos antes de desactivar la tienda."],
 ];
 
 // PostgrestError trae { message, code, details, hint }; AuthError trae
