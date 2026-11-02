@@ -55,6 +55,8 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Editar mi tienda | Tiendas → mi tienda | Cambiar nombre, dirección, ciudad, teléfono y tipo. Los datos operativos no se tocan |
 | Desactivar mi tienda | Tiendas → mi tienda → Desactivar tienda | Queda oculta de las listas y conserva stock, pedidos, rutas y créditos. Se bloquea si hay pedidos pendientes o en ruta; entregalos o cancelalos primero. Podés reactivarla desde Perfil → Gestionar mis tiendas |
 | Conocer Premium | Perfil → Plan → Ver planes | Comparativa Gratis/Premium, precios con IVA y comisión, y preguntas frecuentes |
+| Suscribirme a Premium | Perfil → Plan → Ver planes → Suscribirme | Te redirige a Mercado Pago para autorizar el cobro automático; al volver, `/premium/resultado` confirma el estado |
+| Cancelar la renovación | Perfil → Plan → Cancelar suscripción | Detiene el próximo cobro; el acceso sigue hasta el final del período pagado. No borra tiendas ni datos |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
 | Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |

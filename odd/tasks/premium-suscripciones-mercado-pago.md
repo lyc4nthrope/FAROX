@@ -426,6 +426,8 @@ ALTER TABLE public.stores
 
 ### F4 — Mercado Pago Suscripciones (5–7 días)
 
+**Estado (2026-11-02):** implementado a nivel de código, migración 0035 y pruebas locales; la prueba sandbox real queda pendiente de credenciales y URL pública. Ver `odd/tasks/premium-f4-mercado-pago.md`.
+
 - Edge Functions `create-subscription`, `mp-webhook`, `cancel-subscription`; secrets; migración de soporte si falta.
 - Preapproval con plan o dinámico; `external_reference`; `back_url`; monto desde `plan_versions`, nunca desde el cliente.
 - Webhook con firma, idempotencia, consulta real, activación/extensión.
@@ -500,6 +502,7 @@ ALTER TABLE public.stores
 - **L2 (diseño):** Mercado Pago Suscripciones; `premium_until` + `premium_grace_until`; downgrade con elección/pausa; `my_store_ids` filtra activas; fases F0–F6; revisión legal y de comisiones pendiente.
 - **L3 (2026-11-01):** «Si, ademas me gustaria que se mostrara la lista de precios que agregan valor como el impuesto y el cobro que se lleva mercado pago. El precio mantenlo asi, pero que se modificable para cambiar segun la demanda y la oferta. La seleccion de la tienda que queda a manos del usuario, como una ventana emergente que muestre las 3 tiendas diciendo que cual desea conservar como principal o la opcion de renovar para mantener las 3 tiendas activas.»
 - **L4 (diseño):** desglose `quote_plan` (precio final, IVA incluido, comisión MP estimada, neto), precios editables por admin con `plan_versions` y grandfathering; modal de downgrade con las 3 tiendas, «Conservar como principal» y «Renovar para mantener las 3».
+- **L5 (2026-11-02):** F4 implementado: Edge Functions `create-subscription`, `mp-webhook` y `cancel-subscription`; migración 0035; checkout/resultado/cancelación en la UI; firma, idempotencia y validación de monto. Sandbox real pendiente de `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y `APP_URL`.
 
 ## 11. Backlog: edición, eliminación y transferencia de tiendas
 

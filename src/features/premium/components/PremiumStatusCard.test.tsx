@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,6 +9,8 @@ import { PremiumStatusCard } from "./PremiumStatusCard";
 
 vi.mock("../api", () => ({
   fetchMyPremiumStatus: vi.fn(),
+  fetchMySubscription: vi.fn(),
+  cancelSubscription: vi.fn(),
 }));
 
 const FREE: PremiumStatus = {
@@ -29,10 +32,13 @@ function renderCard() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(premiumApi.fetchMySubscription).mockResolvedValue({ data: null, error: null });
+  vi.mocked(premiumApi.cancelSubscription).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("PremiumStatusCard (0032)", () => {
@@ -88,6 +94,61 @@ describe("PremiumStatusCard (0032)", () => {
 
     expect(await screen.findByText(/Tu Premium venció/)).toBeInTheDocument();
     expect(screen.getByText(/elegir una tienda principal/)).toBeInTheDocument();
+  });
+
+  it("muestra la suscripción activa y permite cancelar la renovación", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({
+      data: { ...FREE, premium: true, premiumUntil: "2026-12-31T12:00:00Z" },
+      error: null,
+    });
+    vi.mocked(premiumApi.fetchMySubscription).mockResolvedValue({
+      data: {
+        id: 1,
+        status: "authorized",
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: "2026-12-31T12:00:00Z",
+        planCode: "premium_monthly",
+        planName: "Premium mensual",
+      },
+      error: null,
+    });
+
+    renderCard();
+
+    expect(await screen.findByText("Renovación automática activa con Mercado Pago.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancelar suscripción" }));
+
+    await waitFor(() => expect(premiumApi.cancelSubscription).toHaveBeenCalled());
+    expect(
+      await screen.findByText("Renovación cancelada. El acceso sigue hasta el final del período."),
+    ).toBeInTheDocument();
+  });
+
+  it("una suscripción cancelada no ofrece cancelar de nuevo", async () => {
+    vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({
+      data: { ...FREE, premium: true, premiumUntil: "2026-12-31T12:00:00Z" },
+      error: null,
+    });
+    vi.mocked(premiumApi.fetchMySubscription).mockResolvedValue({
+      data: {
+        id: 1,
+        status: "cancelled",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: "2026-12-31T12:00:00Z",
+        planCode: "premium_monthly",
+        planName: "Premium mensual",
+      },
+      error: null,
+    });
+
+    renderCard();
+
+    expect(
+      await screen.findByText("Renovación cancelada. El acceso sigue hasta el final del período pagado."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar suscripción" })).not.toBeInTheDocument();
   });
 
   it("muestra un error amigable", async () => {

@@ -60,6 +60,17 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     ).toBe("Entregá o cancelá los pedidos abiertos antes de desactivar la tienda.");
   });
 
+  it("F4: checkout y cancelación de Mercado Pago", () => {
+    expect(
+      mapError({ message: "Ya tenés una suscripción activa. Gestionála desde tu perfil." }),
+    ).toBe("Ya tenés una suscripción activa. Gestionála desde tu perfil.");
+    expect(
+      mapError({
+        message: "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo.",
+      }),
+    ).toBe("Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo.");
+  });
+
   it("23502 not_null (stores.location)", () => {
     expect(
       mapError({

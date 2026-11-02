@@ -33,3 +33,26 @@ export interface OwnedStore {
   isActive: boolean;
   deactivatedReason: string | null;
 }
+
+export type PremiumSubscriptionStatus =
+  | "pending"
+  | "authorized"
+  | "paused"
+  | "cancelled"
+  | "expired";
+
+/** 0035/F4: suscripción propia (sin exponer ids del proveedor). */
+export interface PremiumSubscription {
+  id: number;
+  status: PremiumSubscriptionStatus;
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: string | null;
+  planCode: string | null;
+  planName: string | null;
+}
+
+export interface CreatedSubscription {
+  initPoint: string;
+  subscriptionId: number;
+  reused: boolean;
+}

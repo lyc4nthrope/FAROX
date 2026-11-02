@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
+import { mapError } from "../../../shared/lib/errors/mapError";
 import { formatCOP } from "../../../shared/lib/format";
+import { goTo } from "../../../shared/lib/navigation";
 import { Box, Status, buttonClass } from "../../../shared/ui/Box";
-import { fetchMyPremiumStatus, fetchPlanQuote } from "../api";
+import { createSubscription, fetchMyPremiumStatus, fetchPlanQuote } from "../api";
 import { formatPremiumDate } from "../format";
 import type { PlanQuote } from "../types";
 
@@ -64,14 +67,20 @@ function QuoteCard({
   quote,
   loading,
   error,
-  disabledLabel,
+  disabled,
+  busy,
+  ctaLabel,
+  onSubscribe,
 }: {
   title: string;
   interval: string;
   quote: PlanQuote | null;
   loading: boolean;
   error: string | null;
-  disabledLabel: string;
+  disabled: boolean;
+  busy: boolean;
+  ctaLabel: string;
+  onSubscribe: () => void;
 }) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -106,8 +115,13 @@ function QuoteCard({
         </>
       )}
       <div className="mt-auto pt-4">
-        <button className={buttonClass} type="button" disabled>
-          {disabledLabel}
+        <button
+          className={buttonClass}
+          type="button"
+          disabled={disabled || busy || quote === null}
+          onClick={onSubscribe}
+        >
+          {busy ? "Redirigiendo…" : ctaLabel}
         </button>
       </div>
     </div>
@@ -127,15 +141,34 @@ export function PremiumPage() {
   const status = useLoad(fetchMyPremiumStatus, []);
   const premium = status.data?.premium === true;
   const until = formatPremiumDate(status.data?.premiumUntil ?? null);
+  const [busyPlan, setBusyPlan] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  async function subscribe(planCode: string): Promise<void> {
+    setBusyPlan(planCode);
+    setCheckoutError(null);
+    const result = await createSubscription(planCode);
+    setBusyPlan(null);
+    if (result.error !== null) {
+      setCheckoutError(mapError(result.error));
+      return;
+    }
+    if (result.data !== null) {
+      goTo(result.data.initPoint);
+    }
+  }
+
+  const checkoutDisabled = status.loading || status.error !== null;
+  const ctaLabel = premium ? "Ya sos Premium" : "Suscribirme";
 
   return (
     <section className="mx-auto max-w-4xl">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Plan</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Premium</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Hasta 3 tiendas, dashboard, movimientos manuales y precios de compra/venta. El pago con
-        Mercado Pago se activa en la siguiente fase; mientras tanto, el administrador puede activar
-        Premium manualmente.
+        Hasta 3 tiendas, dashboard, movimientos manuales y precios de compra/venta. El cobro se hace
+        con Mercado Pago; podés cancelar la renovación cuando quieras y el acceso sigue hasta el
+        final del período pagado.
       </p>
 
       <Status loading={status.loading} error={status.error} />
@@ -155,7 +188,10 @@ export function PremiumPage() {
           quote={monthly.data}
           loading={monthly.loading}
           error={monthly.error}
-          disabledLabel={premium ? "Ya sos Premium" : "Pago disponible próximamente"}
+          disabled={premium || checkoutDisabled}
+          busy={busyPlan === "premium_monthly"}
+          ctaLabel={ctaLabel}
+          onSubscribe={() => void subscribe("premium_monthly")}
         />
         <QuoteCard
           title="Premium anual"
@@ -163,9 +199,18 @@ export function PremiumPage() {
           quote={annual.data}
           loading={annual.loading}
           error={annual.error}
-          disabledLabel={premium ? "Ya sos Premium" : "Pago disponible próximamente"}
+          disabled={premium || checkoutDisabled}
+          busy={busyPlan === "premium_annual"}
+          ctaLabel={ctaLabel}
+          onSubscribe={() => void subscribe("premium_annual")}
         />
       </div>
+
+      <Status error={checkoutError} />
+      <p className="mt-2 text-xs text-gray-500">
+        Al continuar vas a Mercado Pago para autorizar el cobro automático. No guardamos datos de
+        tarjeta.
+      </p>
 
       <div className="mt-6">
         <Box title="Gratis vs Premium">

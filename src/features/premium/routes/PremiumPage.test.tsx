@@ -1,7 +1,9 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as navigation from "../../../shared/lib/navigation";
 import * as premiumApi from "../api";
 import type { PlanQuote } from "../types";
 import { PremiumPage } from "./PremiumPage";
@@ -9,6 +11,10 @@ import { PremiumPage } from "./PremiumPage";
 vi.mock("../api", () => ({
   fetchPlanQuote: vi.fn(),
   fetchMyPremiumStatus: vi.fn(),
+  createSubscription: vi.fn(),
+}));
+vi.mock("../../../shared/lib/navigation", () => ({
+  goTo: vi.fn(),
 }));
 
 const MONTHLY: PlanQuote = {
@@ -55,6 +61,14 @@ beforeEach(() => {
     },
     error: null,
   });
+  vi.mocked(premiumApi.createSubscription).mockResolvedValue({
+    data: {
+      initPoint: "https://www.mercadopago.com/subscriptions/checkout?preapproval_id=1",
+      subscriptionId: 1,
+      reused: false,
+    },
+    error: null,
+  });
 });
 
 afterEach(() => {
@@ -74,10 +88,51 @@ describe("PremiumPage (0033)", () => {
     expect(screen.getAllByText(/IVA incluido/).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/Mercado Pago estimado/).length).toBe(2);
     expect(screen.getAllByText(/Neto FAROX/).length).toBe(2);
-    expect(screen.getAllByText("Pago disponible próximamente").length).toBe(2);
+    expect(screen.getAllByText("Suscribirme").length).toBe(2);
+    expect(screen.queryByText("Pago disponible próximamente")).not.toBeInTheDocument();
     expect(screen.getByText("Gratis vs Premium")).toBeInTheDocument();
     expect(screen.getByText("Preguntas frecuentes")).toBeInTheDocument();
     expect(screen.getByText("Hasta 3")).toBeInTheDocument();
+  });
+
+  it("inicia el checkout del plan mensual y redirige a Mercado Pago", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <PremiumPage />
+      </MemoryRouter>,
+    );
+
+    const buttons = await screen.findAllByRole("button", { name: "Suscribirme" });
+    await user.click(buttons[0]);
+
+    await waitFor(() =>
+      expect(premiumApi.createSubscription).toHaveBeenCalledWith("premium_monthly"),
+    );
+    expect(navigation.goTo).toHaveBeenCalledWith(
+      "https://www.mercadopago.com/subscriptions/checkout?preapproval_id=1",
+    );
+  });
+
+  it("si el checkout falla muestra un mensaje amigable", async () => {
+    vi.mocked(premiumApi.createSubscription).mockResolvedValue({
+      data: null,
+      error: { message: "No se pudo iniciar el pago con Mercado Pago. Intentá de nuevo." },
+    });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <PremiumPage />
+      </MemoryRouter>,
+    );
+
+    const buttons = await screen.findAllByRole("button", { name: "Suscribirme" });
+    await user.click(buttons[0]);
+
+    expect(
+      await screen.findByText("No se pudo iniciar el pago. Intentá de nuevo."),
+    ).toBeInTheDocument();
+    expect(navigation.goTo).not.toHaveBeenCalled();
   });
 
   it("si ya es Premium no ofrece pagar de nuevo", async () => {

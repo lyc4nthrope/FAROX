@@ -84,6 +84,16 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["ningún item válido", "Agregá al menos un producto."],
   // Gestión de tiendas (0034): no se puede desactivar con pedidos abiertos.
   ["pedidos abiertos", "Entregá o cancelá los pedidos abiertos antes de desactivar la tienda."],
+  // Mercado Pago (F4): mensajes estables de las Edge Functions.
+  ["no se pudo iniciar el pago", "No se pudo iniciar el pago. Intentá de nuevo."],
+  ["ya tenés una suscripción activa", "Ya tenés una suscripción activa. Gestionála desde tu perfil."],
+  ["ya tenés premium activo", "Ya tenés Premium activo. No necesitás pagar de nuevo."],
+  ["ya autorizaste el pago", "Ya autorizaste el pago. Estamos confirmando la activación."],
+  ["tu suscripción está pausada", "Tu suscripción está pausada. Gestionála desde tu perfil."],
+  ["no se pudo verificar el estado del pago", "No se pudo verificar el estado del pago. Intentá de nuevo."],
+  ["estamos preparando tu pago", "Estamos preparando tu pago. Esperá unos segundos e intentá de nuevo."],
+  ["mercado pago no pudo cancelar", "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo."],
+  ["no tenés una suscripción para cancelar", "No tenés una suscripción para cancelar."],
 ];
 
 // PostgrestError trae { message, code, details, hint }; AuthError trae

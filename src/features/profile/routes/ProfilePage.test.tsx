@@ -16,6 +16,8 @@ vi.mock("../api", () => ({
 }));
 vi.mock("../../premium/api", () => ({
   fetchMyPremiumStatus: vi.fn(),
+  fetchMySubscription: vi.fn(),
+  cancelSubscription: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -61,6 +63,8 @@ describe("ProfilePage (§S2 fila /profile)", () => {
       },
       error: null,
     });
+    vi.mocked(premiumApi.fetchMySubscription).mockResolvedValue({ data: null, error: null });
+    vi.mocked(premiumApi.cancelSubscription).mockResolvedValue({ error: null });
   });
 
   afterEach(() => {

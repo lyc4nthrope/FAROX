@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { Badge, Status } from "../../../shared/ui/Box";
-import { fetchMyPremiumStatus } from "../api";
+import { mapError } from "../../../shared/lib/errors/mapError";
+import { Badge, Status, buttonClass } from "../../../shared/ui/Box";
+import { cancelSubscription, fetchMyPremiumStatus, fetchMySubscription } from "../api";
 import { formatPremiumDate } from "../format";
 
 /**
@@ -12,6 +14,30 @@ import { formatPremiumDate } from "../format";
  */
 export function PremiumStatusCard() {
   const status = useLoad(fetchMyPremiumStatus, []);
+  const subscription = useLoad(fetchMySubscription, []);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
+
+  async function cancel(): Promise<void> {
+    const confirmed = window.confirm(
+      "¿Cancelar la renovación? El acceso sigue hasta el final del período pagado.",
+    );
+    if (!confirmed) return;
+    setBusy(true);
+    setMsg({ error: null, ok: null });
+    const result = await cancelSubscription();
+    setBusy(false);
+    if (result.error !== null) {
+      setMsg({ error: mapError(result.error), ok: null });
+      return;
+    }
+    setMsg({ error: null, ok: "Renovación cancelada. El acceso sigue hasta el final del período." });
+    subscription.reload();
+    status.reload();
+  }
 
   if (status.loading) {
     return <Status loading />;
@@ -26,6 +52,7 @@ export function PremiumStatusCard() {
   const { premium, premiumUntil, premiumGraceUntil, graceActive, needsStoreChoice } = status.data;
   const until = formatPremiumDate(premiumUntil);
   const graceUntil = formatPremiumDate(premiumGraceUntil);
+  const subscriptionEnd = formatPremiumDate(subscription.data?.currentPeriodEnd ?? null);
 
   return (
     <div className="space-y-2 text-sm">
@@ -61,6 +88,43 @@ export function PremiumStatusCard() {
           compra/venta.
         </p>
       )}
+
+      {subscription.data !== null && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p className="font-medium text-gray-900">
+            {subscription.data.planName ?? "Premium"}
+            {subscriptionEnd !== null && (
+              <span className="font-normal text-gray-600"> · hasta el {subscriptionEnd}</span>
+            )}
+          </p>
+          <p className="mt-1 text-gray-600">
+            {subscription.data.status === "cancelled" || subscription.data.cancelAtPeriodEnd
+              ? "Renovación cancelada. El acceso sigue hasta el final del período pagado."
+              : subscription.data.status === "paused"
+                ? "La suscripción está pausada. No se renueva hasta reactivarla."
+                : subscription.data.status === "pending"
+                  ? "Suscripción pendiente de autorización en Mercado Pago."
+                  : subscription.data.status === "expired"
+                    ? "La suscripción venció. Podés renovar desde la página de planes."
+                    : "Renovación automática activa con Mercado Pago."}
+          </p>
+          {subscription.data.status !== "cancelled" &&
+            subscription.data.status !== "expired" &&
+            !subscription.data.cancelAtPeriodEnd && (
+              <button
+                className={`${buttonClass} mt-3 px-3 py-1.5 text-xs`}
+                type="button"
+                disabled={busy}
+                onClick={() => void cancel()}
+              >
+                {busy ? "Cancelando…" : "Cancelar suscripción"}
+              </button>
+            )}
+        </div>
+      )}
+
+      <Status error={subscription.error} />
+      <Status error={msg.error} ok={msg.ok} />
 
       <div className="flex flex-wrap gap-4">
         <Link
