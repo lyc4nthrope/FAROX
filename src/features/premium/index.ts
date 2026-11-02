@@ -1,3 +1,13 @@
 export { PremiumStatusCard } from "./components/PremiumStatusCard";
-export { fetchMyPremiumStatus, fetchPlanQuote } from "./api";
-export type { PlanQuote, PremiumStatus } from "./types";
+export { PremiumDowngradeModal } from "./components/PremiumDowngradeModal";
+export { PremiumPage } from "./routes/PremiumPage";
+export { PremiumStoresPage } from "./routes/PremiumStoresPage";
+export {
+  chooseStoreForFreePlan,
+  fetchMyOwnedStores,
+  fetchMyPremiumStatus,
+  fetchPlanQuote,
+  reactivatePremiumStores,
+} from "./api";
+export { formatPremiumDate } from "./format";
+export type { OwnedStore, PlanQuote, PremiumStatus } from "./types";

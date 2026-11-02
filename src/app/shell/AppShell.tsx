@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { fetchOpenAlerts } from "../../features/inventory/alertsApi";
 import { fetchOpenOrdersCount } from "../../features/orders/api";
+import { PremiumDowngradeModal } from "../../features/premium";
 import { useLoad } from "../../shared/hooks/useLoad";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
@@ -231,6 +232,8 @@ export function AppShell() {
       <main id="contenido" className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Outlet />
       </main>
+
+      <PremiumDowngradeModal />
     </div>
   );
 }

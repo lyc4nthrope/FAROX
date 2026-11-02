@@ -13,6 +13,7 @@ import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage, ShortagePage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
+import { PremiumPage, PremiumStoresPage } from "../features/premium";
 import { RoleFormPage, RolesPage } from "../features/roles";
 import { StoreFormPage, StoresPage } from "../features/stores";
 import { UserDetailPage, UsersPage } from "../features/users";
@@ -275,6 +276,8 @@ export function AppRoutes() {
             <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
             <Route path="/vincular/:code" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/premium" element={<PremiumPage />} />
+            <Route path="/premium/tiendas" element={<PremiumStoresPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>

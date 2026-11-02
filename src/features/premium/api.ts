@@ -1,6 +1,6 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { supabase } from "../../shared/lib/supabase/client";
-import type { PlanQuote, PremiumStatus } from "./types";
+import type { OwnedStore, PlanQuote, PremiumStatus } from "./types";
 
 type Err = { message: string } | null;
 
@@ -60,4 +60,34 @@ export async function fetchPlanQuote(code: string): Promise<{ quote: PlanQuote |
   const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
   const first = rows[0];
   return { quote: first === undefined ? null : normalizeQuote(first), error: null };
+}
+
+function normalizeOwnedStore(raw: Record<string, unknown>): OwnedStore {
+  return {
+    id: asNumber(raw.id),
+    name: typeof raw.name === "string" ? raw.name : "",
+    city: asString(raw.city),
+    createdAt: typeof raw.created_at === "string" ? raw.created_at : "",
+    isActive: raw.is_active === true,
+    deactivatedReason: asString(raw.deactivated_reason),
+  };
+}
+
+export async function fetchMyOwnedStores(): Promise<LoadResult<OwnedStore[]>> {
+  const { data, error } = await supabase.rpc("my_owned_stores");
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return { data: rows.map(normalizeOwnedStore), error: null };
+}
+
+export async function chooseStoreForFreePlan(storeId: number): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("choose_store_for_free_plan", { p_keep: storeId });
+  return { error };
+}
+
+export async function reactivatePremiumStores(storeIds: readonly number[]): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("reactivate_premium_stores", { p_ids: storeIds });
+  return { error };
 }

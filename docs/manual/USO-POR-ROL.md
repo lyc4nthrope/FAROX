@@ -50,6 +50,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Contactar a un distribuidor | Distribuidores → Contactar | Abre el WhatsApp/teléfono/email que el distribuidor configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
+| Gestionar mis tiendas | Perfil → Plan → Gestionar mis tiendas | Si el plan vence, elegí la tienda principal o renová; las demás se pausan sin borrar stock, pedidos, rutas ni créditos |
 | Cobrar un fiado | Fiado → crédito → Registrar pago | Monto y medio de pago |
 | Crear el fiado de un pedido entregado | Pedidos → pedido entregado → Fiado → Registrar fiado | Fecha de vencimiento y monto; el distribuidor no puede crearlo |
 | Imprimir o regenerar el QR de vínculo | Inventario → mi tienda → QR de vínculo | El creador de la tienda o un operador asignado a ella imprime el QR o dicta el código. Regenerarlo invalida el QR anterior |
@@ -70,6 +71,7 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Contactar a una tienda | Mi ruta → Contactar | Abre el WhatsApp/teléfono/email que el operador configuró. Si no lo configuró, muestra «Sin contacto» |
 | Configurar mi contacto | Perfil | Completá teléfono y preferencia (WhatsApp/Teléfono/Email). Para Email se usa el email de la cuenta |
 | Ver mi plan | Perfil → Plan | Muestra si sos Gratis, Premium hasta una fecha o Premium manual; el admin puede activarlo desde Usuarios |
+| Gestionar mis tiendas | Perfil → Plan → Gestionar mis tiendas | Si el plan vence, elegí la tienda principal o renová; las demás se pausan sin borrar stock, pedidos, rutas ni créditos |
 | Marcar mis paradas | Mi ruta | Llegué → Completada (u Omitir) |
 | Terminar la ruta | Mi ruta → Terminar ruta | Solo si el admin la inició |
 | Ver mis pedidos | Mis pedidos | Solo los dirigidos a mi distribuidora; el nav muestra cuántos pedidos abiertos hay |

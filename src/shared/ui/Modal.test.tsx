@@ -49,6 +49,20 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("blocking: no se cierra con ESC, fondo ni botón", () => {
+    const onClose = vi.fn();
+    render(
+      <Modal title="Tu Premium venció" onClose={onClose} blocking>
+        <p>elegí una tienda</p>
+      </Modal>,
+    );
+
+    expect(screen.queryByRole("button", { name: "Cerrar" })).not.toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.mouseDown(screen.getByRole("presentation"));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("bloquea el scroll del body mientras está abierto y devuelve el foco al cerrar", () => {
     const trigger = document.createElement("button");
     document.body.append(trigger);

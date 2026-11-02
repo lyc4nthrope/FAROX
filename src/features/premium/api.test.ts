@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import { fetchMyPremiumStatus, fetchPlanQuote } from "./api";
+import {
+  chooseStoreForFreePlan,
+  fetchMyOwnedStores,
+  fetchMyPremiumStatus,
+  fetchPlanQuote,
+  reactivatePremiumStores,
+} from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: { rpc: vi.fn() },
@@ -84,5 +90,50 @@ describe("premium api (0032)", () => {
 
     expect(result.quote).toBeNull();
     expect(result.error).toEqual({ message: "sin permisos" });
+  });
+
+  it("mapea my_owned_stores", async () => {
+    rpc.mockResolvedValue({
+      data: [
+        {
+          id: 7,
+          name: "Tienda Centro",
+          city: "Bogotá",
+          created_at: "2026-01-10T12:00:00Z",
+          is_active: false,
+          deactivated_reason: "premium_expired",
+        },
+      ],
+      error: null,
+    });
+
+    const result = await fetchMyOwnedStores();
+
+    expect(result.data).toEqual([
+      {
+        id: 7,
+        name: "Tienda Centro",
+        city: "Bogotá",
+        createdAt: "2026-01-10T12:00:00Z",
+        isActive: false,
+        deactivatedReason: "premium_expired",
+      },
+    ]);
+  });
+
+  it("llama choose_store_for_free_plan con la tienda elegida", async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+
+    await chooseStoreForFreePlan(7);
+
+    expect(rpc).toHaveBeenCalledWith("choose_store_for_free_plan", { p_keep: 7 });
+  });
+
+  it("llama reactivate_premium_stores con los ids", async () => {
+    rpc.mockResolvedValue({ data: null, error: null });
+
+    await reactivatePremiumStores([2, 3]);
+
+    expect(rpc).toHaveBeenCalledWith("reactivate_premium_stores", { p_ids: [2, 3] });
   });
 });

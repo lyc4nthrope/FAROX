@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as premiumApi from "../api";
@@ -18,6 +19,14 @@ const FREE: PremiumStatus = {
   activeOwnedStores: 1,
 };
 
+function renderCard() {
+  return render(
+    <MemoryRouter>
+      <PremiumStatusCard />
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -30,7 +39,7 @@ describe("PremiumStatusCard (0032)", () => {
   it("muestra el plan gratuito", async () => {
     vi.mocked(premiumApi.fetchMyPremiumStatus).mockResolvedValue({ data: FREE, error: null });
 
-    render(<PremiumStatusCard />);
+    renderCard();
 
     expect(await screen.findByText("Plan gratuito")).toBeInTheDocument();
     expect(screen.getByText("Gratis")).toBeInTheDocument();
@@ -46,7 +55,7 @@ describe("PremiumStatusCard (0032)", () => {
       error: null,
     });
 
-    render(<PremiumStatusCard />);
+    renderCard();
 
     expect(await screen.findByText("Premium")).toBeInTheDocument();
     expect(screen.getByText(/Activo hasta el/)).toBeInTheDocument();
@@ -58,7 +67,7 @@ describe("PremiumStatusCard (0032)", () => {
       error: null,
     });
 
-    render(<PremiumStatusCard />);
+    renderCard();
 
     expect(await screen.findByText(/Grant manual/)).toBeInTheDocument();
   });
@@ -75,7 +84,7 @@ describe("PremiumStatusCard (0032)", () => {
       error: null,
     });
 
-    render(<PremiumStatusCard />);
+    renderCard();
 
     expect(await screen.findByText(/Tu Premium venció/)).toBeInTheDocument();
     expect(screen.getByText(/elegir una tienda principal/)).toBeInTheDocument();
@@ -87,7 +96,7 @@ describe("PremiumStatusCard (0032)", () => {
       error: { message: "permission denied" },
     });
 
-    render(<PremiumStatusCard />);
+    renderCard();
 
     expect(await screen.findByText(/Ocurrió un error inesperado/)).toBeInTheDocument();
     expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();

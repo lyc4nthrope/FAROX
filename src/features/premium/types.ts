@@ -24,3 +24,12 @@ export interface PlanQuote {
   mpFeeBps: number;
   mpFeeFixedCents: number;
 }
+
+export interface OwnedStore {
+  id: number;
+  name: string;
+  city: string | null;
+  createdAt: string;
+  isActive: boolean;
+  deactivatedReason: string | null;
+}

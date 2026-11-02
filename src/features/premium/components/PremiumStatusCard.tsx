@@ -1,17 +1,9 @@
+import { Link } from "react-router-dom";
+
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { Badge, Status } from "../../../shared/ui/Box";
 import { fetchMyPremiumStatus } from "../api";
-
-function formatDate(value: string | null): string | null {
-  if (value === null) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString("es-CO", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
+import { formatPremiumDate } from "../format";
 
 /**
  * 0032: estado del plan en /profile. La fuente es my_premium_status(); el
@@ -32,8 +24,8 @@ export function PremiumStatusCard() {
   }
 
   const { premium, premiumUntil, premiumGraceUntil, graceActive, needsStoreChoice } = status.data;
-  const until = formatDate(premiumUntil);
-  const graceUntil = formatDate(premiumGraceUntil);
+  const until = formatPremiumDate(premiumUntil);
+  const graceUntil = formatPremiumDate(premiumGraceUntil);
 
   return (
     <div className="space-y-2 text-sm">
@@ -69,6 +61,13 @@ export function PremiumStatusCard() {
           compra/venta.
         </p>
       )}
+
+      <Link
+        to="/premium/tiendas"
+        className="inline-flex text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+      >
+        Gestionar mis tiendas
+      </Link>
     </div>
   );
 }

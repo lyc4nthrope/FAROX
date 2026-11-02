@@ -23,6 +23,9 @@ vi.mock("../../features/inventory/alertsApi", () => ({
 vi.mock("../../features/orders/api", () => ({
   fetchOpenOrdersCount: vi.fn(),
 }));
+vi.mock("../../features/premium", () => ({
+  PremiumDowngradeModal: () => null,
+}));
 
 function renderShell(role: RoleName | null, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
