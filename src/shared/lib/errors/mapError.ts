@@ -92,6 +92,10 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["tu suscripción está pausada", "Tu suscripción está pausada. Gestionála desde tu perfil."],
   ["no se pudo verificar el estado del pago", "No se pudo verificar el estado del pago. Intentá de nuevo."],
   ["estamos preparando tu pago", "Estamos preparando tu pago. Esperá unos segundos e intentá de nuevo."],
+  ["solo un administrador activo", "Solo un administrador activo puede hacer esto."],
+  ["solo se puede reembolsar un pago aprobado", "Solo se puede reembolsar un pago aprobado."],
+  ["mercado pago no pudo reembolsar", "Mercado Pago no pudo reembolsar el pago. Intentá de nuevo."],
+  ["no se pudo conciliar", "No se pudo conciliar con Mercado Pago. Intentá de nuevo."],
   ["mercado pago no pudo cancelar", "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo."],
   ["no tenés una suscripción para cancelar", "No tenés una suscripción para cancelar."],
 ];

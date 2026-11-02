@@ -1,12 +1,19 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { supabase } from "../../shared/lib/supabase/client";
 import type {
+  AdminPaymentRow,
+  AdminPlan,
+  AdminSubscriptionRow,
   CreatedSubscription,
   OwnedStore,
+  PlanPricingInput,
+  PlanPreview,
   PlanQuote,
+  PlanVersionRow,
   PremiumStatus,
   PremiumSubscription,
   PremiumSubscriptionStatus,
+  ReconciliationResult,
 } from "./types";
 
 type Err = { message: string } | null;
@@ -218,4 +225,231 @@ export async function createSubscription(
 export async function cancelSubscription(): Promise<{ error: Err }> {
   const result = await invokeFunction<unknown>("cancel-subscription", {});
   return { error: result.error };
+}
+
+function nestedRecord(value: unknown): Record<string, unknown> | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return typeof candidate === "object" && candidate !== null
+    ? (candidate as Record<string, unknown>)
+    : null;
+}
+
+function normalizeAdminPlan(raw: Record<string, unknown>): AdminPlan {
+  return {
+    id: asNumber(raw.id),
+    code: typeof raw.code === "string" ? raw.code : "",
+    name: typeof raw.name === "string" ? raw.name : "",
+    amountCents: asNumber(raw.amount_cents),
+    currency: typeof raw.currency === "string" ? raw.currency : "COP",
+    intervalMonths: asNumber(raw.interval_months),
+    taxRateBps: asNumber(raw.tax_rate_bps),
+    taxIncluded: raw.tax_included === true,
+    mpFeeBps: asNumber(raw.mp_fee_bps),
+    mpFeeFixedCents: asNumber(raw.mp_fee_fixed_cents),
+    mpFeeTaxBps: asNumber(raw.mp_fee_tax_bps),
+    feePassedToCustomer: raw.fee_passed_to_customer === true,
+    active: raw.active === true,
+    version: asNumber(raw.version),
+  };
+}
+
+export async function fetchAdminPlans(): Promise<LoadResult<AdminPlan[]>> {
+  const { data, error } = await supabase
+    .from("plans")
+    .select(
+      "id, code, name, amount_cents, currency, interval_months, tax_rate_bps, tax_included, mp_fee_bps, mp_fee_fixed_cents, mp_fee_tax_bps, fee_passed_to_customer, active, version",
+    )
+    .order("code");
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return { data: rows.map(normalizeAdminPlan), error: null };
+}
+
+function normalizePlanVersion(raw: Record<string, unknown>): PlanVersionRow {
+  return {
+    version: asNumber(raw.version),
+    amountCents: asNumber(raw.amount_cents),
+    taxRateBps: asNumber(raw.tax_rate_bps),
+    taxIncluded: raw.tax_included === true,
+    mpFeeBps: asNumber(raw.mp_fee_bps),
+    mpFeeFixedCents: asNumber(raw.mp_fee_fixed_cents),
+    mpFeeTaxBps: asNumber(raw.mp_fee_tax_bps),
+    feePassedToCustomer: raw.fee_passed_to_customer === true,
+    validFrom: typeof raw.valid_from === "string" ? raw.valid_from : "",
+  };
+}
+
+export async function fetchPlanVersions(planId: number): Promise<LoadResult<PlanVersionRow[]>> {
+  const { data, error } = await supabase
+    .from("plan_versions")
+    .select(
+      "version, amount_cents, tax_rate_bps, tax_included, mp_fee_bps, mp_fee_fixed_cents, mp_fee_tax_bps, fee_passed_to_customer, valid_from",
+    )
+    .eq("plan_id", planId)
+    .order("version", { ascending: false });
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return { data: rows.map(normalizePlanVersion), error: null };
+}
+
+function normalizePreview(raw: Record<string, unknown>): PlanPreview {
+  return {
+    finalCents: asNumber(raw.final_cents),
+    baseCents: asNumber(raw.base_cents),
+    taxCents: asNumber(raw.tax_cents),
+    mpFeeCents: asNumber(raw.mp_fee_cents),
+    netCents: asNumber(raw.net_cents),
+  };
+}
+
+export async function previewPlanQuote(input: {
+  amountCents: number;
+  taxRateBps: number;
+  taxIncluded: boolean;
+  mpFeeBps: number;
+  mpFeeFixedCents: number;
+  mpFeeTaxBps: number;
+}): Promise<{ preview: PlanPreview | null; error: Err }> {
+  const { data, error } = await supabase.rpc("preview_plan_quote", {
+    p_amount_cents: input.amountCents,
+    p_tax_rate_bps: input.taxRateBps,
+    p_tax_included: input.taxIncluded,
+    p_mp_fee_bps: input.mpFeeBps,
+    p_mp_fee_fixed_cents: input.mpFeeFixedCents,
+    p_mp_fee_tax_bps: input.mpFeeTaxBps,
+  });
+  if (error !== null) {
+    return { preview: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  const first = rows[0];
+  return { preview: first === undefined ? null : normalizePreview(first), error: null };
+}
+
+export async function updatePlanPricing(
+  input: PlanPricingInput,
+): Promise<{ version: number | null; error: Err }> {
+  const { data, error } = await supabase.rpc("update_plan_pricing", {
+    p_code: input.code,
+    p_amount_cents: input.amountCents,
+    p_tax_rate_bps: input.taxRateBps,
+    p_tax_included: input.taxIncluded,
+    p_mp_fee_bps: input.mpFeeBps,
+    p_mp_fee_fixed_cents: input.mpFeeFixedCents,
+    p_mp_fee_tax_bps: input.mpFeeTaxBps,
+    p_fee_passed_to_customer: input.feePassedToCustomer,
+    p_active: input.active,
+  });
+  if (error !== null) {
+    return { version: null, error };
+  }
+  return { version: typeof data === "number" ? data : Number(data), error: null };
+}
+
+function normalizeAdminSubscription(raw: Record<string, unknown>): AdminSubscriptionRow {
+  const plan = nestedRecord(raw.plan);
+  const user = nestedRecord(raw.user);
+  const status =
+    typeof raw.status === "string" && SUBSCRIPTION_STATUSES.has(raw.status)
+      ? (raw.status as PremiumSubscriptionStatus)
+      : "pending";
+  return {
+    id: asNumber(raw.id),
+    userId: typeof raw.user_id === "string" ? raw.user_id : "",
+    userName: typeof user?.full_name === "string" ? user.full_name : "—",
+    userEmail: asString(user?.email),
+    planCode: asString(plan?.code),
+    planName: asString(plan?.name),
+    status,
+    priceCents: asNumber(raw.price_cents_at_signup),
+    currency: typeof raw.currency === "string" ? raw.currency : "COP",
+    currentPeriodEnd: asString(raw.current_period_end),
+    cancelAtPeriodEnd: raw.cancel_at_period_end === true,
+    createdAt: typeof raw.created_at === "string" ? raw.created_at : "",
+    providerSubscriptionId: asString(raw.provider_subscription_id),
+  };
+}
+
+export async function fetchAdminSubscriptions(
+  limit = 50,
+): Promise<LoadResult<AdminSubscriptionRow[]>> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select(
+      "id, user_id, status, price_cents_at_signup, currency, current_period_end, cancel_at_period_end, created_at, provider_subscription_id, plan:plans(code,name), user:users(full_name,email)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return { data: rows.map(normalizeAdminSubscription), error: null };
+}
+
+function normalizeAdminPayment(raw: Record<string, unknown>): AdminPaymentRow {
+  const plan = nestedRecord(raw.plan);
+  const user = nestedRecord(raw.user);
+  const statuses = new Set(["pending", "approved", "rejected", "refunded", "charged_back"]);
+  const status =
+    typeof raw.status === "string" && statuses.has(raw.status)
+      ? (raw.status as AdminPaymentRow["status"])
+      : "pending";
+  return {
+    id: asNumber(raw.id),
+    userId: typeof raw.user_id === "string" ? raw.user_id : "",
+    userName: typeof user?.full_name === "string" ? user.full_name : "—",
+    userEmail: asString(user?.email),
+    planCode: asString(plan?.code),
+    planName: asString(plan?.name),
+    status,
+    amountCents: asNumber(raw.amount_cents),
+    currency: typeof raw.currency === "string" ? raw.currency : "COP",
+    providerPaymentId: asString(raw.provider_payment_id),
+    paidAt: asString(raw.paid_at),
+    createdAt: typeof raw.created_at === "string" ? raw.created_at : "",
+  };
+}
+
+export async function fetchAdminPayments(
+  limit = 50,
+): Promise<LoadResult<AdminPaymentRow[]>> {
+  const { data, error } = await supabase
+    .from("payments")
+    .select(
+      "id, user_id, status, amount_cents, currency, provider_payment_id, paid_at, created_at, plan:plans(code,name), user:users(full_name,email)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return { data: rows.map(normalizeAdminPayment), error: null };
+}
+
+export async function adminCancelSubscription(subscriptionId: number): Promise<{ error: Err }> {
+  const result = await invokeFunction<unknown>("admin-cancel-subscription", {
+    subscription_id: subscriptionId,
+  });
+  return { error: result.error };
+}
+
+export async function adminRefundPayment(paymentId: number): Promise<{ error: Err }> {
+  const result = await invokeFunction<unknown>("refund-payment", {
+    payment_id: paymentId,
+  });
+  return { error: result.error };
+}
+
+export async function reconcileSubscriptions(): Promise<{
+  result: ReconciliationResult | null;
+  error: Err;
+}> {
+  const invocation = await invokeFunction<ReconciliationResult>("reconcile-subscriptions", {});
+  return { result: invocation.data, error: invocation.error };
 }

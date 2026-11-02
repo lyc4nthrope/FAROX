@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. La **0025** traslada «marcar en ruta» y «confirmar entrega» al distribuidor y agrega `set_order_expected_at`: tampoco se ejecutó contra una base real. La **0026** agrega `update_store_product` / `add_store_product` para editar y dar de alta un producto de la tienda en una sola llamada: tampoco se ejecutó contra una base real. La **0027** permite a Premium publicar precios, agrega el precio opcional al alta y a los movimientos: tampoco se ejecutó contra una base real. La **0028** hace reversible in_route → pending y deja que el operador de la tienda lea la cotización sin Premium: tampoco se ejecutó contra una base real. La **0029** extiende la cotización a in_route, agrega la venta directa del distribuidor y el contacto entre partes vinculadas: tampoco se ejecutó contra una base real. La **0030** corrige el alcance de edición (la ficha de `products` es solo del admin; cada parte edita su relación) y agrega precios de compra/venta por relación con prellenado de movimientos y cotizaciones: tampoco se ejecutó contra una base real. La **0031** agrega alertas notificables del distribuidor (stock bajo opt-in y caducidad) con su job diario: tampoco se ejecutó contra una base real. La **0032** agrega el estado Premium con vencimiento, planes versionados, desglose de precio y el modelo de suscripciones/pagos para Mercado Pago: tampoco se ejecutó contra una base real. La **0033** agrega el downgrade de tiendas al vencer Premium, el modal de elección y la reactivación: tampoco se ejecutó contra una base real. La **0034** agrega desactivar/reactivar tiendas y transferir propiedad (admin): tampoco se ejecutó contra una base real. La **0035** agrega la referencia externa y el init_point de Mercado Pago a las suscripciones (F4): tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. La **0025** traslada «marcar en ruta» y «confirmar entrega» al distribuidor y agrega `set_order_expected_at`: tampoco se ejecutó contra una base real. La **0026** agrega `update_store_product` / `add_store_product` para editar y dar de alta un producto de la tienda en una sola llamada: tampoco se ejecutó contra una base real. La **0027** permite a Premium publicar precios, agrega el precio opcional al alta y a los movimientos: tampoco se ejecutó contra una base real. La **0028** hace reversible in_route → pending y deja que el operador de la tienda lea la cotización sin Premium: tampoco se ejecutó contra una base real. La **0029** extiende la cotización a in_route, agrega la venta directa del distribuidor y el contacto entre partes vinculadas: tampoco se ejecutó contra una base real. La **0030** corrige el alcance de edición (la ficha de `products` es solo del admin; cada parte edita su relación) y agrega precios de compra/venta por relación con prellenado de movimientos y cotizaciones: tampoco se ejecutó contra una base real. La **0031** agrega alertas notificables del distribuidor (stock bajo opt-in y caducidad) con su job diario: tampoco se ejecutó contra una base real. La **0032** agrega el estado Premium con vencimiento, planes versionados, desglose de precio y el modelo de suscripciones/pagos para Mercado Pago: tampoco se ejecutó contra una base real. La **0033** agrega el downgrade de tiendas al vencer Premium, el modal de elección y la reactivación: tampoco se ejecutó contra una base real. La **0034** agrega desactivar/reactivar tiendas y transferir propiedad (admin): tampoco se ejecutó contra una base real. La **0035** agrega la referencia externa y el init_point de Mercado Pago a las suscripciones (F4): tampoco se ejecutó contra una base real. La **0036** agrega el outbox de avisos, el preview de precios y el encolado diario de F5: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -198,6 +198,18 @@ UNION ALL SELECT '0035 F4 Mercado Pago',
    AND to_regclass('public.uq_subscriptions_one_active_per_user') IS NOT NULL
    AND to_regprocedure('public.merge_subscription_period(bigint,timestamptz,timestamptz)') IS NOT NULL
    AND to_regprocedure('public.activate_premium_until(uuid,timestamptz,bigint)') IS NOT NULL)::text
+UNION ALL SELECT '0036 F5 avisos admin',
+  (to_regclass('public.premium_notices') IS NOT NULL
+   AND to_regprocedure('public.preview_plan_quote(integer,integer,boolean,integer,integer,integer)') IS NOT NULL
+   AND to_regprocedure('public.enqueue_premium_notices()') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'payments'
+                 AND column_name = 'last_reconciled_at')
+   AND to_regclass('public.idx_payments_pending_reconcile') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'subscriptions'
+                 AND column_name = 'last_reconciled_at')
+   AND to_regclass('public.idx_subscriptions_active_reconcile') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -238,6 +250,7 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0033 | `20261029000033_downgrade_tiendas.sql` | `0033 … = true` — **sin esta, al vencer Premium no se puede elegir tienda principal ni reactivar las pausadas** | ✅ (`ALTER TABLE` + `CREATE OR REPLACE` + cron) |
 | 0034 | `20261029000034_gestion_tiendas.sql` | `0034 … = true` — **sin esta, el dueño no puede desactivar su tienda ni el admin transferir propiedad** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
 | 0035 | `20261029000035_f4_mercado_pago.sql` | `0035 … = true` — **sin esta, el checkout de Mercado Pago no puede guardar la referencia externa ni reutilizar el init_point** | ✅ (`ALTER TABLE` + índice único parcial) |
+| 0036 | `20261029000036_f5_avisos_admin.sql` | `0036 … = true` — **sin esta, no hay preview de precios ni outbox de avisos** | ✅ (`CREATE TABLE` + `CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
 | seed | `supabase/demo-catalog.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
@@ -360,6 +373,17 @@ SELECT has_function_privilege('authenticated','public.merge_subscription_period(
 SELECT has_function_privilege('service_role','public.merge_subscription_period(bigint,timestamptz,timestamptz)','EXECUTE');                     -- true
 SELECT has_function_privilege('authenticated','public.activate_premium_until(uuid,timestamptz,bigint)','EXECUTE');                              -- false
 SELECT has_function_privilege('service_role','public.activate_premium_until(uuid,timestamptz,bigint)','EXECUTE');                               -- true
+-- 0036: outbox de avisos y preview de precios
+SELECT has_table_privilege('authenticated','public.premium_notices','SELECT');                                                                   -- true (policy admin)
+SELECT has_table_privilege('authenticated','public.premium_notices','INSERT');                                                                  -- false
+SELECT has_table_privilege('authenticated','public.premium_notices','UPDATE');                                                                  -- false
+SELECT has_function_privilege('authenticated','public.preview_plan_quote(integer,integer,boolean,integer,integer,integer)','EXECUTE');          -- true (assert_admin)
+SELECT has_function_privilege('authenticated','public.enqueue_premium_notices()','EXECUTE');                                                    -- false
+SELECT has_function_privilege('service_role','public.enqueue_premium_notices()','EXECUTE');                                                     -- true
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_schema = 'public' AND column_name = 'last_reconciled_at'
+  AND table_name IN ('payments', 'subscriptions')
+ORDER BY table_name;                                                                                                                             -- 2 filas
 ```
 
 Y después:
@@ -376,7 +400,12 @@ Y después:
    - **Admin transfiere:** en la ficha de la tienda, «Transferir propiedad» solo lista operadores/admin activos distintos del dueño. Tras transferir, `stores.created_by` y `user_stores` apuntan al nuevo dueño y el dueño anterior deja de verla. Si el nuevo dueño ya está en su tope, la RPC debe rechazar.
    - **Operador ajeno:** no debe ver las acciones de desactivar/transferir; si fuerza la RPC, la base la rechaza.
    - **UPDATE directo acotado:** un PATCH directo a `stores.is_active` o `stores.created_by` debe fallar por privilegios; solo las columnas de edición (`name`, `address`, etc.) se actualizan sin RPC.
-7. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
+7. Probar la **operación F5**:
+   - `/planes` (admin): editar un precio, previsualizar el desglose, guardar y confirmar que se creó una versión nueva. `quote_plan` usa el precio nuevo; una suscripción existente conserva `price_cents_at_signup`.
+   - `/pagos` (admin): cancelar una suscripción y reembolsar un pago aprobado en sandbox. Confirmar el estado local y la fila en `audit_log`.
+   - Avisos: ejecutar `send-premium-notices` con `RESEND_API_KEY`, `EMAIL_FROM` y `APP_URL`; sin esos secrets debe devolver 503 y dejar el outbox pendiente. Repetir el enqueue no duplica avisos.
+   - Conciliación: ejecutar `reconcile-subscriptions` con un pago pendiente sandbox y confirmar que activa/extiende una sola vez.
+8. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
 
 ## 5. Opción C — que lo haga un agente con MCP
 
@@ -387,7 +416,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0028, 0029, 0030, 0031, 0032, 0033, 0034, 0035. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0028, 0029, 0030, 0031, 0032, 0033, 0034, 0035, 0036. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas

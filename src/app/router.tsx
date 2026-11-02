@@ -13,7 +13,13 @@ import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage, ShortagePage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
-import { PremiumPage, PremiumResultPage, PremiumStoresPage } from "../features/premium";
+import {
+  PremiumPage,
+  PremiumPaymentsAdminPage,
+  PremiumPlansAdminPage,
+  PremiumResultPage,
+  PremiumStoresPage,
+} from "../features/premium";
 import { RoleFormPage, RolesPage } from "../features/roles";
 import { StoreFormPage, StoresPage } from "../features/stores";
 import { UserDetailPage, UsersPage } from "../features/users";
@@ -184,6 +190,23 @@ export function AppRoutes() {
               element={
                 <RequireRole roles={ADMIN_ONLY}>
                   <UsersPage />
+                </RequireRole>
+              }
+            />
+            {/* F5: administración de planes/precios y pagos/suscripciones. */}
+            <Route
+              path="/planes"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <PremiumPlansAdminPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/pagos"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <PremiumPaymentsAdminPage />
                 </RequireRole>
               }
             />

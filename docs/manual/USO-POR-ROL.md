@@ -28,6 +28,9 @@ Guía rápida para la demo y base del manual de usuario (tarea C7). Estado al 20
 | Cancelar un pedido | Pedidos → pedido → Cancelar | Pide motivo |
 | Fiar un pedido entregado | Pedidos → pedido entregado → Fiado | Fecha de vencimiento opcional; luego se cobra en Fiado |
 | Ver quién cambió qué | Auditoría | Filtrar por tabla |
+| Editar precios de Premium | Planes | Precio final, IVA y comisión de Mercado Pago; previsualizá el desglose y guardá. Se crea una versión nueva y las suscripciones existentes conservan su precio |
+| Ver suscripciones y pagos | Pagos | Últimos 50 movimientos; cancelar una suscripción o reembolsar un pago aprobado. El reembolso no revoca Premium automáticamente |
+| Conciliar con Mercado Pago | Pagos → Conciliar con Mercado Pago | Corrige suscripciones/pagos pendientes usando el estado real de Mercado Pago |
 | Editar, desactivar o transferir una tienda | Tiendas → tienda | Editar nombre/dirección/teléfono; desactivar conserva stock, pedidos, rutas y créditos y se bloquea si hay pedidos abiertos; transferir la propiedad a otro operador/admin activo respeta el tope del nuevo dueño |
 | Reactivar algo desactivado | Producto / tienda / distribuidor → Reactivar | Producto y distribuidor: solo admin. Tienda: admin, o el dueño si la desactivó él mismo desde Perfil → Gestionar mis tiendas |
 

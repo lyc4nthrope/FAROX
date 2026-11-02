@@ -22,6 +22,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/rutas", label: "Rutas" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/users", label: "Usuarios" },
+  { to: "/planes", label: "Planes" },
+  { to: "/pagos", label: "Pagos" },
   { to: "/roles", label: "Roles" },
   { to: "/catalogs", label: "Catálogos" },
   { to: "/audit", label: "Auditoría" },
@@ -31,6 +33,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
 // catálogos, auditoría ni la planificación de rutas.
 const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
   "/users",
+  "/planes",
+  "/pagos",
   "/roles",
   "/catalogs",
   "/audit",

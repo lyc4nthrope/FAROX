@@ -11,6 +11,10 @@ Supabase y nunca se exponen con prefijo `VITE_`.
 | `create-subscription` | JWT de Supabase | Lee el plan y su última versión en la DB, crea el preapproval en Mercado Pago y devuelve `init_point`. Nunca confía en el monto del cliente. |
 | `mp-webhook` | Firma `x-signature` | Valida el origen, guarda el evento, consulta el recurso real y activa/extiende Premium con `activate_premium`. Tolera duplicados. |
 | `cancel-subscription` | JWT de Supabase | Cancela el preapproval en Mercado Pago y marca `cancel_at_period_end`; no borra el período ya pagado. |
+| `admin-cancel-subscription` | Admin | Cancela la suscripción de otro usuario y audita la acción. |
+| `refund-payment` | Admin | Reembolsa un pago aprobado en Mercado Pago, marca `refunded` y audita. No revoca Premium automáticamente. |
+| `reconcile-subscriptions` | Admin o `CRON_SECRET` | Consulta suscripciones/pagos pendientes en Mercado Pago y corrige estados con el mismo procesador del webhook. |
+| `send-premium-notices` | Admin o `CRON_SECRET` | Encola y envía avisos de renovación/gracia/vencimiento/pago rechazado/cancelación con Resend. |
 
 ## Secrets
 
@@ -18,7 +22,10 @@ Supabase y nunca se exponen con prefijo `VITE_`.
 supabase secrets set \
   MP_ACCESS_TOKEN="APP_USR-..." \
   MP_WEBHOOK_SECRET="..." \
-  APP_URL="https://tu-dominio"
+  APP_URL="https://tu-dominio" \
+  CRON_SECRET="un-secreto-largo-aleatorio" \
+  RESEND_API_KEY="re_..." \
+  EMAIL_FROM="FAROX <no-reply@tu-dominio>"
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` los inyecta
@@ -33,12 +40,18 @@ Supabase en el runtime. No los pongas en `.env` del frontend ni en el repositori
 ```bash
 supabase functions deploy create-subscription
 supabase functions deploy cancel-subscription
+supabase functions deploy admin-cancel-subscription
+supabase functions deploy refund-payment
 supabase functions deploy mp-webhook --no-verify-jwt
+supabase functions deploy reconcile-subscriptions --no-verify-jwt
+supabase functions deploy send-premium-notices --no-verify-jwt
 ```
 
 `mp-webhook` debe desplegarse con `--no-verify-jwt`: Mercado Pago no envía un JWT
-de Supabase; la autenticidad se valida con la firma HMAC. Las otras dos funciones
-conservan la verificación JWT y además llaman `auth.getUser()`.
+de Supabase; la autenticidad se valida con la firma HMAC. `reconcile-subscriptions`
+y `send-premium-notices` también se despliegan así para que el cron use
+`x-cron-secret`; cuando las invoca un humano, la función valida el JWT y el rol
+admin con `auth.getUser()`. Las demás funciones conservan la verificación JWT.
 
 En **Mercado Pago → Tu integración → Webhooks → Configurar notificación**:
 
@@ -71,6 +84,24 @@ npm run test -- supabase/functions/_shared/mercadopago.test.ts
 La prueba sandbox real (tarjeta aprobada/rechazada, webhook duplicado,
 cancelación) requiere credenciales de Mercado Pago y una URL pública. Sin esos
 datos la integración queda verificada solo a nivel unitario/estático.
+
+## Conciliación y avisos programados
+
+`reconcile-subscriptions` y `send-premium-notices` se despliegan con
+`--no-verify-jwt` para que un cron pueda invocarlas con el header
+`x-cron-secret: <CRON_SECRET>`. Un admin autenticado también puede invocarlas
+desde `/pagos` (conciliación) o manualmente; la función valida el rol.
+
+Programá ambas una vez al día desde Supabase Cron / `pg_cron` + `pg_net`:
+
+- `reconcile-subscriptions`: después del cierre del día.
+- `send-premium-notices`: por la mañana, antes de los vencimientos.
+
+`send-premium-notices` usa Resend (`https://api.resend.com/emails`). El dominio
+de `EMAIL_FROM` debe estar verificado en Resend. Si faltan `RESEND_API_KEY`,
+`EMAIL_FROM` o `APP_URL`, la función devuelve 503 y no marca avisos como
+enviados; el outbox queda pendiente. Los avisos son idempotentes por
+`(user_id, kind, period_key)`.
 
 ## Seguridad
 

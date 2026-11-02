@@ -438,6 +438,8 @@ ALTER TABLE public.stores
 
 ### F5 — Renovaciones, gracia, avisos y admin (4–6 días)
 
+**Estado (2026-11-02):** implementado a nivel de código, migración 0036 y pruebas locales; Resend/MP/DB runtime pendientes de credenciales. Ver `odd/tasks/premium-f5-renovaciones-admin.md`.
+
 - Emails 7/3/1, vencimiento, pago fallido, gracia, downgrade, cancelación.
 - Job de gracia/downgrade; reconciliación; panel admin de pagos; reembolsos; auditoría.
 - Panel admin «Planes y precios»: editar precio/IVA/comisión, previsualizar desglose, ver versiones; campaña de cambio de precio a suscriptores existentes con aviso y cancelación.
@@ -503,6 +505,7 @@ ALTER TABLE public.stores
 - **L3 (2026-11-01):** «Si, ademas me gustaria que se mostrara la lista de precios que agregan valor como el impuesto y el cobro que se lleva mercado pago. El precio mantenlo asi, pero que se modificable para cambiar segun la demanda y la oferta. La seleccion de la tienda que queda a manos del usuario, como una ventana emergente que muestre las 3 tiendas diciendo que cual desea conservar como principal o la opcion de renovar para mantener las 3 tiendas activas.»
 - **L4 (diseño):** desglose `quote_plan` (precio final, IVA incluido, comisión MP estimada, neto), precios editables por admin con `plan_versions` y grandfathering; modal de downgrade con las 3 tiendas, «Conservar como principal» y «Renovar para mantener las 3».
 - **L5 (2026-11-02):** F4 implementado: Edge Functions `create-subscription`, `mp-webhook` y `cancel-subscription`; migración 0035; checkout/resultado/cancelación en la UI; firma, idempotencia y validación de monto. Sandbox real pendiente de `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y `APP_URL`.
+- **L6 (2026-11-02):** F5 implementado: panel `/planes` con preview y versiones; `/pagos` con cancelar/reembolsar/conciliar; conciliación rotativa; outbox y envío de avisos con Resend; reembolsos/contracargos registrados sin revocación automática. Pendiente sandbox con MP/Resend.
 
 ## 11. Backlog: edición, eliminación y transferencia de tiendas
 

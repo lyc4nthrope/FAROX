@@ -16,6 +16,8 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/rutas",
       "/dashboard",
       "/users",
+      "/planes",
+      "/pagos",
       "/roles",
       "/catalogs",
       "/audit",
@@ -34,7 +36,15 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/fiado",
       "/dashboard",
     ]);
-    for (const adminOnly of ["/users", "/roles", "/catalogs", "/audit", "/rutas"]) {
+    for (const adminOnly of [
+      "/users",
+      "/planes",
+      "/pagos",
+      "/roles",
+      "/catalogs",
+      "/audit",
+      "/rutas",
+    ]) {
       expect(visibles).not.toContain(adminOnly);
     }
     // 0024: Productos se fusionó en Inventario.
