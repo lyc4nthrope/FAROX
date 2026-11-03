@@ -17,6 +17,8 @@ export interface StockOptionRow {
   product_name: string;
   brand: string | null;
   quantity: number;
+  /** 0037: código de barras para el escáner del ticket. */
+  barcode?: string | null;
 }
 export interface MovementRow {
   id: number;
@@ -33,6 +35,22 @@ export interface MovementRow {
   order_id?: number | null;
   /** 0029: dirección desde la perspectiva del usuario (venta del distribuidor). */
   direction?: "entry" | "exit";
+  /** 0037: descuento porcentual aplicado a la venta (auditoría). */
+  discount_pct?: number | null;
+  /** 0037: origen de la fila; las compras del distribuidor no son movements. */
+  source?: "movement" | "purchase";
+}
+/** 0037: opción de producto para el ticket de movimientos. */
+export interface MovementProductOption {
+  id: number;
+  name: string;
+  brand: string | null;
+  barcode: string | null;
+  /** Stock actual (tienda o catálogo del distribuidor), si se conoce. */
+  quantity: number | null;
+  /** Precio sugerido: venta o compra según el tipo de ticket. */
+  purchasePrice: number | null;
+  salePrice: number | null;
 }
 export interface MotiveOption {
   id: number;
@@ -59,6 +77,13 @@ function relBrand(value: unknown): string | null {
   if (value === null || typeof value !== "object" || !("brand" in value)) return null;
   const brand = relName((value as { brand: unknown }).brand);
   return brand === "" ? null : brand;
+}
+
+/** Código de barras embebido en product, si viene en el select. */
+function relBarcode(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("barcode" in value)) return null;
+  const barcode = (value as { barcode: unknown }).barcode;
+  return typeof barcode === "string" && barcode.trim() !== "" ? barcode.trim() : null;
 }
 
 /** Tiendas sobre las que el usuario opera: admin todas; operador su alcance. */
@@ -93,7 +118,7 @@ export async function fetchStoreName(storeId: number): Promise<LoadResult<string
 export async function fetchStockOptions(storeId: number): Promise<LoadResult<StockOptionRow[]>> {
   const { data, error } = await supabase
     .from("stock")
-    .select("product_id,quantity,product:products(name, brand:brands(name))")
+    .select("product_id,quantity,product:products(name, barcode, brand:brands(name))")
     .eq("store_id", storeId)
     .order("product_id")
     .limit(500);
@@ -102,6 +127,7 @@ export async function fetchStockOptions(storeId: number): Promise<LoadResult<Sto
     product_name: relName(r.product),
     brand: relBrand(r.product),
     quantity: Number(r.quantity),
+    barcode: relBarcode(r.product),
   }));
   return { data: rows, error };
 }
@@ -133,7 +159,7 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,type,quantity,unit_price,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
+      "id,type,quantity,unit_price,discount_pct,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -147,14 +173,65 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
       direction: type === "entry" ? ("exit" as const) : ("entry" as const),
       quantity: Number(r.quantity),
       unit_price: r.unit_price == null ? null : Number(r.unit_price),
+      discount_pct: r.discount_pct == null ? null : Number(r.discount_pct),
       order_id: r.order_id == null ? null : Number(r.order_id),
       created_at: String(r.created_at),
       reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
       product_name: relName(r.product),
       motive_name: relName(r.motive),
       store_name: relName(r.store),
+      source: "movement" as const,
     };
   });
+  return { data: rows, error };
+}
+
+/**
+ * 0037: compras propias del distribuidor. Se presentan como entradas en la
+ * misma lista que los movimientos de tienda.
+ */
+export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRow[]>> {
+  const { data, error } = await supabase
+    .from("distributor_purchases")
+    .select("id,quantity,unit_cost,expiry_date,created_at,product:products(name)")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.id),
+    type: "entry" as const,
+    direction: "entry" as const,
+    quantity: Number(r.quantity),
+    unit_price: r.unit_cost == null ? null : Number(r.unit_cost),
+    created_at: String(r.created_at),
+    reverso_of_id: null,
+    product_name: relName(r.product),
+    motive_name: "Compra a proveedor",
+    store_name: null,
+    source: "purchase" as const,
+  }));
+  return { data: rows, error };
+}
+
+/** 0037: catálogo del distribuidor con stock y precios para el ticket. */
+export async function fetchDistributorMovementOptions(): Promise<
+  LoadResult<MovementProductOption[]>
+> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select(
+      "product_id,quantity,purchase_price,sale_price,product:products!inner(name,is_active,barcode,brand:brands(name))",
+    )
+    .order("product_id")
+    .limit(500);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: Number(r.product_id),
+    name: relName(r.product),
+    brand: relBrand(r.product),
+    barcode: relBarcode(r.product),
+    quantity: r.quantity == null ? null : Number(r.quantity),
+    purchasePrice: r.purchase_price == null ? null : Number(r.purchase_price),
+    salePrice: r.sale_price == null ? null : Number(r.sale_price),
+  }));
   return { data: rows, error };
 }
 
@@ -194,6 +271,66 @@ export async function registerDistributorSale(
     p_qty: input.quantity,
     p_unit_price: input.unitPrice,
     p_expiry_date: input.expiryDate,
+  });
+  return { error };
+}
+
+/** 0037: una línea del ticket (venta o compra). */
+export interface MovementLineInput {
+  productId: number;
+  quantity: number;
+  /** Precio unitario NETO (ya con descuento). null = sin precio. */
+  unitPrice: number | null;
+  expiryDate?: string | null;
+}
+
+function linesPayload(lines: readonly MovementLineInput[]): Record<string, unknown>[] {
+  return lines.map((line) => ({
+    product_id: line.productId,
+    quantity: line.quantity,
+    unit_price: line.unitPrice,
+    expiry_date: line.expiryDate ?? null,
+  }));
+}
+
+/** 0037: ticket de entradas/salidas de una tienda (admin/operador). */
+export async function registerMovementsBulk(input: {
+  storeId: number;
+  type: "entry" | "exit";
+  motiveId: number;
+  lines: readonly MovementLineInput[];
+  discountPct: number | null;
+}): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("register_movements_bulk", {
+    p_store: input.storeId,
+    p_type: input.type,
+    p_motive_id: input.motiveId,
+    p_lines: linesPayload(input.lines),
+    p_discount: input.discountPct,
+  });
+  return { error };
+}
+
+/** 0037: ticket de venta del distribuidor a una tienda vinculada. */
+export async function registerDistributorSalesBulk(input: {
+  storeId: number;
+  lines: readonly MovementLineInput[];
+  discountPct: number | null;
+}): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("register_distributor_sales_bulk", {
+    p_store: input.storeId,
+    p_lines: linesPayload(input.lines),
+    p_discount: input.discountPct,
+  });
+  return { error };
+}
+
+/** 0037: ticket de compra del distribuidor (suma stock propio). */
+export async function registerDistributorPurchasesBulk(input: {
+  lines: readonly MovementLineInput[];
+}): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("register_distributor_purchases", {
+    p_lines: linesPayload(input.lines),
   });
   return { error };
 }

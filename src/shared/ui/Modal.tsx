@@ -9,12 +9,15 @@ export function Modal({
   title,
   onClose,
   blocking = false,
+  size = "lg",
   children,
 }: {
   title: string;
   onClose: () => void;
   /** 0033: un modal bloqueante no se cierra con ESC, fondo ni botón. */
   blocking?: boolean;
+  /** 0037: ancho del diálogo; los formularios angostos usan "sm". */
+  size?: "sm" | "md" | "lg";
   children: ReactNode;
 }) {
   const titleId = useId();
@@ -112,7 +115,9 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="my-auto w-full max-w-3xl rounded-2xl border border-gray-200/80 bg-white p-5 shadow-2xl shadow-gray-900/10 outline-none sm:p-6"
+        className={`my-auto w-full rounded-2xl border border-gray-200/80 bg-white p-5 shadow-2xl shadow-gray-900/10 outline-none sm:p-6 ${
+          size === "sm" ? "max-w-lg" : size === "md" ? "max-w-2xl" : "max-w-3xl"
+        }`}
       >
         <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
           <h2 id={titleId} className="text-base font-semibold tracking-tight text-gray-900">

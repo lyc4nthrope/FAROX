@@ -107,7 +107,7 @@ export function MovementList({
         const direction = movement.direction ?? movement.type;
         return (
           <li
-            key={movement.id}
+            key={`${movement.source ?? "movement"}-${movement.id}`}
             data-tone={toneKey}
             className={`flex flex-wrap items-start gap-3 rounded-r-xl border-y border-r border-y-gray-200 border-r-gray-200 border-l-4 px-3 py-3 ${tone.border} ${tone.background}`}
           >
@@ -152,6 +152,9 @@ export function MovementList({
                       </span>
                     </>
                   )}
+                {movement.discount_pct !== null && movement.discount_pct !== undefined && (
+                  <Badge tone="amber">Desc. {movement.discount_pct}%</Badge>
+                )}
                 {reversed.has(movement.id) && <Badge tone="amber">Revertido</Badge>}
               </div>
             </div>

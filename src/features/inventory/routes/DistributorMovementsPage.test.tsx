@@ -3,18 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
-import * as productsApi from "../../products/api";
 import * as inventoryApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { DistributorMovementsPage } from "./DistributorMovementsPage";
 
 vi.mock("../api", () => ({
   fetchDistributorMovements: vi.fn(),
+  fetchDistributorPurchases: vi.fn(),
+  fetchDistributorMovementOptions: vi.fn(),
   fetchDistributorStores: vi.fn(),
-  registerDistributorSale: vi.fn(),
-}));
-vi.mock("../../products/api", () => ({
-  fetchDistributorCatalog: vi.fn(),
+  registerDistributorSalesBulk: vi.fn(),
+  registerDistributorPurchasesBulk: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -79,6 +78,16 @@ const MOVEMENTS: inventoryApi.MovementRow[] = [
   },
 ];
 
+const PRODUCT = {
+  id: 1,
+  name: "Arroz Diana",
+  brand: "Diana",
+  barcode: "770123",
+  quantity: 10,
+  purchasePrice: 3000,
+  salePrice: 4500,
+};
+
 function renderPage() {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({
@@ -113,16 +122,20 @@ beforeEach(() => {
     data: MOVEMENTS,
     error: null,
   });
+  vi.mocked(inventoryApi.fetchDistributorPurchases).mockResolvedValue({
+    data: [],
+    error: null,
+  });
+  vi.mocked(inventoryApi.fetchDistributorMovementOptions).mockResolvedValue({
+    data: [PRODUCT],
+    error: null,
+  });
   vi.mocked(inventoryApi.fetchDistributorStores).mockResolvedValue({
     data: [],
     error: null,
   });
-  vi.mocked(inventoryApi.registerDistributorSale).mockResolvedValue({ error: null });
-  vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-    rows: [],
-    count: 0,
-    error: null,
-  });
+  vi.mocked(inventoryApi.registerDistributorSalesBulk).mockResolvedValue({ error: null });
+  vi.mocked(inventoryApi.registerDistributorPurchasesBulk).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -142,10 +155,36 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(screen.getByText(/3\.000/)).toBeInTheDocument();
 
     const items = screen.getAllByRole("listitem");
-    expect(items[0]).toHaveAttribute("data-tone", "exit");
-    expect(items[1]).toHaveAttribute("data-tone", "exit");
-    expect(items[2]).toHaveAttribute("data-tone", "entry");
-    expect(items[3]).toHaveAttribute("data-tone", "reverse");
+    expect(items[0]).toHaveAttribute("data-tone", "reverse");
+    expect(items[1]).toHaveAttribute("data-tone", "entry");
+    expect(items[2]).toHaveAttribute("data-tone", "exit");
+    expect(items[3]).toHaveAttribute("data-tone", "exit");
+  });
+
+  it("suma las compras propias como entradas del historial", async () => {
+    vi.mocked(inventoryApi.fetchDistributorPurchases).mockResolvedValue({
+      data: [
+        {
+          id: 90,
+          type: "entry",
+          direction: "entry",
+          quantity: 6,
+          unit_price: 2800,
+          created_at: "2026-10-28T14:00:00Z",
+          product_name: "Café Ávila",
+          motive_name: "Compra a proveedor",
+          reverso_of_id: null,
+          store_name: null,
+          source: "purchase",
+        },
+      ],
+      error: null,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Café Ávila")).toBeInTheDocument();
+    expect(screen.getByText("5 movimientos")).toBeInTheDocument();
   });
 
   it("filtra entradas y salidas por la dirección del distribuidor", async () => {
@@ -162,29 +201,27 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(screen.getByText("Leche Alpina")).toBeInTheDocument();
   });
 
-  it("registra una venta directa Premium a una tienda vinculada", async () => {
+  it("0037: en Todos hay compra y venta; cada filtro deja solo su acción", async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole("button", { name: "Registrar compra" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Registrar venta" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Salidas" }));
+    expect(screen.getByRole("button", { name: "Registrar venta" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Registrar compra" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Entradas" }));
+    expect(screen.getByRole("button", { name: "Registrar compra" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Registrar venta" })).not.toBeInTheDocument();
+  });
+
+  it("0037: registra una venta por ticket con descuento", async () => {
     vi.mocked(inventoryApi.fetchDistributorStores).mockResolvedValue({
       data: [{ id: 7, name: "Tienda Centro" }],
-      error: null,
-    });
-    vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-      rows: [
-        {
-          id: 1,
-          name: "Arroz Diana",
-          is_active: true,
-          brand: { id: 1, name: "Diana" },
-          unit: { id: 1, name: "kg" },
-          category: { id: 1, name: "Granos" },
-          quantity: null,
-          threshold: null,
-          expiry_date: null,
-          purchase_price: 3000,
-          sale_price: 4500,
-          is_shortage: false,
-        },
-      ],
-      count: 1,
       error: null,
     });
     renderPage();
@@ -195,20 +232,40 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
       name: "Registrar venta a una tienda",
     });
     await user.selectOptions(within(dialog).getByLabelText("Tienda vinculada"), "7");
-    await user.selectOptions(within(dialog).getByLabelText("Producto de mi catálogo"), "1");
-    const price = within(dialog).getByLabelText("Precio de venta (COP)");
+
+    // El código de barras también filtra: escanear o escribirlo ubica el producto.
+    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "770123");
+    await user.click(within(dialog).getByRole("button", { name: /Arroz Diana/ }));
+    const price = within(dialog).getByLabelText("Precio de venta de Arroz Diana");
     expect(price).toHaveValue(4500);
-    await user.clear(price);
-    await user.type(price, "4800");
+
+    await user.type(within(dialog).getByLabelText("Descuento (%)"), "10");
     await user.click(within(dialog).getByRole("button", { name: "Registrar venta" }));
 
     await waitFor(() =>
-      expect(inventoryApi.registerDistributorSale).toHaveBeenCalledWith({
+      expect(inventoryApi.registerDistributorSalesBulk).toHaveBeenCalledWith({
         storeId: 7,
-        productId: 1,
-        quantity: 1,
-        unitPrice: 4800,
-        expiryDate: null,
+        lines: [{ productId: 1, quantity: 1, unitPrice: 4050, expiryDate: null }],
+        discountPct: 10,
+      }),
+    );
+  });
+
+  it("0037: registra una compra a proveedor como entrada", async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Registrar compra" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar compra a proveedor",
+    });
+    await user.click(within(dialog).getByRole("button", { name: /Arroz Diana/ }));
+    expect(within(dialog).getByLabelText("Precio de compra de Arroz Diana")).toHaveValue(3000);
+    await user.click(within(dialog).getByRole("button", { name: "Registrar compra" }));
+
+    await waitFor(() =>
+      expect(inventoryApi.registerDistributorPurchasesBulk).toHaveBeenCalledWith({
+        lines: [{ productId: 1, quantity: 1, unitPrice: 3000, expiryDate: null }],
       }),
     );
   });
@@ -219,7 +276,7 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(await screen.findByText("Leche Alpina")).toBeInTheDocument();
     expect(screen.queryByText(/Precio:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/4\.500/)).not.toBeInTheDocument();
-    expect(productsApi.fetchDistributorCatalog).not.toHaveBeenCalled();
+    expect(inventoryApi.fetchDistributorMovementOptions).not.toHaveBeenCalled();
   });
 
   it("sin movimientos muestra el estado vacío", async () => {

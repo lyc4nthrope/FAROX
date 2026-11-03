@@ -17,6 +17,7 @@ vi.mock("../api", () => ({
   fetchStockOptions: vi.fn(),
   fetchStoreName: vi.fn(),
   registerMovement: vi.fn(),
+  registerMovementsBulk: vi.fn(),
   reverseMovement: vi.fn(),
   setPrice: vi.fn(),
 }));
@@ -151,20 +152,19 @@ describe("InventoryPage · pestañas", () => {
 });
 
 describe("InventoryPage · acciones en botones", () => {
-  it("registrar movimiento abre el formulario en un diálogo", async () => {
+  it("registrar movimiento abre el ticket de compra en un diálogo", async () => {
     renderPage();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
 
     const dialog = await screen.findByRole("dialog", {
-      name: "Registrar entrada o salida",
+      name: "Registrar compra",
     });
-    expect(within(dialog).getByRole("group", { name: "Tipo de movimiento" })).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Buscar producto")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Buscar producto o código")).toBeInTheDocument();
   });
 
-  it("el movimiento se busca por marca y se registra con el stepper", async () => {
+  it("la compra se busca por marca y se registra como ticket", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
       data: [
         { product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 12 },
@@ -176,41 +176,37 @@ describe("InventoryPage · acciones en botones", () => {
       data: [{ id: 1, name: "Compra", suggested_type: "entry" }],
       error: null,
     });
-    vi.mocked(inventoryApi.registerMovement).mockResolvedValue({ error: null });
+    vi.mocked(inventoryApi.registerMovementsBulk).mockResolvedValue({ error: null });
 
     renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
     const dialog = await screen.findByRole("dialog", {
-      name: "Registrar entrada o salida",
+      name: "Registrar compra",
     });
 
-    await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
-    expect(
-      within(dialog).queryByRole("button", { name: /Arroz Diana/ }),
-    ).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "alpina");
+    expect(within(dialog).queryByRole("button", { name: /Arroz Diana/ })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
     await user.click(
       within(dialog).getByRole("button", { name: "Sumar cantidad de Leche Alpina" }),
     );
-    await user.type(within(dialog).getByLabelText("Precio de compra (opcional)"), "4500");
+    await user.type(within(dialog).getByLabelText("Precio de compra de Leche Alpina"), "4500");
     await user.selectOptions(within(dialog).getByLabelText("Motivo"), "1");
-    await user.click(within(dialog).getByRole("button", { name: "Registrar entrada" }));
+    await user.click(within(dialog).getByRole("button", { name: "Registrar compra" }));
 
     await waitFor(() =>
-      expect(inventoryApi.registerMovement).toHaveBeenCalledWith({
-        type: "entry",
+      expect(inventoryApi.registerMovementsBulk).toHaveBeenCalledWith({
         storeId: 10,
-        productId: 2,
-        quantity: 2,
-        unitPrice: 4500,
+        type: "entry",
         motiveId: 1,
-        expiryDate: null,
+        lines: [{ productId: 2, quantity: 2, unitPrice: 4500, expiryDate: null }],
+        discountPct: null,
       }),
     );
   });
 
-  it("prellena el precio de compra de la relación y calcula el total (0030)", async () => {
+  it("prellena el precio de compra de la relación y muestra el total del ticket (0030)", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
       data: [
         {
@@ -235,20 +231,20 @@ describe("InventoryPage · acciones en botones", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
     const dialog = await screen.findByRole("dialog", {
-      name: "Registrar entrada o salida",
+      name: "Registrar compra",
     });
 
-    await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
+    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "alpina");
     await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
     await user.click(
       within(dialog).getByRole("button", { name: "Sumar cantidad de Leche Alpina" }),
     );
 
-    expect(within(dialog).getByLabelText("Precio de compra (opcional)")).toHaveValue(4500);
-    expect(within(dialog).getByText(/Total estimado/)).toHaveTextContent("9.000");
+    expect(within(dialog).getByLabelText("Precio de compra de Leche Alpina")).toHaveValue(4500);
+    expect(dialog).toHaveTextContent("9.000");
   });
 
-  it("en una salida prellena el precio de venta activo de la tienda (0030)", async () => {
+  it("en una venta prellena el precio activo y aplica el descuento al neto (0037)", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
       data: [{ product_id: 2, product_name: "Leche Alpina", brand: "Alpina", quantity: 30 }],
       error: null,
@@ -261,35 +257,31 @@ describe("InventoryPage · acciones en botones", () => {
       data: [{ id: 2, name: "Venta", suggested_type: "exit" }],
       error: null,
     });
-    vi.mocked(inventoryApi.registerMovement).mockResolvedValue({ error: null });
+    vi.mocked(inventoryApi.registerMovementsBulk).mockResolvedValue({ error: null });
 
     renderPage();
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
-    const dialog = await screen.findByRole("dialog", {
-      name: "Registrar entrada o salida",
-    });
+    await user.click(screen.getByRole("tab", { name: /movimientos/i }));
+    await user.click(await screen.findByRole("button", { name: "Registrar venta" }));
+    const dialog = await screen.findByRole("dialog", { name: "Registrar venta" });
 
-    await user.type(within(dialog).getByLabelText("Buscar producto"), "alpina");
+    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "alpina");
     await user.click(within(dialog).getByRole("button", { name: /Leche Alpina/ }));
-    await user.click(within(dialog).getByRole("button", { name: "Salida" }));
-    const price = within(dialog).getByLabelText("Precio de venta (opcional)");
-    expect(price).toHaveValue(3000);
+    expect(within(dialog).getByLabelText("Precio de venta de Leche Alpina")).toHaveValue(3000);
 
-    await user.clear(price);
-    await user.type(price, "3200");
+    await user.type(within(dialog).getByLabelText("Descuento (%)"), "10");
+    expect(dialog).toHaveTextContent("2.700");
+
     await user.selectOptions(within(dialog).getByLabelText("Motivo"), "2");
-    await user.click(within(dialog).getByRole("button", { name: "Registrar salida" }));
+    await user.click(within(dialog).getByRole("button", { name: "Registrar venta" }));
 
     await waitFor(() =>
-      expect(inventoryApi.registerMovement).toHaveBeenCalledWith({
-        type: "exit",
+      expect(inventoryApi.registerMovementsBulk).toHaveBeenCalledWith({
         storeId: 10,
-        productId: 2,
-        quantity: 1,
-        unitPrice: 3200,
+        type: "exit",
         motiveId: 2,
-        expiryDate: null,
+        lines: [{ productId: 2, quantity: 1, unitPrice: 2700, expiryDate: null }],
+        discountPct: 10,
       }),
     );
   });

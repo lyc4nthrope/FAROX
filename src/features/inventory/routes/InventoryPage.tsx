@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatCOP, formatQty } from "../../../shared/lib/format";
+import { formatCOP } from "../../../shared/lib/format";
 import {
   Box,
   Field,
@@ -14,7 +14,8 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { MovementList } from "../components/MovementList";
-import { EmptyState, PremiumLock, ProductPicker, QuantityStepper, type ProductPickerOption } from "../../../shared/ui";
+import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
+import { EmptyState, PremiumLock, ProductPicker, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
 import { fetchStorePurchasePrices } from "../../products/api";
@@ -25,9 +26,10 @@ import {
   fetchPrices,
   fetchStockOptions,
   fetchStoreName,
-  registerMovement,
+  registerMovementsBulk,
   reverseMovement,
   setPrice,
+  type MovementProductOption,
   type MovementRow,
 } from "../api";
 
@@ -124,18 +126,22 @@ const TABS: readonly { id: InventoryTab; label: string }[] = [
 
 const PANEL_CLASS = "mt-3 rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm sm:p-5";
 
-function normalizeSearch(value: string): string {
-  return value
-    .toLocaleLowerCase("es")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-}
+type MovementFilter = "all" | "entry" | "exit";
 
-function segmentClass(active: boolean, tone: "entry" | "exit"): string {
+const MOVEMENT_FILTERS: readonly { id: MovementFilter; label: string }[] = [
+  { id: "all", label: "Todos" },
+  { id: "entry", label: "Entradas" },
+  { id: "exit", label: "Salidas" },
+];
+
+// 0037: color por tipo de acción, igual que los tonos de MovementList
+// (entrada/compra en verde, salida/venta en azul).
+function movementActionClass(type: "entry" | "exit"): string {
   const base =
-    "rounded-lg px-4 py-1.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900";
-  if (!active) return `${base} text-gray-600 hover:text-gray-900`;
-  return `${base} ${tone === "entry" ? "bg-emerald-600 text-white shadow-sm" : "bg-sky-600 text-white shadow-sm"}`;
+    "inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium text-white shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  return type === "entry"
+    ? `${base} bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-emerald-600`
+    : `${base} bg-sky-600 hover:bg-sky-700 focus-visible:outline-sky-600`;
 }
 
 function InventoryTabBar({
@@ -251,45 +257,70 @@ export function InventoryPage() {
     setModal(kind);
   }
 
-  // --- movimiento
+  // --- movimiento (0037: ticket multi-producto)
   const [mov, setMov] = useState({
     type: "entry" as "entry" | "exit",
-    productId: "",
-    quantity: "",
-    unitPrice: "",
     motiveId: "",
     expiry: "",
   });
-  const [movementSearch, setMovementSearch] = useState("");
+  const [moveFilter, setMoveFilter] = useState<"all" | "entry" | "exit">("all");
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [discount, setDiscount] = useState("");
+
+  function openMovement(type: "entry" | "exit") {
+    setMsg({ error: null, ok: null });
+    setMov({ type, motiveId: "", expiry: "" });
+    setCart([]);
+    setDiscount("");
+    setModal("movement");
+  }
+
   async function onMovement(event: FormEvent) {
     event.preventDefault();
-    if (mov.productId === "" || mov.motiveId === "" || Number(mov.quantity) <= 0) {
-      setMsg({ error: "Completá producto, una cantidad mayor a 0 y motivo.", ok: null });
+    if (cart.length === 0) {
+      setMsg({ error: "Agregá al menos un producto al ticket.", ok: null });
       return;
     }
+    if (mov.motiveId === "") {
+      setMsg({ error: "Elegí un motivo.", ok: null });
+      return;
+    }
+    if (cart.some((line) => !(Number(line.quantity) > 0))) {
+      setMsg({ error: "La cantidad debe ser mayor a 0 en cada línea.", ok: null });
+      return;
+    }
+    const discountValue = discount.trim() === "" ? null : Number(discount);
+    if (
+      discountValue !== null &&
+      (!Number.isFinite(discountValue) || discountValue < 0 || discountValue > 100)
+    ) {
+      setMsg({ error: "El descuento debe estar entre 0 y 100.", ok: null });
+      return;
+    }
+    const discountInput = mov.type === "exit" ? (discountValue?.toString() ?? "") : "";
+    const lines = cart.map((line) => ({
+      productId: line.productId,
+      quantity: Number(line.quantity),
+      unitPrice: premium ? netUnitPrice(line.unitPrice, discountInput) : null,
+      expiryDate: mov.type === "entry" && mov.expiry !== "" ? mov.expiry : null,
+    }));
     const success = await act(
       () =>
-        registerMovement({
-          type: mov.type,
+        registerMovementsBulk({
           storeId,
-          productId: Number(mov.productId),
-          quantity: Number(mov.quantity),
-          unitPrice: mov.unitPrice === "" ? null : Number(mov.unitPrice),
+          type: mov.type,
           motiveId: Number(mov.motiveId),
-          expiryDate: mov.type === "entry" && mov.expiry !== "" ? mov.expiry : null,
+          lines,
+          discountPct: mov.type === "exit" ? discountValue : null,
         }),
-      mov.type === "entry" ? "Entrada registrada." : "Salida registrada.",
+      `${mov.type === "entry" ? "Compra" : "Venta"} registrada (${lines.length} ${
+        lines.length === 1 ? "producto" : "productos"
+      }).`,
     );
     if (success) {
-      setMov({
-        type: "entry",
-        productId: "",
-        quantity: "",
-        unitPrice: "",
-        motiveId: "",
-        expiry: "",
-      });
-      setMovementSearch("");
+      setCart([]);
+      setDiscount("");
+      setMov({ type: mov.type, motiveId: "", expiry: "" });
       setModal(null);
     }
   }
@@ -320,24 +351,22 @@ export function InventoryPage() {
 
   const motiveOptions =
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
-  const selectedStock =
-    stockOptions.data?.find((row) => row.product_id === Number(mov.productId)) ?? null;
 
-  // 0030: estimación inmediata desde la relación. Nunca pisa lo que el usuario
-  // escribió después; se recalcula al elegir producto o cambiar el tipo.
-  function estimatePrice(type: "entry" | "exit", productId: string): string {
-    if (!premium || productId === "") return "";
-    if (type === "entry") {
-      const purchase = purchasePrices.data?.get(Number(productId));
-      return purchase == null ? "" : String(purchase);
-    }
-    const sale = prices.data?.find((priceRow) => priceRow.product_id === Number(productId));
-    return sale === undefined ? "" : String(sale.price);
-  }
-  const movementProducts = (stockOptions.data ?? []).filter((row) =>
-    normalizeSearch(`${row.product_name} ${row.brand ?? ""}`).includes(
-      normalizeSearch(movementSearch),
-    ),
+  // Opciones del ticket: stock de la tienda + precios de compra/venta vigentes.
+  const movementOptions = useMemo<MovementProductOption[]>(() => {
+    const salePrices = new Map((prices.data ?? []).map((row) => [row.product_id, row.price]));
+    return (stockOptions.data ?? []).map((row) => ({
+      id: row.product_id,
+      name: row.product_name,
+      brand: row.brand,
+      barcode: row.barcode ?? null,
+      quantity: row.quantity,
+      purchasePrice: purchasePrices.data?.get(row.product_id) ?? null,
+      salePrice: salePrices.get(row.product_id) ?? null,
+    }));
+  }, [stockOptions.data, purchasePrices.data, prices.data]);
+  const visibleMovements = (movements.data ?? []).filter(
+    (movement) => moveFilter === "all" || movement.type === moveFilter,
   );
   const selectedPrice =
     prices.data?.find((row) => row.product_id === Number(price.productId)) ?? null;
@@ -347,192 +376,57 @@ export function InventoryPage() {
 
   const movementForm = (
     <form onSubmit={onMovement}>
-      <div className="mb-4">
-        <span className="block text-xs font-semibold tracking-wide text-gray-600">Tipo</span>
-        <div
-          role="group"
-          aria-label="Tipo de movimiento"
-          className="mt-1.5 inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1"
-        >
-          <button
-            type="button"
-            aria-pressed={mov.type === "entry"}
-            className={segmentClass(mov.type === "entry", "entry")}
-            onClick={() =>
-              setMov({
-                ...mov,
-                type: "entry",
-                motiveId: "",
-                unitPrice: estimatePrice("entry", mov.productId),
-              })
-            }
+      <MovementCart
+        options={movementOptions}
+        loading={stockOptions.loading}
+        error={stockOptions.error}
+        lines={cart}
+        onChange={setCart}
+        priceKind={mov.type === "entry" ? "purchase" : "sale"}
+        showPrices={premium}
+        showDiscount={mov.type === "exit"}
+        discount={discount}
+        onDiscountChange={setDiscount}
+        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
+      />
+
+      <div className="mx-auto mt-4 w-full max-w-md">
+        <Status loading={motives.loading} error={motives.error} />
+        <Field label="Motivo">
+          <select
+            className={`${inputClass} w-full`}
+            value={mov.motiveId}
+            onChange={(e) => setMov({ ...mov, motiveId: e.target.value })}
+            required
           >
-            Entrada
-          </button>
-          <button
-            type="button"
-            aria-pressed={mov.type === "exit"}
-            className={segmentClass(mov.type === "exit", "exit")}
-            onClick={() =>
-              setMov({
-                ...mov,
-                type: "exit",
-                motiveId: "",
-                unitPrice: estimatePrice("exit", mov.productId),
-              })
-            }
-          >
-            Salida
-          </button>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <label className="flex flex-col gap-1.5 text-sm">
-          <span className="text-xs font-semibold tracking-wide text-gray-600">Producto</span>
-          <input
-            className={inputClass}
-            type="search"
-            placeholder="Nombre o marca…"
-            aria-label="Buscar producto"
-            autoFocus
-            value={movementSearch}
-            onChange={(event) => setMovementSearch(event.target.value)}
-          />
-        </label>
-        <Status loading={stockOptions.loading} error={stockOptions.error} />
-        <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-gray-100">
-          {movementProducts.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-gray-500">
-              {stockOptions.data?.length === 0
-                ? "La tienda no tiene productos asignados. Usá «Agregar productos» primero."
-                : "Ningún producto coincide con la búsqueda."}
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {movementProducts.map((row) => {
-                const selected = String(row.product_id) === mov.productId;
-                return (
-                  <li key={row.product_id}>
-                    <button
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() =>
-                        setMov({
-                          ...mov,
-                          productId: String(row.product_id),
-                          quantity: mov.quantity === "" ? "1" : mov.quantity,
-                          unitPrice: estimatePrice(mov.type, String(row.product_id)),
-                        })
-                      }
-                      className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition ${
-                        selected ? "bg-gray-900 text-white" : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{row.product_name}</span>
-                        <span
-                          className={`block truncate text-xs ${
-                            selected ? "text-gray-300" : "text-gray-500"
-                          }`}
-                        >
-                          {row.brand ?? "Sin marca"} · Stock: {formatQty(row.quantity)}
-                        </span>
-                      </span>
-                      {selected && (
-                        <span aria-hidden="true" className="text-xs font-semibold">
-                          Elegido
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <span className="block text-xs font-semibold tracking-wide text-gray-600">
-          Cantidad
-        </span>
-        <div className="mt-1.5">
-          <QuantityStepper
-            label={selectedStock?.product_name ?? "movimiento"}
-            value={mov.quantity}
-            onChange={(quantity) => setMov({ ...mov, quantity })}
-          />
-        </div>
-      </div>
-
-      {premium && (
-        <Field
-          label={
-            mov.type === "entry"
-              ? "Precio de compra (opcional)"
-              : "Precio de venta (opcional)"
-          }
-        >
-          <input
-            className={inputClass}
-            type="number"
-            min="0.01"
-            step="0.01"
-            placeholder="0"
-            value={mov.unitPrice}
-            onChange={(event) => setMov({ ...mov, unitPrice: event.target.value })}
-          />
+            <option value="">— elegir —</option>
+            {motiveOptions.map((motive) => (
+              <option key={motive.id} value={motive.id}>
+                {motive.name}
+              </option>
+            ))}
+          </select>
         </Field>
-      )}
-      {premium && (
-        <p className="-mt-2 mb-3 text-xs text-gray-500">
-          Se completa con el precio de la relación; podés cambiarlo para esta operación.
-        </p>
-      )}
-      {premium &&
-        mov.unitPrice.trim() !== "" &&
-        Number(mov.quantity) > 0 &&
-        Number(mov.unitPrice) > 0 && (
-          <p className="-mt-3 mb-3 text-xs text-gray-500">
-            Total estimado:{" "}
-            <span className="font-medium text-gray-900">
-              {formatCOP(Number(mov.quantity) * Number(mov.unitPrice))}
-            </span>
-          </p>
+
+        {mov.type === "entry" && (
+          <Field label="Fecha de vencimiento (opcional)">
+            <input
+              className={`${inputClass} w-full`}
+              type="date"
+              value={mov.expiry}
+              onChange={(e) => setMov({ ...mov, expiry: e.target.value })}
+            />
+          </Field>
         )}
 
-      <Status loading={motives.loading} error={motives.error} />
-      <Field label="Motivo">
-        <select
-          className={inputClass}
-          value={mov.motiveId}
-          onChange={(e) => setMov({ ...mov, motiveId: e.target.value })}
-          required
-        >
-          <option value="">— elegir —</option>
-          {motiveOptions.map((motive) => (
-            <option key={motive.id} value={motive.id}>
-              {motive.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      {mov.type === "entry" && (
-        <Field label="Fecha de vencimiento (opcional)">
-          <input
-            className={inputClass}
-            type="date"
-            value={mov.expiry}
-            onChange={(e) => setMov({ ...mov, expiry: e.target.value })}
-          />
-        </Field>
-      )}
-
-      <button className={buttonClass} type="submit" disabled={busy}>
-        {busy ? "Registrando…" : mov.type === "entry" ? "Registrar entrada" : "Registrar salida"}
-      </button>
+        <button className={`${buttonClass} w-full`} type="submit" disabled={busy}>
+          {busy
+            ? "Registrando…"
+            : mov.type === "entry"
+              ? "Registrar compra"
+              : "Registrar venta"}
+        </button>
+      </div>
     </form>
   );
 
@@ -607,7 +501,11 @@ export function InventoryPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className={buttonClass} type="button" onClick={() => openModal("movement")}>
+          <button
+            className={buttonClass}
+            type="button"
+            onClick={() => openMovement(moveFilter === "exit" ? "exit" : "entry")}
+          >
             <Icon>
               {premium ? (
                 <path d="M7 17V7m0 0-3 3m3-3 3 3M17 7v10m0 0 3-3m-3 3-3-3" />
@@ -663,29 +561,86 @@ export function InventoryPage() {
           aria-labelledby="inventory-tab-movements"
           className={PANEL_CLASS}
         >
-          <div className="flex flex-wrap items-end justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold tracking-tight text-gray-900">
-                Últimos movimientos
-              </h2>
+              <h2 className="text-sm font-semibold tracking-tight text-gray-900">Movimientos</h2>
               <p className="text-xs text-gray-500">
-                Entradas en verde, salidas en azul y reversos en ámbar.
+                Compras en verde, ventas en azul y reversos en ámbar.
               </p>
             </div>
-            <span className="text-xs font-medium text-gray-500">Últimos 50</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">
+                {visibleMovements.length}{" "}
+                {visibleMovements.length === 1 ? "movimiento" : "movimientos"}
+              </span>
+              {moveFilter !== "exit" && (
+                <button
+                  className={movementActionClass("entry")}
+                  type="button"
+                  onClick={() => openMovement("entry")}
+                >
+                  <Icon>
+                    <path d="M12 4v12m0 0 5-5m-5 5-5-5M5 20h14" />
+                  </Icon>
+                  Registrar compra
+                </button>
+              )}
+              {moveFilter !== "entry" && (
+                <button
+                  className={movementActionClass("exit")}
+                  type="button"
+                  onClick={() => openMovement("exit")}
+                >
+                  <Icon>
+                    <path d="M12 20V8m0 0 5 5m-5-5-5 5M5 4h14" />
+                  </Icon>
+                  Registrar venta
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Tipo de movimiento"
+            className="mt-3 inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1"
+          >
+            {MOVEMENT_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                aria-pressed={moveFilter === filter.id}
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  moveFilter === filter.id
+                    ? "bg-gray-900 text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+                onClick={() => setMoveFilter(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
           </div>
 
           <Status loading={movements.loading} error={movements.error} />
-          {movements.data?.length === 0 ? (
+          {visibleMovements.length === 0 ? (
             <div className="mt-3">
               <EmptyState
-                title="Todavía no hay movimientos en esta tienda"
-                hint="Las entradas y salidas que registres van a aparecer acá."
+                title={
+                  (movements.data ?? []).length === 0
+                    ? "Todavía no hay movimientos en esta tienda"
+                    : "No hay movimientos de este tipo"
+                }
+                hint={
+                  (movements.data ?? []).length === 0
+                    ? "Las compras y ventas que registres van a aparecer acá."
+                    : "Probá con otro filtro."
+                }
               />
             </div>
           ) : (
             <MovementList
-              movements={movements.data ?? []}
+              movements={visibleMovements}
               canReverse={isAdmin}
               busy={busy}
               onReverse={(movement) => void onReverse(movement)}
@@ -751,7 +706,11 @@ export function InventoryPage() {
       )}
 
       {modal === "movement" && (
-        <Modal title="Registrar entrada o salida" onClose={() => setModal(null)}>
+        <Modal
+          title={mov.type === "entry" ? "Registrar compra" : "Registrar venta"}
+          size="lg"
+          onClose={() => setModal(null)}
+        >
           <Status error={msg.error} />
           {premium ? (
             movementForm
@@ -759,8 +718,8 @@ export function InventoryPage() {
             <PremiumLock
               title="Movimientos manuales"
               benefits={[
-                "Registrar entradas y salidas manuales, con motivo y vencimiento.",
-                "Dashboard analítico con totales y valores del rango que elijas.",
+                "Registrar compras y ventas con varios productos en un solo ticket.",
+                "Descuentos por venta y dashboard analítico del rango que elijas.",
                 "Precios por producto en los pedidos y QR de vínculo masivo.",
               ]}
             >
@@ -771,7 +730,7 @@ export function InventoryPage() {
       )}
 
       {modal === "price" && (
-        <Modal title="Publicar precio" onClose={() => setModal(null)}>
+        <Modal title="Publicar precio" size="sm" onClose={() => setModal(null)}>
           <Status error={msg.error} />
           {priceForm}
         </Modal>

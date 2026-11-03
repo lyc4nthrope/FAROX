@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 describe("inventory api — stock paginado", () => {
-  it("fetchStockOptions trae marca y cantidad para el buscador", async () => {
+  it("fetchStockOptions trae marca, código y cantidad para el buscador", async () => {
     const builder = {
       select: vi.fn(),
       eq: vi.fn(),
@@ -31,7 +31,7 @@ describe("inventory api — stock paginado", () => {
           {
             product_id: 10,
             quantity: 12,
-            product: { name: "Arroz Diana", brand: { name: "Diana" } },
+            product: { name: "Arroz Diana", brand: { name: "Diana" }, barcode: "770123" },
           },
         ],
         error: null,
@@ -45,10 +45,16 @@ describe("inventory api — stock paginado", () => {
     const result = await fetchStockOptions(3);
 
     expect(builder.select).toHaveBeenCalledWith(
-      "product_id,quantity,product:products(name, brand:brands(name))",
+      "product_id,quantity,product:products(name, barcode, brand:brands(name))",
     );
     expect(result.data).toEqual([
-      { product_id: 10, product_name: "Arroz Diana", brand: "Diana", quantity: 12 },
+      {
+        product_id: 10,
+        product_name: "Arroz Diana",
+        brand: "Diana",
+        quantity: 12,
+        barcode: "770123",
+      },
     ]);
   });
 });

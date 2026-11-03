@@ -17,6 +17,7 @@ vi.mock("../api", () => ({
   fetchStockOptions: vi.fn(),
   fetchStoreName: vi.fn(),
   registerMovement: vi.fn(),
+  registerMovementsBulk: vi.fn(),
   reverseMovement: vi.fn(),
   setPrice: vi.fn(),
 }));
@@ -197,12 +198,12 @@ describe("0030 · el prellenado refleja el precio recién editado", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
-    const movement = await screen.findByRole("dialog", { name: "Registrar entrada o salida" });
-    await user.type(within(movement).getByLabelText("Buscar producto"), "leche");
+    const movement = await screen.findByRole("dialog", { name: "Registrar compra" });
+    await user.type(within(movement).getByLabelText("Buscar producto o código"), "leche");
     await user.click(within(movement).getByRole("button", { name: /Leche Alpina/ }));
 
     await waitFor(() =>
-      expect(within(movement).getByLabelText("Precio de compra (opcional)")).toHaveValue(2000),
+      expect(within(movement).getByLabelText("Precio de compra de Leche Alpina")).toHaveValue(2000),
     );
   });
 
@@ -224,14 +225,14 @@ describe("0030 · el prellenado refleja el precio recién editado", () => {
       ),
     );
 
-    await user.click(screen.getByRole("button", { name: /registrar movimiento/i }));
-    const movement = await screen.findByRole("dialog", { name: "Registrar entrada o salida" });
-    await user.click(within(movement).getByRole("button", { name: "Salida" }));
-    await user.type(within(movement).getByLabelText("Buscar producto"), "leche");
+    await user.click(screen.getByRole("tab", { name: /movimientos/i }));
+    await user.click(await screen.findByRole("button", { name: "Registrar venta" }));
+    const movement = await screen.findByRole("dialog", { name: "Registrar venta" });
+    await user.type(within(movement).getByLabelText("Buscar producto o código"), "leche");
     await user.click(within(movement).getByRole("button", { name: /Leche Alpina/ }));
 
     await waitFor(() =>
-      expect(within(movement).getByLabelText("Precio de venta (opcional)")).toHaveValue(4000),
+      expect(within(movement).getByLabelText("Precio de venta de Leche Alpina")).toHaveValue(4000),
     );
   });
 
