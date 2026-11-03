@@ -1,6 +1,10 @@
 import { corsHeaders, errorJson, isPost, json } from "../_shared/http.ts";
 import { authHeader, serviceClient, userClient } from "../_shared/supabase.ts";
-import { runAgent, type AgentHistoryItem } from "../_shared/agent.ts";
+import {
+  ModelUnavailableError,
+  runAgent,
+  type AgentHistoryItem,
+} from "../_shared/agent.ts";
 
 // ============================================================================
 // Edge Function «agent»: un solo endpoint para todos los usuarios.
@@ -30,6 +34,9 @@ Deno.serve(async (request) => {
     return errorJson("Falta configurar el asistente.", 500, true);
   }
   const model = Deno.env.get("AGENT_MODEL") ?? "gemini-2.5-flash";
+  // Respaldo ante obsolescencia: si el primario deja de existir, el turno
+  // sigue con este modelo sin tocar código.
+  const fallbackModel = Deno.env.get("AGENT_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
 
   const client = userClient(header);
   const { data: userData, error: userError } = await client.auth.getUser();
@@ -119,6 +126,7 @@ Deno.serve(async (request) => {
       client,
       apiKey,
       model,
+      fallbackModel,
       message,
       history,
     });
@@ -142,6 +150,11 @@ Deno.serve(async (request) => {
 
     return json({ conversation_id: activeId, reply }, 200, true);
   } catch (error) {
+    if (error instanceof ModelUnavailableError) {
+      // Línea estable para alertas de log: el modelo configurado ya no existe.
+      console.error("agent MODEL_UNAVAILABLE", error.message);
+      return errorJson("El asistente está en mantenimiento. Probá más tarde.", 503, true);
+    }
     console.error("agent", error instanceof Error ? error.message : error);
     return errorJson("No pude responder ahora. Probá de nuevo en un rato.", 502, true);
   }

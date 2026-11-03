@@ -59,3 +59,11 @@ El esquema ya tenía `chat_conversations`, `chat_messages` (`chat_role` + `paylo
 ### L6 — límite conocido
 
 La búsqueda es `LIKE` normalizado, no fuzzy: un error de tipeo ("arrox") no encuentra el producto. `pg_trgm` (D22) queda para cuando se priorice la búsqueda global.
+
+### L7 — obsolescencia del modelo (2026-11-03)
+
+- `runAgent` distingue `ModelUnavailableError` (404, o 400 con "not found / no longer / deprecated") y reintenta **una vez** con `AGENT_FALLBACK_MODEL`, que queda activo para el resto del turno.
+- `agent` registra `agent MODEL_UNAVAILABLE` y responde 503 con «El asistente está en mantenimiento».
+- `agent-health` (nuevo, cron con `x-cron-secret` o admin) hace un ping de 1 token: 200 si el primario vive, 200 con `fallback_used` si ya cayó, 503 si cayeron los dos.
+- Cambiar de modelo es `supabase secrets set AGENT_MODEL=...` + `functions deploy agent`; no hay que tocar código.
+- Runbook completo en `supabase/functions/agent/README.md`.

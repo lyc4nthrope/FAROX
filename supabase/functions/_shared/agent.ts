@@ -22,6 +22,41 @@ export interface AgentToolLog {
   result: unknown;
 }
 
+/**
+ * El proveedor retiró el modelo (404, o 400 "not found / no longer available").
+ * Se distingue del resto de los fallos para poder usar el fallback y para que
+ * el log diga MODEL_UNAVAILABLE en vez de un 502 genérico.
+ */
+export class ModelUnavailableError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ModelUnavailableError";
+    this.status = status;
+  }
+}
+
+function isModelUnavailable(status: number, detail: string): boolean {
+  if (status === 404) return true;
+  if (status !== 400) return false;
+  const text = detail.toLowerCase();
+  return (
+    text.includes("not found") ||
+    text.includes("not supported") ||
+    text.includes("no longer") ||
+    text.includes("is not available") ||
+    text.includes("deprecated")
+  );
+}
+
+function modelUrl(model: string, apiKey: string): string {
+  return (
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+  );
+}
+
 const SYSTEM_PROMPT = `Sos el asistente de FARØX, una app de inventario, pedidos y rutas para tiendas y distribuidoras.
 
 Reglas:
@@ -91,9 +126,10 @@ export async function runAgent(input: {
   client: SupabaseClient;
   apiKey: string;
   model: string;
+  fallbackModel?: string | null;
   message: string;
   history: readonly AgentHistoryItem[];
-}): Promise<{ reply: string; toolLog: AgentToolLog[] }> {
+}): Promise<{ reply: string; toolLog: AgentToolLog[]; model: string }> {
   const contents: GeminiContent[] = [
     ...input.history.slice(-MAX_HISTORY).map((item) => ({
       role: item.role === "assistant" ? ("model" as const) : ("user" as const),
@@ -102,12 +138,12 @@ export async function runAgent(input: {
     { role: "user", parts: [{ text: input.message }] },
   ];
   const toolLog: AgentToolLog[] = [];
-  const url =
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-    `${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`;
+  let activeModel = input.model;
+  let usedFallback = false;
+  const fallback = input.fallbackModel ?? null;
 
-  for (let step = 0; step < MAX_STEPS; step += 1) {
-    const response = await fetch(url, {
+  async function callModel(): Promise<GeminiResponse> {
+    const response = await fetch(modelUrl(activeModel, input.apiKey), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -117,11 +153,32 @@ export async function runAgent(input: {
         generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
       }),
     });
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`gemini ${response.status}: ${detail.slice(0, 300)}`);
+    if (response.ok) return (await response.json()) as GeminiResponse;
+    const detail = await response.text();
+    const short = `gemini ${response.status}: ${detail.slice(0, 300)}`;
+    if (isModelUnavailable(response.status, detail)) {
+      throw new ModelUnavailableError(short, response.status);
     }
-    const payload = (await response.json()) as GeminiResponse;
+    throw new Error(short);
+  }
+
+  for (let step = 0; step < MAX_STEPS; step += 1) {
+    let payload: GeminiResponse;
+    try {
+      payload = await callModel();
+    } catch (error) {
+      // Obsolescencia: un solo reintento con el modelo de respaldo. El
+      // fallback queda activo para el resto del turno.
+      const canFallback =
+        error instanceof ModelUnavailableError &&
+        !usedFallback &&
+        fallback !== null &&
+        fallback !== activeModel;
+      if (!canFallback || fallback === null) throw error;
+      usedFallback = true;
+      activeModel = fallback;
+      payload = await callModel();
+    }
     const parts = payload.candidates?.[0]?.content?.parts ?? [];
     const calls = parts.flatMap((part) =>
       "functionCall" in part && part.functionCall !== undefined ? [part.functionCall] : [],
@@ -135,6 +192,7 @@ export async function runAgent(input: {
       return {
         reply: text === "" ? "No pude generar una respuesta. Probá reformulando la pregunta." : text,
         toolLog,
+        model: activeModel,
       };
     }
 
@@ -152,7 +210,33 @@ export async function runAgent(input: {
   return {
     reply: "No pude terminar la consulta. Probá con una pregunta más específica.",
     toolLog,
+    model: activeModel,
   };
+}
+
+/** Ping mínimo para el chequeo de salud (1 token de salida). */
+export async function probeModel(input: {
+  apiKey: string;
+  model: string;
+}): Promise<{ ok: boolean; status: number; detail: string }> {
+  try {
+    const response = await fetch(modelUrl(input.model, input.apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: "ping" }] }],
+        generationConfig: { maxOutputTokens: 1, temperature: 0 },
+      }),
+    });
+    const detail = response.ok ? "" : (await response.text()).slice(0, 200);
+    return { ok: response.ok, status: response.status, detail };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      detail: error instanceof Error ? error.message : "network",
+    };
+  }
 }
 
 async function runTool(

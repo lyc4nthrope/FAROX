@@ -34,19 +34,79 @@ Las tres viven en la migración `0039_asistente_consultas.sql`.
 supabase secrets set \
   GEMINI_API_KEY="..." \
   AGENT_MODEL="gemini-2.5-flash" \
+  AGENT_FALLBACK_MODEL="gemini-2.5-flash-lite" \
   AGENT_ENABLED="true"
 ```
 
 `AGENT_ENABLED` es el interruptor de lanzamiento: si falta o es `false`, la
-función responde `503`.
+función responde `503`. `AGENT_FALLBACK_MODEL` se usa si el primario deja de
+existir; nunca se llama si el primario responde.
 
 ## Deploy
 
 ```bash
 supabase functions deploy agent
+supabase functions deploy agent-health --no-verify-jwt
 ```
 
-Conserva la verificación de JWT (no uses `--no-verify-jwt`).
+`agent` conserva la verificación de JWT. `agent-health` se despliega sin JWT
+para que el cron use `x-cron-secret`; cuando lo llama un humano, valida el JWT
+y el rol admin dentro de la función.
+
+## Obsolescencia del modelo
+
+**Cómo te enterás**
+
+1. **Antes de que falle**: la página de deprecaciones de Gemini publica la fecha
+   de retiro; conviene revisarla cada release. Google también avisa por email a
+   la cuenta del proyecto.
+2. **Chequeo diario** (lo importante): un cron llama `agent-health` con
+   `x-cron-secret`. Responde `200 {ok:true}` si el primario vive; `200
+   {ok:true, fallback_used:true}` si ya cayó pero el respaldo funciona (y deja
+   `PRIMARY_MODEL_UNAVAILABLE` en el log); `503` si cayeron los dos. Alertá con
+   Resend/WhatsApp sobre el `503` y sobre `fallback_used:true`.
+3. **En caliente**: la función registra `agent MODEL_UNAVAILABLE` y responde
+   `503` con «El asistente está en mantenimiento». Si ves esa línea o ese
+   mensaje, el modelo configurado ya no existe.
+
+Un cron mínimo (Supabase `pg_cron` + `pg_net`, o n8n):
+
+```sql
+select cron.schedule(
+  'agent-health',
+  '17 6 * * *',
+  $$select net.http_post(
+      url := 'https://<proyecto>.supabase.co/functions/v1/agent-health',
+      headers := '{"x-cron-secret":"<CRON_SECRET>"}'::jsonb
+    )$$
+);
+```
+
+**Cómo cambiás de modelo (sin deploy de código)**
+
+```bash
+# 1. Ver qué modelos existen hoy
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"
+
+# 2. Cambiar el primario y, si hace falta, el respaldo
+supabase secrets set AGENT_MODEL="gemini-3.5-flash" AGENT_FALLBACK_MODEL="gemini-2.5-flash"
+
+# 3. Forzar que las instancias tomen el secreto nuevo
+supabase functions deploy agent
+
+# 4. Verificar
+curl -X POST "https://<proyecto>.supabase.co/functions/v1/agent-health" \
+  -H "x-cron-secret: <CRON_SECRET>"
+```
+
+El respaldo ya cubre la ventana entre el retiro y el cambio de secreto: el
+turno reintenta una vez con `AGENT_FALLBACK_MODEL` y sigue. Si el cambio es de
+proveedor, el único archivo a tocar es `_shared/agent.ts`; usar un gateway
+compatible con OpenAI (OpenRouter, LiteLLM o Vercel AI Gateway) convierte el
+proveedor en otra variable de entorno.
+
+Después de cambiar de modelo, corré el set de evaluación (40 frases por rol) y
+compará la tasa de tool-calling antes de dar el cambio por bueno.
 
 ## WhatsApp y reportes (fase 3)
 
