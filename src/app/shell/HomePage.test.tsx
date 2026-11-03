@@ -15,9 +15,9 @@ vi.mock("../../features/auth/api", () => ({
   fetchPrivileges: vi.fn(),
 }));
 
-function renderHome(role: RoleName | null) {
+function renderHome(role: RoleName | null, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
-  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium });
   return render(
     <MemoryRouter>
       <AuthProvider>
@@ -58,5 +58,14 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
     expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
+  });
+
+  it("ADM-11.1: con Premium la cabecera muestra la insignia y el título sigue solo", async () => {
+    renderHome("operador", true);
+
+    expect(await screen.findByText("Premium")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Bienvenido a FARØX" }),
+    ).toBeInTheDocument();
   });
 });

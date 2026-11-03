@@ -194,7 +194,7 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     ).toBeInTheDocument();
   });
 
-  it("muestra rutas, paradas y completadas de la ruta de hoy", async () => {
+  it("el resumen 'Tu día' refleja los pedidos y las paradas de la ruta de hoy", async () => {
     vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
       data: {
         id: 9,
@@ -230,11 +230,12 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     });
     renderPage();
 
-    await waitFor(() =>
-      expect(screen.getByText("Completadas").nextElementSibling).toHaveTextContent("1"),
-    );
-    expect(screen.getByText("Rutas hoy").nextElementSibling).toHaveTextContent("1");
-    expect(screen.getByText("Paradas").nextElementSibling).toHaveTextContent("2");
+    expect(await screen.findByText("Tu día")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Pedidos").nextElementSibling).toHaveTextContent("3");
+      expect(screen.getByText("Paradas").nextElementSibling).toHaveTextContent("2");
+    });
+    expect(screen.getByText("1 pendiente")).toBeInTheDocument();
   });
 
   it("sin solicitudes abiertas muestra el estado vacío", async () => {
@@ -276,8 +277,7 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
 
     expect(await screen.findByText(/Ruta del/)).toBeInTheDocument();
     expect(screen.getByText("Pendiente")).toBeInTheDocument();
-    expect(screen.getByText("Rutas hoy")).toBeInTheDocument();
-    expect(screen.getByText("Paradas")).toBeInTheDocument();
-    expect(screen.getByText("Completadas")).toBeInTheDocument();
+    expect(screen.getByText("Tu día")).toBeInTheDocument();
+    expect(screen.getByText("Paradas").nextElementSibling).toHaveTextContent("1");
   });
 });

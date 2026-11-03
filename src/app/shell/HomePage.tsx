@@ -17,6 +17,7 @@ const DESCRIPTIONS: Record<string, string> = {
   "/faltantes": "Lo que falta en cada tienda, listo para pedir.",
   "/rutas": "Planificación de rutas de entrega.",
   "/dashboard": "Entradas y salidas por distribuidor (Premium).",
+  "/asistente": "Preguntá por stock y por el último pedido de un producto.",
   "/users": "Roles, Premium y alcance de cada usuario.",
   "/roles": "Descripción de los roles del sistema.",
   "/catalogs": "Marcas, categorías, unidades, tipos de tienda y motivos.",
@@ -84,6 +85,12 @@ const ICONS: Record<string, ReactNode> = {
   "/dashboard": (
     <>
       <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </>
+  ),
+  "/asistente": (
+    <>
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 1 1 21 12Z" />
+      <path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01" />
     </>
   ),
   "/users": (
@@ -160,24 +167,27 @@ export function HomePage() {
         <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
         <div className="relative">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-400">
-            Panel de control
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            {/* text-white explícito: la regla base `main h1` (index.css) gana a
-                la herencia del contenedor y lo dejaba casi negro sobre oscuro. */}
-            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Bienvenido a FARØX
-            </h1>
+          {/* La píldora Premium vive en la fila del rótulo y no junto al título:
+              al compartir fila con el h1 no entraba en móviles de 360px y la
+              cabecera se partía en dos filas. */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-400">
+              Panel de control
+            </p>
             {premium && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-200">
-                <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-200">
+                <svg aria-hidden="true" className="h-3 w-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
                 </svg>
                 Premium
               </span>
             )}
           </div>
+          {/* text-white explícito: la regla base `main h1` (index.css) gana a
+              la herencia del contenedor y lo dejaba casi negro sobre oscuro. */}
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+            Bienvenido a FARØX
+          </h1>
           <p className="mt-3 text-sm text-gray-300">
             Sesión iniciada como <span className="font-medium text-white">{roleLabel(role)}</span>
             {email === null ? "" : ` · ${email}`}.

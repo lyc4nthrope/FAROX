@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { EmptyState } from "../../../shared/ui";
+import { EmptyState, ExampleDashboard, type ExampleDashboardStat } from "../../../shared/ui";
 import {
   Badge,
   Box,
@@ -299,8 +299,26 @@ export function MyRoutePage() {
   }
 
   const routeStops = route.data?.stops.length ?? 0;
-  const routeCompleted =
-    route.data?.stops.filter((stop) => stop.status === "completed").length ?? 0;
+  const routeStopsList = route.data?.stops ?? [];
+  const pendingStops = routeStopsList.filter((stop) => stop.status === "pending").length;
+  const totalRequests = stores.reduce((total, store) => total + store.orderCount, 0);
+  // Mismo panel que la “Vista de ejemplo” del inicio, pero con datos reales:
+  // los pedidos abiertos y las paradas de la ruta de hoy.
+  const summaryStats: readonly [ExampleDashboardStat, ExampleDashboardStat] = [
+    {
+      label: "Pedidos",
+      value: requests.loading ? "—" : String(totalRequests),
+      hint: `${stores.length} ${stores.length === 1 ? "tienda" : "tiendas"} con solicitudes`,
+    },
+    {
+      label: "Paradas",
+      value: route.loading ? "—" : String(routeStops),
+      hint:
+        route.data === null
+          ? "sin ruta guardada"
+          : `${pendingStops} ${pendingStops === 1 ? "pendiente" : "pendientes"}`,
+    },
+  ];
 
   return (
     <section>
@@ -324,6 +342,16 @@ export function MyRoutePage() {
             {selectedStores.length} de {stores.length} tiendas
           </span>
         </div>
+      </div>
+
+      <div className="mt-5">
+        <ExampleDashboard
+          eyebrow="Tu día"
+          layout="wide"
+          stats={summaryStats}
+          stops={routeStopsList.map((stop) => stop.store_name)}
+          emptyStopsText="Todavía no guardaste paradas para hoy."
+        />
       </div>
 
       <Status loading={requests.loading} error={requests.error} />
@@ -485,31 +513,6 @@ export function MyRoutePage() {
           <Status error={routeMsg.error} ok={routeMsg.ok} />
         </div>
       )}
-
-      <div className="mt-6 grid grid-cols-3 divide-x divide-gray-300 border border-gray-300 bg-white">
-        <div className="px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Rutas hoy
-          </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
-            {route.data === null ? 0 : 1}
-          </p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Paradas
-          </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{routeStops}</p>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Completadas
-          </p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
-            {routeCompleted}
-          </p>
-        </div>
-      </div>
 
       <div className="mt-8">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">

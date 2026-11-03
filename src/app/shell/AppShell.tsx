@@ -79,10 +79,10 @@ export function AppShell() {
             </span>
           </Link>
 
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 sm:px-2.5">
             <svg
               aria-hidden="true"
-              className="h-3 w-3 text-gray-400"
+              className="h-3 w-3 shrink-0 text-gray-400"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -92,19 +92,26 @@ export function AppShell() {
             >
               <path d="M12 3 5 6v6c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Z" />
             </svg>
-            {roleLabel(role)}
+            {/* En móvil el rol queda solo como icono (con nombre accesible) para
+                que el header entre en una sola fila aun con la insignia Premium. */}
+            <span className="sr-only sm:not-sr-only">{roleLabel(role)}</span>
           </span>
 
           {verInsigniaPremium && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
-              <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 sm:px-2.5">
+              <svg
+                aria-hidden="true"
+                className="h-3 w-3 shrink-0"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
               </svg>
-              Premium
+              <span className="sr-only sm:not-sr-only">Premium</span>
             </span>
           )}
 
-          <div className="ml-auto flex items-center gap-1 text-sm">
+          <div className="ml-auto flex shrink-0 items-center gap-1 text-sm">
             <Link
               to="/profile"
               aria-label="Perfil"
@@ -165,7 +172,7 @@ export function AppShell() {
               >
                 <path d="M4 7h16M4 12h16M4 17h16" />
               </svg>
-              Menú
+              <span className="sr-only sm:not-sr-only">Menú</span>
             </button>
           </div>
         </div>

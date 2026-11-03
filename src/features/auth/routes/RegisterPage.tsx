@@ -6,6 +6,7 @@ import { ErrorBanner } from "../../../shared/ui";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { PRIVACY_VERSION } from "../../../shared/lib/legal/privacyVersion";
 import { resendConfirmationEmail, signUp } from "../api";
+import { BackToHomeLink } from "../components/BackToHomeLink";
 import { RegisterForm, type RegisterFormErrors } from "../components/RegisterForm";
 import { registerSchema, type RegisterFormValues } from "../schemas";
 
@@ -150,7 +151,8 @@ export function RegisterPage() {
   if (phase === "confirmation-pending") {
     return (
       <div className="mx-auto max-w-sm px-4 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight">Revisá tu email</h1>
+        <BackToHomeLink />
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Revisá tu email</h1>
         <p className="mt-1 text-sm text-gray-600">
           Revisá tu email para confirmar tu cuenta. Te enviamos el link de confirmación
           a <span className="font-medium">{pendingEmail}</span>. Sin confirmar tu email no
@@ -188,7 +190,8 @@ export function RegisterPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Crear tu cuenta</h1>
+      <BackToHomeLink />
+      <h1 className="mt-6 text-2xl font-semibold tracking-tight">Crear tu cuenta</h1>
       <p className="mt-1 text-sm text-gray-600">
         Registrate con tu nombre, email y contraseña para usar FAROX.
       </p>

@@ -81,6 +81,11 @@ describe("LoginPage (§S2 fila /login)", () => {
     ).toHaveAttribute("href", "/register");
   });
 
+  it("pantalla pública sin chrome: ofrece volver al inicio", () => {
+    renderLogin();
+    expect(screen.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
+  });
+
   it("enlace de recuperación: Link a la ruta pública /recuperar", () => {
     renderLogin();
     expect(screen.getByRole("link", { name: "¿Olvidaste tu contraseña?" })).toHaveAttribute(

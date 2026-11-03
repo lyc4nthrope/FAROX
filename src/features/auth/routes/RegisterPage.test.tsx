@@ -84,6 +84,19 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     ).toHaveAttribute("href", "/login");
   });
 
+  it("pantalla pública sin chrome: ofrece volver al inicio", () => {
+    renderRegister();
+    expect(screen.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
+  });
+
+  it("pantalla de confirmación: también ofrece volver al inicio", async () => {
+    const user = userEvent.setup();
+    renderRegister();
+    await enviarRegistro(user);
+    await screen.findByRole("heading", { name: "Revisá tu email" });
+    expect(screen.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/");
+  });
+
   it("formulario vacío: errores inline y CERO requests", async () => {
     const user = userEvent.setup();
     renderRegister();
