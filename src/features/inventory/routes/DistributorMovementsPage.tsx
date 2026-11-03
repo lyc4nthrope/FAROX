@@ -19,8 +19,11 @@ import {
   fetchDistributorMovements,
   fetchDistributorPurchases,
   fetchDistributorStores,
+  deleteMovementTemplate,
+  fetchMovementTemplates,
   registerDistributorPurchasesBulk,
   registerDistributorSalesBulk,
+  saveMovementTemplate,
   type MovementLineInput,
 } from "../api";
 
@@ -71,6 +74,15 @@ export function DistributorMovementsPage() {
     error: null,
     ok: null,
   });
+
+  // 0038: plantillas propias (sin tienda) del tipo que se está cargando.
+  const templates = useLoad(
+    () =>
+      mode === null
+        ? Promise.resolve({ data: null, error: null })
+        : fetchMovementTemplates({ kind: mode === "sale" ? "exit" : "entry", storeId: null }),
+    [mode],
+  );
 
   const rows = [...(movements.data ?? []), ...(purchases.data ?? [])]
     .filter((movement) => type === "all" || (movement.direction ?? movement.type) === type)
@@ -184,7 +196,30 @@ export function DistributorMovementsPage() {
       discount={discount}
       onDiscountChange={setDiscount}
       emptyHint="Tu catálogo está vacío: agregá productos primero."
-      recentProductIds={recentSoldIds}
+      recentProductIds={mode === "sale" ? recentSoldIds : []}
+      templates={templates.data ?? []}
+      onSaveTemplate={async (name) => {
+        if (mode === null) return "Elegí el tipo de ticket.";
+        const error = await runAction(() =>
+          saveMovementTemplate({
+            name,
+            kind: mode === "sale" ? "exit" : "entry",
+            storeId: null,
+            lines: lines.map((line) => ({
+              productId: line.productId,
+              quantity: Number(line.quantity),
+            })),
+          }),
+        );
+        if (error === null) templates.reload();
+        return error;
+      }}
+      onDeleteTemplate={(template) => {
+        void runAction(() => deleteMovementTemplate(template.id)).then((error) => {
+          if (error === null) templates.reload();
+          else setMsg({ error, ok: null });
+        });
+      }}
       action={
         <button className={buttonClass} type="submit" disabled={saving}>
           {saving

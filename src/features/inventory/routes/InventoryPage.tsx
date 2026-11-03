@@ -27,6 +27,9 @@ import {
   fetchStockOptions,
   fetchStoreName,
   registerMovementsBulk,
+  deleteMovementTemplate,
+  fetchMovementTemplates,
+  saveMovementTemplate,
   reverseMovement,
   setPrice,
   type MovementProductOption,
@@ -267,6 +270,16 @@ export function InventoryPage() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [discount, setDiscount] = useState("");
 
+  // 0038: plantillas del tipo que se está cargando; solo se piden con el
+  // diálogo abierto para no sumar requests a la pantalla.
+  const templates = useLoad(
+    () =>
+      modal === "movement"
+        ? fetchMovementTemplates({ kind: mov.type, storeId })
+        : Promise.resolve({ data: null, error: null }),
+    [modal, mov.type, storeId],
+  );
+
   function openMovement(type: "entry" | "exit") {
     setMsg({ error: null, ok: null });
     setMov({ type, motiveId: "", expiry: "" });
@@ -433,7 +446,29 @@ export function InventoryPage() {
         discount={discount}
         onDiscountChange={setDiscount}
         emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
-        recentProductIds={recentSoldIds}
+        recentProductIds={mov.type === "exit" ? recentSoldIds : []}
+        templates={templates.data ?? []}
+        onSaveTemplate={async (name) => {
+          const error = await runAction(() =>
+            saveMovementTemplate({
+              name,
+              kind: mov.type,
+              storeId,
+              lines: cart.map((line) => ({
+                productId: line.productId,
+                quantity: Number(line.quantity),
+              })),
+            }),
+          );
+          if (error === null) templates.reload();
+          return error;
+        }}
+        onDeleteTemplate={(template) => {
+          void runAction(() => deleteMovementTemplate(template.id)).then((error) => {
+            if (error === null) templates.reload();
+            else setMsg({ error, ok: null });
+          });
+        }}
         action={
           <button className={buttonClass} type="submit" disabled={busy}>
             {busy

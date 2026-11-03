@@ -342,6 +342,87 @@ export async function registerDistributorPurchasesBulk(input: {
   return { error };
 }
 
+// ============================================================================
+// 0038 — tickets recurrentes: compras y ventas guardadas para reaplicar.
+// ============================================================================
+
+export interface MovementTemplateLine {
+  productId: number;
+  quantity: number;
+}
+
+export interface MovementTemplate {
+  id: number;
+  name: string;
+  kind: "entry" | "exit";
+  lines: MovementTemplateLine[];
+}
+
+function normalizeTemplateLines(value: unknown): MovementTemplateLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (raw === null || typeof raw !== "object") return [];
+    const record = raw as Record<string, unknown>;
+    const productId = Number(record.product_id);
+    const quantity = Number(record.quantity);
+    if (
+      !Number.isFinite(productId) ||
+      productId <= 0 ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0
+    ) {
+      return [];
+    }
+    return [{ productId, quantity }];
+  });
+}
+
+/** Plantillas del alcance: tienda (operador/admin) o distribuidora (storeId null). */
+export async function fetchMovementTemplates(input: {
+  kind: "entry" | "exit";
+  storeId: number | null;
+}): Promise<LoadResult<MovementTemplate[]>> {
+  let query = supabase
+    .from("movement_templates")
+    .select("id,name,kind,lines")
+    .eq("kind", input.kind);
+  query = input.storeId === null ? query.is("store_id", null) : query.eq("store_id", input.storeId);
+  const { data, error } = await query.order("updated_at", { ascending: false }).limit(50);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: Number(row.id),
+    name: String(row.name),
+    kind: row.kind as "entry" | "exit",
+    lines: normalizeTemplateLines(row.lines),
+  }));
+  return { data: rows, error };
+}
+
+/** Crea o reemplaza la plantilla del mismo nombre dentro del alcance. */
+export async function saveMovementTemplate(input: {
+  name: string;
+  kind: "entry" | "exit";
+  storeId: number | null;
+  lines: readonly MovementTemplateLine[];
+}): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("save_movement_template", {
+    p_name: input.name,
+    p_kind: input.kind,
+    p_store: input.storeId,
+    p_lines: input.lines.map((line) => ({
+      product_id: line.productId,
+      quantity: line.quantity,
+    })),
+  });
+  return { error };
+}
+
+export async function deleteMovementTemplate(templateId: number): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("delete_movement_template", {
+    p_id: templateId,
+  });
+  return { error };
+}
+
 export async function fetchMotives(): Promise<LoadResult<MotiveOption[]>> {
   const { data, error } = await supabase
     .from("motives")

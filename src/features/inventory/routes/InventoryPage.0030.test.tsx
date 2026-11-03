@@ -18,6 +18,9 @@ vi.mock("../api", () => ({
   fetchStoreName: vi.fn(),
   registerMovement: vi.fn(),
   registerMovementsBulk: vi.fn(),
+  fetchMovementTemplates: vi.fn(),
+  saveMovementTemplate: vi.fn(),
+  deleteMovementTemplate: vi.fn(),
   reverseMovement: vi.fn(),
   setPrice: vi.fn(),
 }));
@@ -119,6 +122,7 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(inventoryApi.fetchMovements).mockResolvedValue({ data: [], error: null });
+  vi.mocked(inventoryApi.fetchMovementTemplates).mockResolvedValue({ data: [], error: null });
   vi.mocked(productsApi.fetchProductCategories).mockResolvedValue({ rows: [], error: null });
   vi.mocked(productsApi.fetchStoreCatalog).mockImplementation(async () => ({
     rows: added ? [ROW, NEW_ROW] : [ROW],

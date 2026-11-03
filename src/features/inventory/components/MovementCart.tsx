@@ -1,7 +1,7 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { formatCOP, formatQty } from "../../../shared/lib/format";
-import { Status, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
+import { Status, buttonClass, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
 import { QuantityStepper } from "../../../shared/ui";
 import { BarcodeScanner } from "../../products/components/BarcodeScanner";
 import type { MovementProductOption } from "../api";
@@ -14,6 +14,13 @@ export interface CartLine {
   quantity: string;
   /** Precio unitario de lista; el descuento se aplica al total del ticket. */
   unitPrice: string;
+}
+
+/** 0038: plantilla guardada (producto + cantidad, sin precios históricos). */
+export interface CartTemplate {
+  id: number;
+  name: string;
+  lines: readonly { productId: number; quantity: number }[];
 }
 
 function normalize(value: string): string {
@@ -69,6 +76,9 @@ export function MovementCart({
   disabled = false,
   recentProductIds = [],
   action,
+  templates = [],
+  onSaveTemplate,
+  onDeleteTemplate,
 }: {
   options: readonly MovementProductOption[];
   loading?: boolean;
@@ -86,9 +96,17 @@ export function MovementCart({
   recentProductIds?: readonly number[];
   /** 0039: confirmación de una línea (total + botón) al pie del ticket. */
   action?: ReactNode;
+  /** 0038: compras y ventas guardadas para reaplicar. */
+  templates?: readonly CartTemplate[];
+  onSaveTemplate?: (name: string) => Promise<string | null>;
+  onDeleteTemplate?: (template: CartTemplate) => void;
 }) {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [templateForm, setTemplateForm] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const [templateMsg, setTemplateMsg] = useState<string | null>(null);
   const priceLabel = priceKind === "purchase" ? "Precio de compra" : "Precio de venta";
 
   const filtered = useMemo(() => {
@@ -181,6 +199,67 @@ export function MovementCart({
     .filter((option): option is MovementProductOption => option !== undefined)
     .slice(0, 6);
 
+  // 0038: aplicar una plantilla suma sus líneas al ticket actual; el precio
+  // sale del catálogo vigente, nunca de un precio histórico.
+  function applyTemplate(template: CartTemplate): void {
+    setNotice(null);
+    let next = [...lines];
+    let missing = 0;
+    for (const templateLine of template.lines) {
+      const option = byId.get(templateLine.productId);
+      if (option === undefined) {
+        missing += 1;
+        continue;
+      }
+      const index = next.findIndex((line) => line.productId === option.id);
+      if (index >= 0) {
+        const current = Number(next[index]?.quantity);
+        const total = (Number.isFinite(current) ? current : 0) + templateLine.quantity;
+        next = next.map((line, position) =>
+          position === index ? { ...line, quantity: String(total) } : line,
+        );
+      } else {
+        next = [
+          ...next,
+          {
+            productId: option.id,
+            name: option.name,
+            brand: option.brand,
+            quantity: String(templateLine.quantity),
+            unitPrice: suggestedPrice(option),
+          },
+        ];
+      }
+    }
+    if (next.length === 0) {
+      setNotice(`"${template.name}" no tiene productos disponibles en este catálogo.`);
+      return;
+    }
+    onChange(next);
+    setNotice(
+      missing > 0
+        ? `"${template.name}" agregado · ${missing} ${
+            missing === 1 ? "producto ya no está" : "productos ya no están"
+          } en el catálogo.`
+        : `"${template.name}" agregado al ticket.`,
+    );
+  }
+
+  async function saveTemplate(): Promise<void> {
+    const name = templateName.trim();
+    if (name === "" || onSaveTemplate === undefined) return;
+    setTemplateBusy(true);
+    const error = await onSaveTemplate(name);
+    setTemplateBusy(false);
+    if (error !== null) {
+      setTemplateMsg(error);
+      return;
+    }
+    setTemplateMsg(null);
+    setTemplateName("");
+    setTemplateForm(false);
+  }
+
   const subtotal = cartSubtotal(lines);
   const total = cartTotal(lines, discount);
   const discountAmount = Math.max(0, subtotal - total);
@@ -209,6 +288,44 @@ export function MovementCart({
           Escaneá seguido para sumar unidades · Enter agrega el primero
         </span>
       </label>
+
+      {templates.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            Recurrentes
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {templates.map((template) => (
+              <span
+                key={template.id}
+                className="inline-flex items-center overflow-hidden rounded-full border border-gray-200 bg-white"
+              >
+                <button
+                  type="button"
+                  className="px-2.5 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                  aria-label={`Agregar ${template.name} de recurrentes`}
+                  disabled={disabled}
+                  onClick={() => applyTemplate(template)}
+                >
+                  {template.name}
+                  <span className="ml-1 text-gray-400">{template.lines.length}</span>
+                </button>
+                {onDeleteTemplate !== undefined && (
+                  <button
+                    type="button"
+                    className="border-l border-gray-200 px-2 py-1 text-xs text-gray-400 transition hover:bg-red-50 hover:text-red-700"
+                    aria-label={`Eliminar plantilla ${template.name}`}
+                    disabled={disabled}
+                    onClick={() => onDeleteTemplate(template)}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {recent.length > 0 && (
         <div className="mt-2">
@@ -427,18 +544,84 @@ export function MovementCart({
       )}
 
       {lines.length > 0 && (
-        <button
-          type="button"
-          className={`${secondaryButtonClass} mt-3 px-3 py-1.5 text-xs`}
-          disabled={disabled}
-          onClick={() => {
-            onChange([]);
-            onDiscountChange("");
-            setNotice(null);
-          }}
-        >
-          Vaciar ticket
-        </button>
+        <div className="mt-3">
+          {templateForm ? (
+            <div className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 p-3">
+              <label className="min-w-0 flex-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  Nombre de la plantilla
+                </span>
+                <input
+                  className={`${inputClass} mt-1 w-full`}
+                  aria-label="Nombre de la plantilla"
+                  value={templateName}
+                  disabled={templateBusy}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void saveTemplate();
+                    }
+                  }}
+                  autoFocus
+                />
+              </label>
+              <button
+                type="button"
+                className={`${buttonClass} px-3 py-1.5 text-xs`}
+                disabled={templateBusy || templateName.trim() === ""}
+                onClick={() => void saveTemplate()}
+              >
+                {templateBusy ? "Guardando…" : "Guardar"}
+              </button>
+              <button
+                type="button"
+                className={`${secondaryButtonClass} px-3 py-1.5 text-xs`}
+                disabled={templateBusy}
+                onClick={() => {
+                  setTemplateForm(false);
+                  setTemplateName("");
+                  setTemplateMsg(null);
+                }}
+              >
+                Cancelar
+              </button>
+              {templateMsg !== null && (
+                <p role="alert" className="w-full text-xs font-medium text-red-700">
+                  {templateMsg}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                className={`${secondaryButtonClass} px-3 py-1.5 text-xs`}
+                disabled={disabled}
+                onClick={() => {
+                  setNotice(null);
+                  onChange([]);
+                  onDiscountChange("");
+                }}
+              >
+                Vaciar ticket
+              </button>
+              {onSaveTemplate !== undefined && (
+                <button
+                  type="button"
+                  className={`${secondaryButtonClass} px-3 py-1.5 text-xs`}
+                  disabled={disabled}
+                  onClick={() => {
+                    setTemplateMsg(null);
+                    setTemplateForm(true);
+                  }}
+                >
+                  Guardar recurrente
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

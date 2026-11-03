@@ -12,6 +12,9 @@ vi.mock("../api", () => ({
   fetchDistributorPurchases: vi.fn(),
   fetchDistributorMovementOptions: vi.fn(),
   fetchDistributorStores: vi.fn(),
+  fetchMovementTemplates: vi.fn(),
+  saveMovementTemplate: vi.fn(),
+  deleteMovementTemplate: vi.fn(),
   registerDistributorSalesBulk: vi.fn(),
   registerDistributorPurchasesBulk: vi.fn(),
 }));
@@ -130,6 +133,11 @@ beforeEach(() => {
     data: [PRODUCT],
     error: null,
   });
+  vi.mocked(inventoryApi.fetchMovementTemplates).mockResolvedValue({
+    data: [],
+    error: null,
+  });
+  vi.mocked(inventoryApi.saveMovementTemplate).mockResolvedValue({ error: null });
   vi.mocked(inventoryApi.fetchDistributorStores).mockResolvedValue({
     data: [],
     error: null,
@@ -271,6 +279,58 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(
       within(dialog).getByLabelText("Precio de venta de Arroz Diana"),
     ).toBeInTheDocument();
+  });
+
+  it("0038: aplicar una recurrente carga sus líneas con el precio vigente", async () => {
+    vi.mocked(inventoryApi.fetchMovementTemplates).mockResolvedValue({
+      data: [
+        {
+          id: 5,
+          name: "Venta mostrador",
+          kind: "exit",
+          lines: [{ productId: 1, quantity: 2 }],
+        },
+      ],
+      error: null,
+    });
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Registrar venta" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar venta a una tienda",
+    });
+    await user.click(
+      await within(dialog).findByRole("button", {
+        name: "Agregar Venta mostrador de recurrentes",
+      }),
+    );
+
+    expect(within(dialog).getByLabelText("Cantidad de Arroz Diana")).toHaveValue(2);
+    expect(within(dialog).getByLabelText("Precio de venta de Arroz Diana")).toHaveValue(4500);
+  });
+
+  it("0038: guarda el ticket actual como recurrente", async () => {
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Registrar venta" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar venta a una tienda",
+    });
+    await user.click(within(dialog).getByRole("button", { name: /Arroz Diana/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Guardar recurrente" }));
+    await user.type(within(dialog).getByLabelText("Nombre de la plantilla"), "Venta mostrador");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(inventoryApi.saveMovementTemplate).toHaveBeenCalledWith({
+        name: "Venta mostrador",
+        kind: "exit",
+        storeId: null,
+        lines: [{ productId: 1, quantity: 1 }],
+      }),
+    );
   });
 
   it("0037: registra una compra a proveedor como entrada", async () => {
