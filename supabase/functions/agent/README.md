@@ -32,7 +32,8 @@ Las tres viven en la migración `0039_asistente_consultas.sql`.
 
 ```bash
 supabase secrets set \
-  GEMINI_API_KEY="..." \
+  AGENT_API_KEY="..." \
+  AGENT_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai" \
   AGENT_MODEL="gemini-2.5-flash" \
   AGENT_FALLBACK_MODEL="gemini-2.5-flash-lite" \
   AGENT_ENABLED="true"
@@ -40,7 +41,32 @@ supabase secrets set \
 
 `AGENT_ENABLED` es el interruptor de lanzamiento: si falta o es `false`, la
 función responde `503`. `AGENT_FALLBACK_MODEL` se usa si el primario deja de
-existir; nunca se llama si el primario responde.
+existir; nunca se llama si el primario responde. `GEMINI_API_KEY` todavía se
+acepta como nombre alternativo de `AGENT_API_KEY`.
+
+## Proveedores
+
+La función habla la API **compatible con OpenAI** (`POST /chat/completions` con
+function calling), así que cambiar de proveedor es cambiar tres secretos:
+
+| Proveedor | `AGENT_BASE_URL` | Ejemplo de `AGENT_MODEL` |
+|---|---|---|
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `google/gemini-2.5-flash` |
+| Groq | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` |
+| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` |
+| Together | `https://api.together.xyz/v1` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` |
+| LiteLLM / AI Gateway | la URL del gateway | el id que exponga el gateway |
+
+Requisito: el proveedor tiene que soportar **function calling**. Un modelo que
+no lo soporte puede responder texto, pero nunca va a consultar stock ni pedidos;
+el `agent-health` no detecta eso, así que se prueba en el set de evaluación.
+
+Si algún proveedor exige otro header de auth (por ejemplo `api-key` en Azure),
+el único archivo a tocar es `_shared/agent.ts` (`providerHeaders`).
+
 
 ## Deploy
 
@@ -85,8 +111,8 @@ select cron.schedule(
 **Cómo cambiás de modelo (sin deploy de código)**
 
 ```bash
-# 1. Ver qué modelos existen hoy
-curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"
+# 1. Ver qué modelos existen hoy (catálogo del proveedor; en Gemini:)
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$AGENT_API_KEY"
 
 # 2. Cambiar el primario y, si hace falta, el respaldo
 supabase secrets set AGENT_MODEL="gemini-3.5-flash" AGENT_FALLBACK_MODEL="gemini-2.5-flash"
@@ -128,6 +154,19 @@ hacen falta cuatro piezas que no están en este repo:
    Supabase, así que `auth.uid()` no existe: hacen falta variantes
    `agent_*_for_user(uuid)` con guard de `service_role`, o un gateway que emita
    un JWT de corta vida. No alcanza con cambiar el cliente.
+
+## Alternativas a WhatsApp Business
+
+De más a menos recomendable para arrancar:
+
+1. **Widget web** (ya existe): costo cero, sin alta ni verificación.
+2. **Telegram Bot API**: gratis, sin tarjeta, webhook en minutos con un token de BotFather. Es el mejor canal para un piloto real fuera de la app.
+3. **WhatsApp Business Cloud API con número de prueba**: Meta da un número de prueba y hasta 5 destinatarios verificados **sin método de pago**. Alcanza para validar el flujo completo. Para producción: número propio, verificación del negocio y método de pago.
+4. **Instagram / Messenger**: mismo backend de Meta y la misma complejidad operativa.
+5. **SMS (Twilio)**: cobra por mensaje y no tiene la familiaridad de WhatsApp.
+6. **NO usar** librerías no oficiales (Baileys, whatsapp-web.js): violan los términos de WhatsApp, el número se banea y el riesgo cae sobre el producto.
+
+Sobre el crédito de USD 200: es del **proveedor de IA** (Google Cloud/Vertex o similar), no de WhatsApp. WhatsApp no cobra por el entorno de prueba; el modelo sí consume ese crédito si usás Vertex. Con la Gemini API o un free tier de otro proveedor alcanza para el piloto, con límites de tasa y datos usados para mejorar el producto.
 
 ## Reportes (fase 3)
 

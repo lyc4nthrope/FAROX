@@ -74,3 +74,11 @@ La búsqueda es `LIKE` normalizado, no fuzzy: un error de tipeo ("arrox") no enc
 - **S11.** El chat muestra «WhatsApp ↗» cuando `VITE_WHATSAPP_AGENT_NUMBER` está definido; abre `wa.me` con mensaje prellenado.
 - El número **no responde solo**: falta el webhook de Meta, la verificación de firma y el alcance por usuario (el webhook no tiene JWT). Documentado en el README de la función; no se implementó un webhook a medias por el riesgo de suplantación.
 - `npm run ci` en verde.
+
+### L9 — proveedor genérico y canales alternativos (2026-11-03)
+
+- **S12.** El adaptador habla la API **compatible con OpenAI** (`POST {AGENT_BASE_URL}/chat/completions` con `tools`), así que OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Together, Ollama/vLLM y el endpoint compatible de Gemini funcionan sin tocar código.
+- **S13.** Cambiar de proveedor es `AGENT_API_KEY` + `AGENT_BASE_URL` + `AGENT_MODEL` (+ `AGENT_FALLBACK_MODEL`) y `functions deploy agent`.
+- `AGENT_API_KEY` cae a `GEMINI_API_KEY` si existe, para no romper un despliegue previo.
+- **S14.** El runbook documenta alternativas a WhatsApp Business: widget web (gratis), Telegram Bot API (gratis, sin tarjeta), número de prueba de WhatsApp Cloud API (5 destinatarios, sin tarjeta) y el descarte explícito de librerías no oficiales.
+- El crédito de USD 200 corresponde al proveedor de IA, no a WhatsApp; con un free tier alcanza para el piloto.

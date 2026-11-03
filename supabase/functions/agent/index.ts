@@ -29,10 +29,12 @@ Deno.serve(async (request) => {
   const header = authHeader(request);
   if (header === null) return errorJson("Iniciá sesión para continuar.", 401, true);
 
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  const apiKey = Deno.env.get("AGENT_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
   if (apiKey === undefined || apiKey === "") {
     return errorJson("Falta configurar el asistente.", 500, true);
   }
+  const baseUrl =
+    Deno.env.get("AGENT_BASE_URL") ?? "https://generativelanguage.googleapis.com/v1beta/openai";
   const model = Deno.env.get("AGENT_MODEL") ?? "gemini-2.5-flash";
   // Respaldo ante obsolescencia: si el primario deja de existir, el turno
   // sigue con este modelo sin tocar código.
@@ -125,6 +127,7 @@ Deno.serve(async (request) => {
     const { reply, toolLog } = await runAgent({
       client,
       apiKey,
+      baseUrl,
       model,
       fallbackModel,
       message,

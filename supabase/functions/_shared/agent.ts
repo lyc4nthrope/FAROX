@@ -1,11 +1,16 @@
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 // ============================================================================
-// Asistente FARØX — fase 1: SOLO consultas (lectura).
+// Asistente FARØX — adaptador GENÉRICO (API compatible con OpenAI).
 //
-// El modelo nunca ejecuta SQL: elige entre tres herramientas fijas, y cada una
-// corre como RPC SECURITY DEFINER con el JWT del usuario, así que la RLS
-// decide qué puede ver. Ninguna herramienta escribe.
+// Habla `POST {AGENT_BASE_URL}/chat/completions` con function calling, el
+// contrato que comparten OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Together,
+// Ollama/vLLM y el endpoint compatible de Gemini. Cambiar de proveedor es
+// cambiar AGENT_BASE_URL + AGENT_API_KEY + AGENT_MODEL: no se toca código.
+//
+// El modelo nunca ejecuta SQL: elige entre herramientas fijas y cada una corre
+// como RPC SECURITY DEFINER con el JWT del usuario, así que la RLS decide qué
+// puede ver. Ninguna herramienta escribe.
 // ============================================================================
 
 const MAX_STEPS = 4;
@@ -23,9 +28,9 @@ export interface AgentToolLog {
 }
 
 /**
- * El proveedor retiró el modelo (404, o 400 "not found / no longer available").
- * Se distingue del resto de los fallos para poder usar el fallback y para que
- * el log diga MODEL_UNAVAILABLE en vez de un 502 genérico.
+ * El proveedor retiró el modelo (404, o 400 con "not found / no longer /
+ * does not exist / deprecated"). Se distingue del resto de los fallos para
+ * usar el respaldo y para que el log diga MODEL_UNAVAILABLE.
  */
 export class ModelUnavailableError extends Error {
   readonly status: number;
@@ -39,22 +44,22 @@ export class ModelUnavailableError extends Error {
 
 function isModelUnavailable(status: number, detail: string): boolean {
   if (status === 404) return true;
-  if (status !== 400) return false;
+  if (status !== 400 && status !== 422) return false;
   const text = detail.toLowerCase();
   return (
     text.includes("not found") ||
     text.includes("not supported") ||
     text.includes("no longer") ||
+    text.includes("does not exist") ||
     text.includes("is not available") ||
-    text.includes("deprecated")
+    text.includes("deprecated") ||
+    text.includes("unsupported model") ||
+    text.includes("invalid model")
   );
 }
 
-function modelUrl(model: string, apiKey: string): string {
-  return (
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-    `${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
-  );
+export function chatUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 }
 
 const SYSTEM_PROMPT = `Sos el asistente de FARØX, una app de inventario, pedidos y rutas para tiendas y distribuidoras.
@@ -68,94 +73,129 @@ Reglas:
 - En esta versión solo podés consultar. No podés registrar ventas, compras ni cambios de stock: si te lo piden, explicá que por ahora solo consultás.
 - No muestres detalles técnicos (nombres de tablas, RPC, errores internos).`;
 
-// Gemini usa un subconjunto de OpenAPI: tipos en mayúsculas.
 const TOOLS = [
   {
-    name: "buscar_producto",
-    description:
-      "Busca productos activos por nombre, marca o código de barras. Usala siempre antes de consultar stock o pedidos. Devuelve hasta 8 candidatos con product_id, nombre, marca y código.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        termino: {
-          type: "STRING",
-          description: "Texto a buscar: nombre, marca o código de barras (ej. 'arroz', 'diana', '770123').",
+    type: "function",
+    function: {
+      name: "buscar_producto",
+      description:
+        "Busca productos activos por nombre, marca o código de barras. Usala siempre antes de consultar stock o pedidos. Devuelve hasta 8 candidatos con product_id, nombre, marca y código.",
+      parameters: {
+        type: "object",
+        properties: {
+          termino: {
+            type: "string",
+            description:
+              "Texto a buscar: nombre, marca o código de barras (ej. 'arroz', 'diana', '770123').",
+          },
         },
+        required: ["termino"],
       },
-      required: ["termino"],
     },
   },
   {
-    name: "consultar_stock",
-    description:
-      "Devuelve cuánto stock hay de un producto, por tienda. Para un distribuidor devuelve el stock de su propio catálogo. Requiere product_id de buscar_producto.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        producto_id: { type: "INTEGER", description: "product_id devuelto por buscar_producto." },
+    type: "function",
+    function: {
+      name: "consultar_stock",
+      description:
+        "Devuelve cuánto stock hay de un producto, por tienda. Para un distribuidor devuelve el stock de su propio catálogo. Requiere product_id de buscar_producto.",
+      parameters: {
+        type: "object",
+        properties: {
+          producto_id: {
+            type: "integer",
+            description: "product_id devuelto por buscar_producto.",
+          },
+        },
+        required: ["producto_id"],
       },
-      required: ["producto_id"],
     },
   },
   {
-    name: "dias_sin_pedido",
-    description:
-      "Devuelve el último pedido registrado de un producto (por tienda) y cuántos días pasaron desde entonces. Requiere product_id de buscar_producto.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        producto_id: { type: "INTEGER", description: "product_id devuelto por buscar_producto." },
+    type: "function",
+    function: {
+      name: "dias_sin_pedido",
+      description:
+        "Devuelve el último pedido registrado de un producto (por tienda) y cuántos días pasaron desde entonces. Requiere product_id de buscar_producto.",
+      parameters: {
+        type: "object",
+        properties: {
+          producto_id: {
+            type: "integer",
+            description: "product_id devuelto por buscar_producto.",
+          },
+        },
+        required: ["producto_id"],
       },
-      required: ["producto_id"],
     },
   },
 ] as const;
 
-type GeminiPart =
-  | { text: string }
-  | { functionCall: { name: string; args?: Record<string, unknown> } }
-  | { functionResponse: { name: string; response: Record<string, unknown> } };
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
 
-type GeminiContent = { role: "user" | "model"; parts: GeminiPart[] };
+type ChatMessage =
+  | { role: "system"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string };
 
-interface GeminiResponse {
-  candidates?: { content?: { parts?: GeminiPart[] } }[];
+interface ChatResponse {
+  choices?: { message?: { content?: string | null; tool_calls?: ToolCall[] } }[];
+}
+
+interface ProviderConfig {
+  apiKey: string;
+  baseUrl: string;
+}
+
+function providerHeaders(apiKey: string): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
 }
 
 export async function runAgent(input: {
   client: SupabaseClient;
   apiKey: string;
+  baseUrl: string;
   model: string;
   fallbackModel?: string | null;
   message: string;
   history: readonly AgentHistoryItem[];
 }): Promise<{ reply: string; toolLog: AgentToolLog[]; model: string }> {
-  const contents: GeminiContent[] = [
-    ...input.history.slice(-MAX_HISTORY).map((item) => ({
-      role: item.role === "assistant" ? ("model" as const) : ("user" as const),
-      parts: [{ text: item.content }],
-    })),
-    { role: "user", parts: [{ text: input.message }] },
+  const messages: ChatMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...input.history.slice(-MAX_HISTORY).map(
+      (item): ChatMessage => ({ role: item.role, content: item.content }),
+    ),
+    { role: "user", content: input.message },
   ];
   const toolLog: AgentToolLog[] = [];
+  const url = chatUrl(input.baseUrl);
   let activeModel = input.model;
   let usedFallback = false;
   const fallback = input.fallbackModel ?? null;
 
-  async function callModel(): Promise<GeminiResponse> {
-    const response = await fetch(modelUrl(activeModel, input.apiKey), {
+  async function callModel(): Promise<ChatResponse> {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: providerHeaders(input.apiKey),
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        tools: [{ functionDeclarations: TOOLS }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 700 },
+        model: activeModel,
+        messages,
+        tools: TOOLS,
+        tool_choice: "auto",
+        temperature: 0.2,
       }),
     });
-    if (response.ok) return (await response.json()) as GeminiResponse;
+    if (response.ok) return (await response.json()) as ChatResponse;
     const detail = await response.text();
-    const short = `gemini ${response.status}: ${detail.slice(0, 300)}`;
+    const short = `provider ${response.status}: ${detail.slice(0, 300)}`;
     if (isModelUnavailable(response.status, detail)) {
       throw new ModelUnavailableError(short, response.status);
     }
@@ -163,7 +203,7 @@ export async function runAgent(input: {
   }
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
-    let payload: GeminiResponse;
+    let payload: ChatResponse;
     try {
       payload = await callModel();
     } catch (error) {
@@ -179,14 +219,10 @@ export async function runAgent(input: {
       activeModel = fallback;
       payload = await callModel();
     }
-    const parts = payload.candidates?.[0]?.content?.parts ?? [];
-    const calls = parts.flatMap((part) =>
-      "functionCall" in part && part.functionCall !== undefined ? [part.functionCall] : [],
-    );
-    const text = parts
-      .flatMap((part) => ("text" in part && typeof part.text === "string" ? [part.text] : []))
-      .join("")
-      .trim();
+
+    const message = payload.choices?.[0]?.message;
+    const calls = message?.tool_calls ?? [];
+    const text = typeof message?.content === "string" ? message.content.trim() : "";
 
     if (calls.length === 0) {
       return {
@@ -196,15 +232,17 @@ export async function runAgent(input: {
       };
     }
 
-    contents.push({ role: "model", parts });
-    const responses: GeminiPart[] = [];
+    messages.push({ role: "assistant", content: message?.content ?? null, tool_calls: calls });
     for (const call of calls) {
-      const args = (call.args ?? {}) as Record<string, unknown>;
-      const result = await runTool(input.client, call.name, args);
-      toolLog.push({ name: call.name, args, result });
-      responses.push({ functionResponse: { name: call.name, response: { result } } });
+      const args = parseArgs(call.function.arguments);
+      const result = await runTool(input.client, call.function.name, args);
+      toolLog.push({ name: call.function.name, args, result });
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: JSON.stringify(result),
+      });
     }
-    contents.push({ role: "user", parts: responses });
   }
 
   return {
@@ -214,18 +252,31 @@ export async function runAgent(input: {
   };
 }
 
-/** Ping mínimo para el chequeo de salud (1 token de salida). */
-export async function probeModel(input: {
-  apiKey: string;
-  model: string;
-}): Promise<{ ok: boolean; status: number; detail: string }> {
+function parseArgs(raw: string | undefined): Record<string, unknown> {
+  if (raw === undefined || raw === "") return {};
   try {
-    const response = await fetch(modelUrl(input.model, input.apiKey), {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Ping mínimo para el chequeo de salud (1 token de salida). */
+export async function probeModel(
+  input: ProviderConfig & { model: string },
+): Promise<{ ok: boolean; status: number; detail: string }> {
+  try {
+    const response = await fetch(chatUrl(input.baseUrl), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: providerHeaders(input.apiKey),
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "ping" }] }],
-        generationConfig: { maxOutputTokens: 1, temperature: 0 },
+        model: input.model,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+        temperature: 0,
       }),
     });
     const detail = response.ok ? "" : (await response.text()).slice(0, 200);

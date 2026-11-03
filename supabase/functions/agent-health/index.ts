@@ -24,15 +24,17 @@ Deno.serve(async (request) => {
     via = "admin";
   }
 
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  const apiKey = Deno.env.get("AGENT_API_KEY") ?? Deno.env.get("GEMINI_API_KEY");
   if (apiKey === undefined || apiKey === "") {
     return errorJson("Falta configurar el asistente.", 500, true);
   }
 
+  const baseUrl =
+    Deno.env.get("AGENT_BASE_URL") ?? "https://generativelanguage.googleapis.com/v1beta/openai";
   const primary = Deno.env.get("AGENT_MODEL") ?? "gemini-2.5-flash";
   const fallback = Deno.env.get("AGENT_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
 
-  const first = await probeModel({ apiKey, model: primary });
+  const first = await probeModel({ apiKey, baseUrl, model: primary });
   const checkedAt = new Date().toISOString();
 
   if (first.ok) {
@@ -43,11 +45,12 @@ Deno.serve(async (request) => {
     );
   }
 
-  const second = await probeModel({ apiKey, model: fallback });
+  const second = await probeModel({ apiKey, baseUrl, model: fallback });
   const body = {
     ok: second.ok,
     model: second.ok ? fallback : primary,
     fallback_used: second.ok,
+    base_url: baseUrl,
     primary_status: first.status,
     fallback_status: second.status,
     primary_detail: first.detail,
