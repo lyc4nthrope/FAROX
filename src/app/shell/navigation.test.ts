@@ -15,6 +15,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/fiado",
       "/rutas",
       "/dashboard",
+      "/asistente",
       "/users",
       "/planes",
       "/pagos",
@@ -35,6 +36,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/faltantes",
       "/fiado",
       "/dashboard",
+      "/asistente",
     ]);
     for (const adminOnly of [
       "/users",
@@ -58,6 +60,7 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/movimientos",
       "/vincular",
       "/alertas",
+      "/asistente",
       "/dashboard",
       "/products",
     ]);

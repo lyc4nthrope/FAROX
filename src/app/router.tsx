@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { CallbackPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../features/auth";
+import { AssistantPage } from "../features/assistant";
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
@@ -295,6 +296,7 @@ export function AppRoutes() {
             <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
             <Route path="/movimientos" element={<RequireRole roles={DISTRIBUTOR_ONLY}><DistributorMovementsPage /></RequireRole>} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/asistente" element={<AssistantPage />} />
             <Route path="/tiendas/:storeId/qr" element={<RequireRole roles={ADMIN_OR_OPERATOR}><StoreQrPage /></RequireRole>} />
             <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
             <Route path="/vincular/:code" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />

@@ -9,18 +9,16 @@ import { join, relative } from "node:path";
 const SRC = join(process.cwd(), "src");
 
 // §S8-1 · 21 RPCs diferidos (whitelist Base:642-659; 10 en alcance + 21 = 31).
+// 0039: create_chat / send_message / chat_* ya son parte del alcance real
+// (asistente de consultas), asi que salen de las listas diferidas.
 const DEFERRED_RPCS = [
   "get_stock",
-  "create_chat",
-  "send_message",
 ];
 
 // Tablas todavía no habilitadas en el front (el resto ya tiene slice).
 const DEFERRED_TABLES = [
   "order_items",
   "dashboard_daily",
-  "chat_conversations",
-  "chat_messages",
 ];
 
 const QUOTE = "['\"`]";

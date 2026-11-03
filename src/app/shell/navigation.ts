@@ -21,6 +21,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/fiado", label: "Fiado" },
   { to: "/rutas", label: "Rutas" },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/asistente", label: "Asistente" },
   { to: "/users", label: "Usuarios" },
   { to: "/planes", label: "Planes" },
   { to: "/pagos", label: "Pagos" },
@@ -51,6 +52,7 @@ const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/movimientos", label: "Movimientos" },
   { to: "/vincular", label: "Vincular tienda" },
   { to: "/alertas", label: "Alertas" },
+  { to: "/asistente", label: "Asistente" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/products", label: "Productos" },
 ];
