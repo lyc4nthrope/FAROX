@@ -36,6 +36,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 describe("AssistantPage · asistente de consultas (0039)", () => {
@@ -75,5 +76,19 @@ describe("AssistantPage · asistente de consultas (0039)", () => {
       "No pude responder ahora. Probá de nuevo en un rato.",
     );
     expect(screen.getByText("¿cuánto hay de café?")).toBeInTheDocument();
+  });
+
+  it("0040: muestra el acceso directo a WhatsApp cuando está configurado", async () => {
+    vi.stubEnv("VITE_WHATSAPP_AGENT_NUMBER", "57 300 123 4567");
+    render(<AssistantPage />);
+
+    const link = await screen.findByRole("link", {
+      name: "Abrir el asistente en WhatsApp",
+    });
+    expect(link).toHaveAttribute(
+      "href",
+      expect.stringContaining("https://wa.me/573001234567?text="),
+    );
+    expect(link).toHaveAttribute("href", expect.stringContaining("FAR%C3%98X"));
   });
 });

@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { fetchOpenAlerts } from "../../features/inventory/alertsApi";
 import { fetchOpenOrdersCount } from "../../features/orders/api";
+import { AssistantWidget } from "../../features/assistant";
 import { PremiumDowngradeModal } from "../../features/premium";
 import { useLoad } from "../../shared/hooks/useLoad";
 import { useAuth } from "../providers/AuthProvider";
@@ -240,6 +241,7 @@ export function AppShell() {
         <Outlet />
       </main>
 
+      <AssistantWidget />
       <PremiumDowngradeModal />
     </div>
   );

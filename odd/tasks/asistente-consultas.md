@@ -67,3 +67,10 @@ La búsqueda es `LIKE` normalizado, no fuzzy: un error de tipeo ("arrox") no enc
 - `agent-health` (nuevo, cron con `x-cron-secret` o admin) hace un ping de 1 token: 200 si el primario vive, 200 con `fallback_used` si ya cayó, 503 si cayeron los dos.
 - Cambiar de modelo es `supabase secrets set AGENT_MODEL=...` + `functions deploy agent`; no hay que tocar código.
 - Runbook completo en `supabase/functions/agent/README.md`.
+
+### L8 — widget flotante y WhatsApp (2026-11-03)
+
+- **S10.** El chat vive en `AssistantChat` y lo comparten `/asistente` y el widget flotante (burbuja abajo a la derecha) montado en `AppShell`; se oculta en `/asistente` y cierra con Esc.
+- **S11.** El chat muestra «WhatsApp ↗» cuando `VITE_WHATSAPP_AGENT_NUMBER` está definido; abre `wa.me` con mensaje prellenado.
+- El número **no responde solo**: falta el webhook de Meta, la verificación de firma y el alcance por usuario (el webhook no tiene JWT). Documentado en el README de la función; no se implementó un webhook a medias por el riesgo de suplantación.
+- `npm run ci` en verde.

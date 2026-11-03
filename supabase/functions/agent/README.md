@@ -108,10 +108,31 @@ proveedor en otra variable de entorno.
 Después de cambiar de modelo, corré el set de evaluación (40 frases por rol) y
 compará la tasa de tool-calling antes de dar el cambio por bueno.
 
-## WhatsApp y reportes (fase 3)
+## WhatsApp (acceso desde la UI)
+
+El chat muestra «WhatsApp ↗» cuando el build del frontend define
+`VITE_WHATSAPP_AGENT_NUMBER` (solo dígitos, con código de país). Abre
+`https://wa.me/<número>` con un mensaje prellenado para que el usuario agregue
+el número.
+
+**Eso es solo el acceso: el número todavía no responde solo.** Para que conteste
+hacen falta cuatro piezas que no están en este repo:
+
+1. WhatsApp Business Platform (Meta): número verificado y `phone_number_id`.
+2. `whatsapp-webhook` con la verificación `GET` (`hub.verify_token`) y el `POST`
+   validando `x-hub-signature-256` con el app secret.
+3. Resolver el usuario por `users.phone_number` **activo**. El teléfono pasa a
+   ser identidad: requiere opt-in explícito y número verificado, o cualquiera
+   que escriba al número opera como otro usuario.
+4. Ejecutar las tools con el alcance de ese usuario. El webhook no tiene JWT de
+   Supabase, así que `auth.uid()` no existe: hacen falta variantes
+   `agent_*_for_user(uuid)` con guard de `service_role`, o un gateway que emita
+   un JWT de corta vida. No alcanza con cambiar el cliente.
+
+## Reportes (fase 3)
 
 `_shared/agent.ts` no sabe de HTTP: recibe `{ client, message, history }` y
-devuelve `{ reply, toolLog }`. Un webhook de WhatsApp puede reutilizarlo
-resolviendo el usuario por `users.phone_number` y creando un cliente con
-`service_role` **después** de validar el número. Los reportes diarios pueden
-llamar las mismas RPC de lectura desde un cron (n8n).
+devuelve `{ reply, toolLog, model }`. Los reportes diarios pueden llamar las
+mismas RPC de lectura (`agent_stock`, `agent_last_order`) desde un cron con
+`service_role` + alcance explícito, o desde n8n con un usuario de servicio.
+
