@@ -63,3 +63,10 @@ El usuario eligió **con migración**: se agrega ledger de compras del distribui
 - **S14.** «Últimos vendidos»: hasta 6 productos vendidos recientemente (sin reversos) como atajos arriba del ticket; un toque los agrega o suma una unidad.
 - `MovementRow` ahora expone `product_id` para derivar los atajos de los movimientos ya cargados (sin request extra).
 - `npm run ci` en verde: 762 tests.
+
+### L7 — confirmación de una línea (2026-11-03)
+
+- **S15.** El pie del ticket muestra el **total grande** (`text-3xl`), la cantidad (`3 productos`), el ahorro cuando hay descuento y el botón de registrar **en el mismo renglón**.
+- El motivo/vencimiento pasan arriba del ticket: primero el contexto de la operación, después los productos y al final la confirmación.
+- El botón de registrar vive dentro del resumen del ticket (`action` slot de `MovementCart`), que solo aparece con líneas cargadas.
+- `npm run ci` en verde: 762 tests.

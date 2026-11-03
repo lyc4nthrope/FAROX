@@ -391,22 +391,7 @@ export function InventoryPage() {
 
   const movementForm = (
     <form onSubmit={onMovement}>
-      <MovementCart
-        options={movementOptions}
-        loading={stockOptions.loading}
-        error={stockOptions.error}
-        lines={cart}
-        onChange={setCart}
-        priceKind={mov.type === "entry" ? "purchase" : "sale"}
-        showPrices={premium}
-        showDiscount={mov.type === "exit"}
-        discount={discount}
-        onDiscountChange={setDiscount}
-        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
-        recentProductIds={recentSoldIds}
-      />
-
-      <div className="mx-auto mt-4 w-full max-w-md">
+      <div className="mx-auto w-full max-w-md">
         <Status loading={motives.loading} error={motives.error} />
         <Field label="Motivo">
           <select
@@ -434,15 +419,31 @@ export function InventoryPage() {
             />
           </Field>
         )}
-
-        <button className={`${buttonClass} w-full`} type="submit" disabled={busy}>
-          {busy
-            ? "Registrando…"
-            : mov.type === "entry"
-              ? "Registrar compra"
-              : "Registrar venta"}
-        </button>
       </div>
+
+      <MovementCart
+        options={movementOptions}
+        loading={stockOptions.loading}
+        error={stockOptions.error}
+        lines={cart}
+        onChange={setCart}
+        priceKind={mov.type === "entry" ? "purchase" : "sale"}
+        showPrices={premium}
+        showDiscount={mov.type === "exit"}
+        discount={discount}
+        onDiscountChange={setDiscount}
+        emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
+        recentProductIds={recentSoldIds}
+        action={
+          <button className={buttonClass} type="submit" disabled={busy}>
+            {busy
+              ? "Registrando…"
+              : mov.type === "entry"
+                ? "Registrar compra"
+                : "Registrar venta"}
+          </button>
+        }
+      />
     </form>
   );
 

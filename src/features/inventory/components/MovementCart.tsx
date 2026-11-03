@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { formatCOP, formatQty } from "../../../shared/lib/format";
 import { Status, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
@@ -68,6 +68,7 @@ export function MovementCart({
   emptyHint,
   disabled = false,
   recentProductIds = [],
+  action,
 }: {
   options: readonly MovementProductOption[];
   loading?: boolean;
@@ -83,6 +84,8 @@ export function MovementCart({
   disabled?: boolean;
   /** 0038: ids vendidos recientemente, para los atajos del ticket. */
   recentProductIds?: readonly number[];
+  /** 0039: confirmación de una línea (total + botón) al pie del ticket. */
+  action?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -399,17 +402,27 @@ export function MovementCart({
               <span className="tabular-nums">−{formatCOP(discountAmount)}</span>
             </div>
           )}
-          {showPrices && (
-            <div className="mt-2 flex items-center justify-between border-t border-gray-200 pt-2 text-base font-semibold text-gray-900">
-              <span>Total</span>
-              <span className="tabular-nums">{formatCOP(total)}</span>
+          {/* 0039 · confirmación de una línea: el total manda y la acción vive
+              al lado, en el mismo renglón. */}
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-3 border-t border-gray-200 pt-3">
+            <div>
+              {showPrices && (
+                <>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                    Total
+                  </p>
+                  <p className="text-3xl font-semibold tracking-tight tabular-nums text-gray-900">
+                    {formatCOP(total)}
+                  </p>
+                </>
+              )}
+              <p className="text-xs text-gray-500">
+                {lines.length} {lines.length === 1 ? "producto" : "productos"}
+                {discountAmount > 0 ? ` · ahorrás ${formatCOP(discountAmount)}` : ""}
+              </p>
             </div>
-          )}
-          {!showPrices && (
-            <p className="text-xs text-gray-500">
-              {lines.length} {lines.length === 1 ? "producto" : "productos"} en el ticket.
-            </p>
-          )}
+            {action}
+          </div>
         </div>
       )}
 

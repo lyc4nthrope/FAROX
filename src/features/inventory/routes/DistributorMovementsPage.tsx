@@ -185,6 +185,15 @@ export function DistributorMovementsPage() {
       onDiscountChange={setDiscount}
       emptyHint="Tu catálogo está vacío: agregá productos primero."
       recentProductIds={recentSoldIds}
+      action={
+        <button className={buttonClass} type="submit" disabled={saving}>
+          {saving
+            ? "Registrando…"
+            : mode === "sale"
+              ? "Registrar venta"
+              : "Registrar compra"}
+        </button>
+      }
     />
   );
 
@@ -317,10 +326,8 @@ export function DistributorMovementsPage() {
               </>
             )}
 
-            {cart}
-
-            <div className="mx-auto mt-4 w-full max-w-md">
-              <Field label={mode === "sale" ? "Vencimiento (opcional)" : "Vencimiento (opcional)"}>
+            <div className="mx-auto w-full max-w-md">
+              <Field label="Vencimiento (opcional)">
                 <input
                   className={`${inputClass} w-full`}
                   type="date"
@@ -333,14 +340,9 @@ export function DistributorMovementsPage() {
                   ? "El descuento se aplica al total y queda registrado en cada movimiento."
                   : "Cada compra suma stock a tu catálogo y guarda el costo unitario."}
               </p>
-              <button className={`${buttonClass} w-full`} type="submit" disabled={saving}>
-                {saving
-                  ? "Registrando…"
-                  : mode === "sale"
-                    ? "Registrar venta"
-                    : "Registrar compra"}
-              </button>
             </div>
+
+            {cart}
           </form>
         </Modal>
       )}

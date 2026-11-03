@@ -271,6 +271,8 @@ describe("InventoryPage · acciones en botones", () => {
 
     await user.type(within(dialog).getByLabelText("Descuento (%)"), "10");
     expect(dialog).toHaveTextContent("2.700");
+    expect(dialog).toHaveTextContent("1 producto");
+    expect(dialog).toHaveTextContent("ahorrás");
 
     await user.selectOptions(within(dialog).getByLabelText("Motivo"), "2");
     await user.click(within(dialog).getByRole("button", { name: "Registrar venta" }));

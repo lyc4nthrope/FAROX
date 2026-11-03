@@ -239,6 +239,8 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     expect(price).toHaveValue(4500);
 
     await user.type(within(dialog).getByLabelText("Descuento (%)"), "10");
+    expect(dialog).toHaveTextContent("4.050");
+    expect(dialog).toHaveTextContent("ahorrás");
     await user.click(within(dialog).getByRole("button", { name: "Registrar venta" }));
 
     await waitFor(() =>
