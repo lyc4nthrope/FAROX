@@ -448,6 +448,8 @@ ALTER TABLE public.stores
 
 ### F6 — Lanzamiento (1–2 semanas, paralelo)
 
+**Estado (2026-11-02):** preparación técnica completa (flag, canary, salud, runbook y borradores); la revisión legal, DIAN y PQR final siguen siendo tareas humanas. Ver `odd/tasks/premium-f6-lanzamiento.md`.
+
 - Legal final, facturación/IVA, PQR, runbook, monitoreo, feature flag, staging, canary, rollback.
 - **Aceptación:** checklist legal y operativo completo; rollout gradual.
 
@@ -475,7 +477,7 @@ ALTER TABLE public.stores
 
 ## 8. Rollout y operación
 
-- Feature flag `premium_payments_enabled` (env/config) para activar checkout sin redeploy.
+- Feature flag: `PREMIUM_CHECKOUT_ENABLED` en Edge (secreto, sin redeploy) + `VITE_PREMIUM_CHECKOUT_ENABLED` en el build (requiere rebuild para canary/rollback).
 - Staging con Mercado Pago sandbox; producción con credenciales productivas.
 - Canary: admin + 5–10 usuarios; monitorear conversión, activación, webhooks, errores.
 - Métricas: checkout iniciado, pago aprobado, activación, renovación, churn, downgrade, reembolsos, contracargos, tickets.
@@ -506,6 +508,7 @@ ALTER TABLE public.stores
 - **L4 (diseño):** desglose `quote_plan` (precio final, IVA incluido, comisión MP estimada, neto), precios editables por admin con `plan_versions` y grandfathering; modal de downgrade con las 3 tiendas, «Conservar como principal» y «Renovar para mantener las 3».
 - **L5 (2026-11-02):** F4 implementado: Edge Functions `create-subscription`, `mp-webhook` y `cancel-subscription`; migración 0035; checkout/resultado/cancelación en la UI; firma, idempotencia y validación de monto. Sandbox real pendiente de `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y `APP_URL`.
 - **L6 (2026-11-02):** F5 implementado: panel `/planes` con preview y versiones; `/pagos` con cancelar/reembolsar/conciliar; conciliación rotativa; outbox y envío de avisos con Resend; reembolsos/contracargos registrados sin revocación automática. Pendiente sandbox con MP/Resend.
+- **L7 (2026-11-02):** F6 preparado: checkout apagado por defecto en producción, canary por allowlist, salud en `/pagos`, runbook de lanzamiento/rollback/incidentes/PQR y borradores legales. Legal/DIAN/PQR final pendientes de responsables humanos.
 
 ## 11. Backlog: edición, eliminación y transferencia de tiendas
 

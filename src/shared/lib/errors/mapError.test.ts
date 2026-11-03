@@ -71,6 +71,18 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     ).toBe("Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo.");
   });
 
+  it("F6: checkout apagado y allowlist de canary", () => {
+    expect(
+      mapError({ message: "El pago con Mercado Pago todavía no está habilitado." }),
+    ).toBe("El pago con Mercado Pago todavía no está habilitado.");
+    expect(
+      mapError({
+        message:
+          "El pago está en pruebas. Pedile al administrador que active Premium manualmente.",
+      }),
+    ).toBe("El pago está en pruebas. Pedile al administrador que active Premium manualmente.");
+  });
+
   it("23502 not_null (stores.location)", () => {
     expect(
       mapError({

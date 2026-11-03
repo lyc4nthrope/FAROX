@@ -25,7 +25,9 @@ supabase secrets set \
   APP_URL="https://tu-dominio" \
   CRON_SECRET="un-secreto-largo-aleatorio" \
   RESEND_API_KEY="re_..." \
-  EMAIL_FROM="FAROX <no-reply@tu-dominio>"
+  EMAIL_FROM="FAROX <no-reply@tu-dominio>" \
+  PREMIUM_CHECKOUT_ENABLED="false" \
+  PREMIUM_CHECKOUT_ALLOWLIST="interno1@...,interno2@..."
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` los inyecta
@@ -34,6 +36,8 @@ Supabase en el runtime. No los pongas en `.env` del frontend ni en el repositori
 - `MP_ACCESS_TOKEN`: credencial de producción o de prueba de Mercado Pago.
 - `MP_WEBHOOK_SECRET`: secreto que muestra Mercado Pago en **Webhooks → Configurar notificación**.
 - `APP_URL`: origen público de FAROX; se usa para el `back_url` del checkout.
+- `PREMIUM_CHECKOUT_ENABLED`: debe ser `true` para aceptar nuevos checkouts. Si falta o es `false`, `create-subscription` devuelve 503 y `/premium` muestra el pago como no disponible.
+- `PREMIUM_CHECKOUT_ALLOWLIST`: emails separados por coma para un canary. Si está vacío, el checkout queda abierto a todos una vez habilitado.
 
 ## Deploy
 
@@ -84,6 +88,13 @@ npm run test -- supabase/functions/_shared/mercadopago.test.ts
 La prueba sandbox real (tarjeta aprobada/rechazada, webhook duplicado,
 cancelación) requiere credenciales de Mercado Pago y una URL pública. Sin esos
 datos la integración queda verificada solo a nivel unitario/estático.
+
+## Lanzamiento gradual (F6)
+
+- `PREMIUM_CHECKOUT_ENABLED=false` por defecto: `create-subscription` devuelve 503 y no se puede iniciar un cobro nuevo.
+- `PREMIUM_CHECKOUT_ALLOWLIST="interno1@...,interno2@..."` limita el checkout a un canary. Vacío = todos, una vez habilitado.
+- `VITE_PREMIUM_CHECKOUT_ENABLED=false` en el build de producción oculta/habilita el botón de checkout. En dev/test queda habilitado por defecto.
+- El runbook completo (deploy, canary, rollback, incidentes, PQR y monitoreo) está en `docs/runbooks/premium-lanzamiento.md`.
 
 ## Conciliación y avisos programados
 

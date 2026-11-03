@@ -143,3 +143,11 @@ export interface ReconciliationResult {
   checkedPayments: number;
   updated: number;
 }
+
+export interface PremiumHealth {
+  stalePendingPayments: number;
+  stalePendingSubscriptions: number;
+  failedNotices: number;
+  graceUsers: number;
+  webhookEvents24h: number;
+}

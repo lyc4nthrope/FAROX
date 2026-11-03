@@ -10,6 +10,7 @@ import type {
   PlanPreview,
   PlanQuote,
   PlanVersionRow,
+  PremiumHealth,
   PremiumStatus,
   PremiumSubscription,
   PremiumSubscriptionStatus,
@@ -452,4 +453,57 @@ export async function reconcileSubscriptions(): Promise<{
 }> {
   const invocation = await invokeFunction<ReconciliationResult>("reconcile-subscriptions", {});
   return { result: invocation.data, error: invocation.error };
+}
+
+export async function fetchPremiumHealth(): Promise<LoadResult<PremiumHealth>> {
+  const now = new Date();
+  const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const [pendingPayments, pendingSubscriptions, failedNotices, graceUsers, webhookEvents] =
+    await Promise.all([
+      supabase
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lt("created_at", oneHourAgo),
+      supabase
+        .from("subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lt("created_at", oneHourAgo),
+      supabase
+        .from("premium_notices")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "failed"),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .not("premium_grace_until", "is", null)
+        .gt("premium_grace_until", now.toISOString()),
+      supabase
+        .from("payment_events")
+        .select("id", { count: "exact", head: true })
+        .gte("received_at", oneDayAgo),
+    ]);
+
+  const firstError =
+    pendingPayments.error ??
+    pendingSubscriptions.error ??
+    failedNotices.error ??
+    graceUsers.error ??
+    webhookEvents.error;
+  if (firstError !== null) {
+    return { data: null, error: firstError };
+  }
+
+  return {
+    data: {
+      stalePendingPayments: pendingPayments.count ?? 0,
+      stalePendingSubscriptions: pendingSubscriptions.count ?? 0,
+      failedNotices: failedNotices.count ?? 0,
+      graceUsers: graceUsers.count ?? 0,
+      webhookEvents24h: webhookEvents.count ?? 0,
+    },
+    error: null,
+  };
 }

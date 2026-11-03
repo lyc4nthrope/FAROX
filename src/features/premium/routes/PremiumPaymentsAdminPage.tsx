@@ -10,6 +10,7 @@ import {
   adminRefundPayment,
   fetchAdminPayments,
   fetchAdminSubscriptions,
+  fetchPremiumHealth,
   reconcileSubscriptions,
 } from "../api";
 import type { AdminPaymentRow, AdminSubscriptionRow } from "../types";
@@ -36,6 +37,29 @@ function paymentBadge(status: AdminPaymentRow["status"]) {
   return <Badge tone="red">Contracargo</Badge>;
 }
 
+function HealthCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "gray" | "green" | "amber" | "red";
+}) {
+  const tones = {
+    gray: "border-gray-200 bg-gray-50 text-gray-900",
+    green: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    amber: "border-amber-200 bg-amber-50 text-amber-900",
+    red: "border-red-200 bg-red-50 text-red-900",
+  } as const;
+  return (
+    <div className={`rounded-xl border p-3 ${tones[tone]}`}>
+      <p className="text-xs font-medium">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
 /** F5: panel admin de suscripciones y pagos; acciones auditadas por Edge Functions. */
 export function PremiumPaymentsAdminPage() {
   const [subscriptionsLimit, setSubscriptionsLimit] = useState(50);
@@ -45,6 +69,7 @@ export function PremiumPaymentsAdminPage() {
     [subscriptionsLimit],
   );
   const payments = useLoad(() => fetchAdminPayments(paymentsLimit), [paymentsLimit]);
+  const health = useLoad(fetchPremiumHealth, []);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
@@ -66,6 +91,7 @@ export function PremiumPaymentsAdminPage() {
     }
     setMsg({ error: null, ok: "Suscripción cancelada. El acceso sigue hasta el fin del período." });
     subscriptions.reload();
+    health.reload();
   }
 
   async function refund(paymentId: number): Promise<void> {
@@ -83,6 +109,7 @@ export function PremiumPaymentsAdminPage() {
     }
     setMsg({ error: null, ok: "Pago reembolsado en Mercado Pago." });
     payments.reload();
+    health.reload();
   }
 
   async function reconcile(): Promise<void> {
@@ -100,6 +127,7 @@ export function PremiumPaymentsAdminPage() {
     });
     subscriptions.reload();
     payments.reload();
+    health.reload();
   }
 
   return (
@@ -133,6 +161,41 @@ export function PremiumPaymentsAdminPage() {
         error={subscriptions.error ?? payments.error}
       />
       <Status error={msg.error} ok={msg.ok} />
+
+      <div className="mt-5">
+        <Box title="Salud de pagos">
+          <Status loading={health.loading} error={health.error} />
+          {health.data !== null && (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <HealthCard
+                label="Pagos pendientes > 1 h"
+                value={health.data.stalePendingPayments}
+                tone={health.data.stalePendingPayments > 0 ? "amber" : "green"}
+              />
+              <HealthCard
+                label="Suscripciones pendientes > 1 h"
+                value={health.data.stalePendingSubscriptions}
+                tone={health.data.stalePendingSubscriptions > 0 ? "amber" : "green"}
+              />
+              <HealthCard
+                label="Avisos fallidos"
+                value={health.data.failedNotices}
+                tone={health.data.failedNotices > 0 ? "red" : "green"}
+              />
+              <HealthCard
+                label="Usuarios en gracia"
+                value={health.data.graceUsers}
+                tone={health.data.graceUsers > 0 ? "amber" : "gray"}
+              />
+              <HealthCard
+                label="Eventos webhook 24 h"
+                value={health.data.webhookEvents24h}
+                tone="gray"
+              />
+            </div>
+          )}
+        </Box>
+      </div>
 
       <div className="mt-5">
         <Box title="Suscripciones">

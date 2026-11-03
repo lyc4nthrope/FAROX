@@ -16,6 +16,14 @@ Deno.serve(async (request) => {
   }
   if (!isPost(request)) return errorJson("Método no permitido.", 405, true);
 
+  if (Deno.env.get("PREMIUM_CHECKOUT_ENABLED") !== "true") {
+    return errorJson(
+      "El pago con Mercado Pago todavía no está habilitado.",
+      503,
+      true,
+    );
+  }
+
   const header = authHeader(request);
   if (header === null) return errorJson("Iniciá sesión para continuar.", 401, true);
 
@@ -42,6 +50,18 @@ Deno.serve(async (request) => {
     const payerEmail = user?.email;
     if (userError !== null || user === null || payerEmail === null || payerEmail === undefined) {
       return errorJson("Iniciá sesión para continuar.", 401, true);
+    }
+
+    const allowlist = (Deno.env.get("PREMIUM_CHECKOUT_ALLOWLIST") ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter((email) => email !== "");
+    if (allowlist.length > 0 && !allowlist.includes(payerEmail.toLowerCase())) {
+      return errorJson(
+        "El pago está en pruebas. Pedile al administrador que active Premium manualmente.",
+        403,
+        true,
+      );
     }
 
     const service = serviceClient();

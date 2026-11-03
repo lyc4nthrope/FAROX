@@ -10,4 +10,4 @@
 // Regla: CUALQUIER cambio de texto en la política mueve este número junto
 // con él (accepted_privacy_version en user_metadata queda con la versión que
 // el usuario aceptó).
-export const PRIVACY_VERSION = "1.0";
+export const PRIVACY_VERSION = "1.1";

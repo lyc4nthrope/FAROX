@@ -7,6 +7,7 @@ import { formatCOP } from "../../../shared/lib/format";
 import { goTo } from "../../../shared/lib/navigation";
 import { Box, Status, buttonClass } from "../../../shared/ui/Box";
 import { createSubscription, fetchMyPremiumStatus, fetchPlanQuote } from "../api";
+import { isPremiumCheckoutEnabled } from "../flags";
 import { formatPremiumDate } from "../format";
 import type { PlanQuote } from "../types";
 
@@ -143,6 +144,7 @@ export function PremiumPage() {
   const until = formatPremiumDate(status.data?.premiumUntil ?? null);
   const [busyPlan, setBusyPlan] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const checkoutEnabled = isPremiumCheckoutEnabled();
 
   async function subscribe(planCode: string): Promise<void> {
     setBusyPlan(planCode);
@@ -158,8 +160,12 @@ export function PremiumPage() {
     }
   }
 
-  const checkoutDisabled = status.loading || status.error !== null;
-  const ctaLabel = premium ? "Ya sos Premium" : "Suscribirme";
+  const checkoutDisabled = status.loading || status.error !== null || !checkoutEnabled;
+  const ctaLabel = premium
+    ? "Ya sos Premium"
+    : checkoutEnabled
+      ? "Suscribirme"
+      : "Pago disponible próximamente";
 
   return (
     <section className="mx-auto max-w-4xl">
@@ -172,6 +178,12 @@ export function PremiumPage() {
       </p>
 
       <Status loading={status.loading} error={status.error} />
+      {!checkoutEnabled && !premium && (
+        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          El pago con Mercado Pago se está habilitando gradualmente. Mientras tanto, el
+          administrador puede activar Premium manualmente.
+        </p>
+      )}
       {premium && (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           Ya sos Premium{until === null ? " (manual)" : ` hasta el ${until}`}.{" "}

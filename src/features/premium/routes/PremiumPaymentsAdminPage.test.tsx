@@ -10,6 +10,7 @@ import { PremiumPaymentsAdminPage } from "./PremiumPaymentsAdminPage";
 vi.mock("../api", () => ({
   fetchAdminSubscriptions: vi.fn(),
   fetchAdminPayments: vi.fn(),
+  fetchPremiumHealth: vi.fn(),
   adminCancelSubscription: vi.fn(),
   adminRefundPayment: vi.fn(),
   reconcileSubscriptions: vi.fn(),
@@ -53,6 +54,16 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(premiumApi.fetchAdminPayments).mockResolvedValue({ data: [PAYMENT], error: null });
+  vi.mocked(premiumApi.fetchPremiumHealth).mockResolvedValue({
+    data: {
+      stalePendingPayments: 0,
+      stalePendingSubscriptions: 0,
+      failedNotices: 0,
+      graceUsers: 0,
+      webhookEvents24h: 3,
+    },
+    error: null,
+  });
   vi.mocked(premiumApi.adminCancelSubscription).mockResolvedValue({ error: null });
   vi.mocked(premiumApi.adminRefundPayment).mockResolvedValue({ error: null });
   vi.mocked(premiumApi.reconcileSubscriptions).mockResolvedValue({
@@ -81,6 +92,8 @@ describe("PremiumPaymentsAdminPage (F5)", () => {
     renderPage();
 
     expect((await screen.findAllByText("Ada Lovelace")).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Salud de pagos")).toBeInTheDocument();
+    expect(screen.getByText("Eventos webhook 24 h")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(premiumApi.adminCancelSubscription).toHaveBeenCalledWith(7));
     expect(
@@ -112,6 +125,37 @@ describe("PremiumPaymentsAdminPage (F5)", () => {
     await waitFor(() =>
       expect(premiumApi.fetchAdminSubscriptions).toHaveBeenLastCalledWith(100),
     );
+  });
+
+  it("muestra cada contador de salud y refresca tras conciliar", async () => {
+    vi.mocked(premiumApi.fetchPremiumHealth).mockResolvedValue({
+      data: {
+        stalePendingPayments: 11,
+        stalePendingSubscriptions: 22,
+        failedNotices: 33,
+        graceUsers: 44,
+        webhookEvents24h: 55,
+      },
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    const pairs = [
+      ["Pagos pendientes > 1 h", "11"],
+      ["Suscripciones pendientes > 1 h", "22"],
+      ["Avisos fallidos", "33"],
+      ["Usuarios en gracia", "44"],
+      ["Eventos webhook 24 h", "55"],
+    ] as const;
+    for (const [label, value] of pairs) {
+      const card = (await screen.findByText(label)).closest("div");
+      expect(card?.textContent).toContain(value);
+    }
+
+    await waitFor(() => expect(premiumApi.fetchPremiumHealth).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole("button", { name: "Conciliar con Mercado Pago" }));
+    await waitFor(() => expect(premiumApi.fetchPremiumHealth).toHaveBeenCalledTimes(2));
   });
 
   it("muestra el resultado de la conciliación", async () => {

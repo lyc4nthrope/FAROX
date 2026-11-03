@@ -96,6 +96,8 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["solo se puede reembolsar un pago aprobado", "Solo se puede reembolsar un pago aprobado."],
   ["mercado pago no pudo reembolsar", "Mercado Pago no pudo reembolsar el pago. Intentá de nuevo."],
   ["no se pudo conciliar", "No se pudo conciliar con Mercado Pago. Intentá de nuevo."],
+  ["todavía no está habilitado", "El pago con Mercado Pago todavía no está habilitado."],
+  ["el pago está en pruebas", "El pago está en pruebas. Pedile al administrador que active Premium manualmente."],
   ["mercado pago no pudo cancelar", "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo."],
   ["no tenés una suscripción para cancelar", "No tenés una suscripción para cancelar."],
 ];

@@ -253,6 +253,8 @@ Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagn
 | 0036 | `20261029000036_f5_avisos_admin.sql` | `0036 … = true` — **sin esta, no hay preview de precios ni outbox de avisos** | ✅ (`CREATE TABLE` + `CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
 | seed | `supabase/demo-catalog.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
 
+> **F6 — el checkout sigue apagado después de migrar.** `PREMIUM_CHECKOUT_ENABLED` debe quedar en `false` hasta el canary; el frontend usa `VITE_PREMIUM_CHECKOUT_ENABLED`. Seguir `docs/runbooks/premium-lanzamiento.md` para secrets, deploy, allowlist, salud, canary y rollback.
+
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
 - **Opción C, agente con MCP de Supabase:** ver §5.

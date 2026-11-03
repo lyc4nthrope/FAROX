@@ -73,6 +73,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
 });
 
 describe("PremiumPage (0033)", () => {
@@ -133,6 +134,23 @@ describe("PremiumPage (0033)", () => {
       await screen.findByText("No se pudo iniciar el pago. Intentá de nuevo."),
     ).toBeInTheDocument();
     expect(navigation.goTo).not.toHaveBeenCalled();
+  });
+
+  it("con el feature flag apagado no inicia checkout", async () => {
+    vi.stubEnv("VITE_PREMIUM_CHECKOUT_ENABLED", "false");
+    render(
+      <MemoryRouter>
+        <PremiumPage />
+      </MemoryRouter>,
+    );
+
+    const buttons = await screen.findAllByRole("button", {
+      name: "Pago disponible próximamente",
+    });
+    expect(buttons.length).toBe(2);
+    for (const button of buttons) expect(button).toBeDisabled();
+    expect(screen.getByText(/se está habilitando gradualmente/)).toBeInTheDocument();
+    expect(premiumApi.createSubscription).not.toHaveBeenCalled();
   });
 
   it("si ya es Premium no ofrece pagar de nuevo", async () => {

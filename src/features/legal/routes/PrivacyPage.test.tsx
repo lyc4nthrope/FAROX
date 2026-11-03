@@ -44,6 +44,8 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
     expect(screen.getByText(/^Supabase/)).toBeInTheDocument();
     expect(screen.getByText(/^OpenStreetMap/)).toBeInTheDocument();
     expect(screen.getByText(/^CARTO/)).toBeInTheDocument();
+    expect(screen.getByText(/^Mercado Pago/)).toBeInTheDocument();
+    expect(screen.getByText(/^Resend/)).toBeInTheDocument();
     // Sustantivo legal, no solo el dominio: la transferencia se explica.
     // (Varios terceros mencionan la IP ⇒ getAllByText, no getByText.)
     expect(screen.getAllByText(/dirección IP/).length).toBeGreaterThan(0);
@@ -70,8 +72,8 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
     }
   });
 
-  it("PRIVACY_VERSION se exporta del slice legal como string no vacío", () => {
+  it("PRIVACY_VERSION se exporta del slice legal y refleja la revisión F6", () => {
     expect(typeof PRIVACY_VERSION).toBe("string");
-    expect(PRIVACY_VERSION.length).toBeGreaterThan(0);
+    expect(PRIVACY_VERSION).toBe("1.1");
   });
 });
