@@ -26,6 +26,8 @@ export interface MovementRow {
   quantity: number;
   created_at: string;
   product_name: string;
+  /** 0038: id del producto, para los atajos de «últimos vendidos». */
+  product_id?: number;
   motive_name: string;
   reverso_of_id: number | null;
   /** 0028: tienda del movimiento (solo la vista del distribuidor la muestra). */
@@ -135,12 +137,15 @@ export async function fetchStockOptions(storeId: number): Promise<LoadResult<Sto
 export async function fetchMovements(storeId: number): Promise<LoadResult<MovementRow[]>> {
   const { data, error } = await supabase
     .from("movements")
-    .select("id,type,quantity,created_at,reverso_of_id,product:products(name),motive:motives(name)")
+    .select(
+      "id,product_id,type,quantity,created_at,reverso_of_id,product:products(name),motive:motives(name)",
+    )
     .eq("store_id", storeId)
     .order("created_at", { ascending: false })
     .limit(50);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.id),
+    product_id: Number(r.product_id),
     type: r.type as "entry" | "exit",
     quantity: Number(r.quantity),
     created_at: String(r.created_at),
@@ -159,7 +164,7 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,type,quantity,unit_price,discount_pct,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
+      "id,product_id,type,quantity,unit_price,discount_pct,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -167,6 +172,7 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
     const type = r.type as "entry" | "exit";
     return {
       id: Number(r.id),
+      product_id: Number(r.product_id),
       type,
       // Venta/entrega para el distribuidor: la fila es entry para la tienda,
       // pero desde su lado es una salida. Un reverso conserva su tono propio.
@@ -193,11 +199,12 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
 export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRow[]>> {
   const { data, error } = await supabase
     .from("distributor_purchases")
-    .select("id,quantity,unit_cost,expiry_date,created_at,product:products(name)")
+    .select("id,product_id,quantity,unit_cost,expiry_date,created_at,product:products(name)")
     .order("created_at", { ascending: false })
     .limit(100);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.id),
+    product_id: Number(r.product_id),
     type: "entry" as const,
     direction: "entry" as const,
     quantity: Number(r.quantity),

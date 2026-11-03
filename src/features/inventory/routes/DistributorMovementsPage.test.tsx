@@ -233,9 +233,8 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
     });
     await user.selectOptions(within(dialog).getByLabelText("Tienda vinculada"), "7");
 
-    // El código de barras también filtra: escanear o escribirlo ubica el producto.
-    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "770123");
-    await user.click(within(dialog).getByRole("button", { name: /Arroz Diana/ }));
+    // Escanear o escribir el código y Enter: agrega sin tocar la lista.
+    await user.type(within(dialog).getByLabelText("Buscar producto o código"), "770123{Enter}");
     const price = within(dialog).getByLabelText("Precio de venta de Arroz Diana");
     expect(price).toHaveValue(4500);
 
@@ -249,6 +248,27 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
         discountPct: 10,
       }),
     );
+  });
+
+  it("0038: «últimos vendidos» agrega el producto con un toque", async () => {
+    vi.mocked(inventoryApi.fetchDistributorMovements).mockResolvedValue({
+      data: [{ ...MOVEMENTS[0]!, product_id: 1 }],
+      error: null,
+    });
+    renderPage();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Registrar venta" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Registrar venta a una tienda",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Agregar Arroz Diana de últimos vendidos" }),
+    );
+
+    expect(
+      within(dialog).getByLabelText("Precio de venta de Arroz Diana"),
+    ).toBeInTheDocument();
   });
 
   it("0037: registra una compra a proveedor como entrada", async () => {

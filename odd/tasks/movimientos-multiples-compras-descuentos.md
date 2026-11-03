@@ -55,3 +55,11 @@ El usuario eligió **con migración**: se agrega ledger de compras del distribui
 ### L5 — límite conocido
 
 - Las ventas directas del distribuidor todavía NO descuentan `distributor_products.quantity`; la compra sí lo suma. Queda como deuda explícita para no bloquear ventas con stock en 0.
+
+### L6 — venta rápida y últimos vendidos (2026-11-03)
+
+- **S12.** Escanear en el ticket mantiene la cámara activa: cada lectura agrega el producto y el mismo código dentro de 1,5 s se ignora (evita sumar decenas por tener el producto enfrente).
+- **S13.** En el buscador, `Enter` agrega sin tocar la lista: primero busca coincidencia exacta de código de barras; si el filtro deja un solo candidato, agrega ese; limpia el buscador y deja el foco listo para el siguiente.
+- **S14.** «Últimos vendidos»: hasta 6 productos vendidos recientemente (sin reversos) como atajos arriba del ticket; un toque los agrega o suma una unidad.
+- `MovementRow` ahora expone `product_id` para derivar los atajos de los movimientos ya cargados (sin request extra).
+- `npm run ci` en verde: 762 tests.

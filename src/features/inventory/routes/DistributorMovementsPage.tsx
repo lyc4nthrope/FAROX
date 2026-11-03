@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -76,6 +76,22 @@ export function DistributorMovementsPage() {
     .filter((movement) => type === "all" || (movement.direction ?? movement.type) === type)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const empty = (movements.data ?? []).length === 0 && (purchases.data ?? []).length === 0;
+
+  // 0038: últimos productos vendidos (una venta es direction "exit" para el
+  // distribuidor), para los atajos del ticket.
+  const recentSoldIds = useMemo(() => {
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    for (const movement of movements.data ?? []) {
+      if (movement.direction !== "exit" || movement.reverso_of_id !== null) continue;
+      const id = movement.product_id;
+      if (id === undefined || seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+      if (ids.length === 6) break;
+    }
+    return ids;
+  }, [movements.data]);
 
   function openMode(next: Mode): void {
     setMsg({ error: null, ok: null });
@@ -168,6 +184,7 @@ export function DistributorMovementsPage() {
       discount={discount}
       onDiscountChange={setDiscount}
       emptyHint="Tu catálogo está vacío: agregá productos primero."
+      recentProductIds={recentSoldIds}
     />
   );
 

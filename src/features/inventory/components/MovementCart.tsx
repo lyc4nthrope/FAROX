@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 
 import { formatCOP, formatQty } from "../../../shared/lib/format";
 import { Status, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
@@ -67,6 +67,7 @@ export function MovementCart({
   onDiscountChange,
   emptyHint,
   disabled = false,
+  recentProductIds = [],
 }: {
   options: readonly MovementProductOption[];
   loading?: boolean;
@@ -80,6 +81,8 @@ export function MovementCart({
   onDiscountChange: (value: string) => void;
   emptyHint?: string;
   disabled?: boolean;
+  /** 0038: ids vendidos recientemente, para los atajos del ticket. */
+  recentProductIds?: readonly number[];
 }) {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -151,6 +154,30 @@ export function MovementCart({
     setNotice(`${match.name} agregado al ticket.`);
   }
 
+  // 0038 · venta rápida: escribir o escanear y Enter agrega el producto sin
+  // tocar la lista. Con un código exacto gana el código; si el filtro deja un
+  // solo candidato, ese. El buscador queda limpio y enfocado para el siguiente.
+  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const term = search.trim();
+    if (term === "") return;
+    const byCode = options.find((option) => option.barcode !== null && option.barcode === term);
+    const match = byCode ?? (filtered.length === 1 ? filtered[0] : undefined);
+    if (match === undefined) {
+      setNotice("Ningún producto coincide con la búsqueda.");
+      return;
+    }
+    addProduct(match);
+    setSearch("");
+    setNotice(`${match.name} agregado al ticket.`);
+  }
+
+  const recent = recentProductIds
+    .map((id) => byId.get(id))
+    .filter((option): option is MovementProductOption => option !== undefined)
+    .slice(0, 6);
+
   const subtotal = cartSubtotal(lines);
   const total = cartTotal(lines, discount);
   const discountAmount = Math.max(0, subtotal - total);
@@ -172,11 +199,45 @@ export function MovementCart({
           value={search}
           disabled={disabled}
           onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={onSearchKeyDown}
           autoFocus
         />
+        <span className="mt-1 block text-[11px] text-gray-500">
+          Escaneá seguido para sumar unidades · Enter agrega el primero
+        </span>
       </label>
 
-      <BarcodeScanner onCode={onScanned} disabled={disabled} />
+      {recent.length > 0 && (
+        <div className="mt-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+            Últimos vendidos
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {recent.map((option) => {
+              const added = lines.some((line) => line.productId === option.id);
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-label={`Agregar ${option.name} de últimos vendidos`}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                    added
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                  disabled={disabled}
+                  onClick={() => addProduct(option)}
+                >
+                  {option.name}
+                  {added && <span aria-hidden="true">+1</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <BarcodeScanner onCode={onScanned} disabled={disabled} continuous />
       {notice !== null && (
         <p role="status" className="mt-2 text-xs text-gray-600">
           {notice}

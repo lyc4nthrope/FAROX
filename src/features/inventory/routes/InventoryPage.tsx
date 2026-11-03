@@ -368,6 +368,21 @@ export function InventoryPage() {
   const visibleMovements = (movements.data ?? []).filter(
     (movement) => moveFilter === "all" || movement.type === moveFilter,
   );
+  // 0038: últimos productos vendidos en esta tienda (sin reversos), para los
+  // atajos del ticket. Se derivan de los mismos 50 movimientos ya cargados.
+  const recentSoldIds = useMemo(() => {
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    for (const movement of movements.data ?? []) {
+      if (movement.type !== "exit" || movement.reverso_of_id !== null) continue;
+      const id = movement.product_id;
+      if (id === undefined || seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+      if (ids.length === 6) break;
+    }
+    return ids;
+  }, [movements.data]);
   const selectedPrice =
     prices.data?.find((row) => row.product_id === Number(price.productId)) ?? null;
   const sortedPrices = [...(prices.data ?? [])].sort((a, b) =>
@@ -388,6 +403,7 @@ export function InventoryPage() {
         discount={discount}
         onDiscountChange={setDiscount}
         emptyHint="La tienda no tiene productos asignados. Usá «Agregar productos» primero."
+        recentProductIds={recentSoldIds}
       />
 
       <div className="mx-auto mt-4 w-full max-w-md">
