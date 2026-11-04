@@ -38,16 +38,17 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
     cleanup();
   });
 
-  it("distribuidor: muestra pedidos, paradas y ruta de hoy, marcado como ejemplo", async () => {
+  it("distribuidor: no muestra la vista de ejemplo en el inicio", async () => {
     renderHome("distribuidor");
 
-    expect(await screen.findByText("Tu día, de un vistazo")).toBeInTheDocument();
-    expect(screen.getByText("Vista de ejemplo")).toBeInTheDocument();
-    expect(screen.getByText("Pedidos")).toBeInTheDocument();
-    expect(screen.getByText("Paradas")).toBeInTheDocument();
-    expect(screen.getByText("Ruta de hoy")).toBeInTheDocument();
-    expect(screen.getByText("Tienda Central")).toBeInTheDocument();
-    expect(screen.queryByText("Stock bajo")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Bienvenido a FARØX" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tienda Central")).not.toBeInTheDocument();
+    // Las secciones reales siguen disponibles.
+    expect(screen.getByText("Mi ruta")).toBeInTheDocument();
   });
 
   it("operador: conserva el inicio actual sin la vista del distribuidor", async () => {
