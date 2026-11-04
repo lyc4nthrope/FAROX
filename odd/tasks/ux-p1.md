@@ -20,10 +20,10 @@ Objetivo: ejecutar la segunda prioridad de la auditoría UX sin cambiar reglas d
 - **T2** — Barra de acción primaria en el detalle de pedido. Ruta: inline. Estado: hecho.
 - **T3** — Dashboard del distribuidor acotado a su operación. Ruta: inline. Estado: hecho.
 - **T4** — Reordenar Mi ruta: ruta de hoy antes de la planificación. Ruta: inline. Estado: hecho.
-- **T5** — Tiendas/Inventario. Ruta: pendiente de decisión. Estado: bloqueada.
+- **T5** — Tiendas/Inventario. Se unificó para el operador: una sola lista en Inventario, con accesos «Datos de la tienda» y «QR de vínculo» por tienda; `/stores` sigue existiendo para admin y para el formulario. Ruta: inline. Estado: hecho (alcance acotado).
 
 ## Log
 
 - **L1** — «Haz commit y sigue con P1»
 - **L2** — Decisión asumida para T3: se conserva el Dashboard (no se oculta una función Premium) y se elimina el desglose por distribuidor para el rol distribuidor.
-- **L3** — Decisión asumida para T5: no se toca hasta confirmar el modelo de navegación, porque cambia la ruta de entrada diaria del operador.
+- **L3** — Decisión asumida para T5: el operador deja de tener «Tiendas» como destino separado; la lista de Inventario es el hub y cada tienda expone «Datos» y «QR». Se conserva `/stores` para admin y formularios. Es reversible: si se prefiere el hub con pestañas por tienda, se puede evolucionar después.

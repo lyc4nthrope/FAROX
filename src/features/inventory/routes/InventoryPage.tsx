@@ -51,7 +51,27 @@ export function InventoryStoresPage() {
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Elegí una tienda para ver su stock, registrar movimientos y ajustar precios.
       </p>
-      <Box title="Elegí una tienda">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-gray-500">
+          {stores.data?.length ?? 0}{" "}
+          {stores.data?.length === 1 ? "tienda" : "tiendas"}
+        </span>
+        <Link className={buttonClass} to="/stores/new">
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            viewBox="0 0 24 24"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Nueva tienda
+        </Link>
+      </div>
+      <Box title="Tus tiendas">
         <Status loading={stores.loading} error={stores.error} />
         {stores.data?.length === 0 && (
           <EmptyState
@@ -61,9 +81,12 @@ export function InventoryStoresPage() {
         )}
         <ul className="grid gap-2 sm:grid-cols-2">
           {stores.data?.map((s) => (
-            <li key={s.id}>
+            <li
+              key={s.id}
+              className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md"
+            >
               <Link
-                className="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 text-sm shadow-sm transition hover:border-gray-300 hover:shadow-md"
+                className="group flex items-center gap-3 p-3 text-sm"
                 to={`/inventario/${s.id}`}
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition group-hover:bg-gray-900 group-hover:text-white">
@@ -95,6 +118,20 @@ export function InventoryStoresPage() {
                   <path d="M5 12h14m-6-6 6 6-6 6" />
                 </svg>
               </Link>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 px-3 py-2 text-xs">
+                <Link
+                  to={`/stores/${s.id}`}
+                  className="font-medium text-gray-600 transition hover:text-gray-900"
+                >
+                  Datos de la tienda
+                </Link>
+                <Link
+                  to={`/tiendas/${s.id}/qr`}
+                  className="font-medium text-gray-600 transition hover:text-gray-900"
+                >
+                  QR de vínculo
+                </Link>
+              </div>
             </li>
           ))}
         </ul>

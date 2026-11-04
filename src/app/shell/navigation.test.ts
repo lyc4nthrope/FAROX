@@ -30,7 +30,6 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/pedidos",
       "/alertas",
       "/fiado",
-      "/stores",
       "/distributors",
       "/dashboard",
     ]);

@@ -42,7 +42,6 @@ const OPERATOR_ITEMS: readonly NavItem[] = [
   { to: "/pedidos", label: "Pedidos" },
   { to: "/alertas", label: "Alertas" },
   { to: "/fiado", label: "Fiado" },
-  { to: "/stores", label: "Tiendas" },
   { to: "/distributors", label: "Mis distribuidores" },
   { to: "/dashboard", label: "Dashboard" },
 ];
