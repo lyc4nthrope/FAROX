@@ -10,6 +10,10 @@ export interface NavItem {
 // productos (solo lectura). sdd/admin-console T-C5: +Roles y +Catálogos;
 // T-D2: +Auditoría (ADM-12.1/12.2 — audit_read es solo-admin 0006:330-332,
 // así que /audit entra a la matriz de solo-admin, como /users).
+//
+// /asistente ya NO es una entrada de nav: el chat vive en el widget flotante
+// (AssistantWidget) y la ruta /asistente sigue existiendo para enlaces
+// directos. Tenerlo en los dos lugares duplicaba la misma pantalla.
 export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/distributors", label: "Distribuidores" },
   { to: "/products", label: "Productos" },
@@ -21,7 +25,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/fiado", label: "Fiado" },
   { to: "/rutas", label: "Rutas" },
   { to: "/dashboard", label: "Dashboard" },
-  { to: "/asistente", label: "Asistente" },
   { to: "/users", label: "Usuarios" },
   { to: "/planes", label: "Planes" },
   { to: "/pagos", label: "Pagos" },
@@ -30,44 +33,42 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/audit", label: "Auditoría" },
 ];
 
-// Entradas SOLO-admin del nav: el operador nunca ve usuarios, roles,
-// catálogos, auditoría ni la planificación de rutas.
-const ADMIN_ONLY_PATHS: ReadonlySet<string> = new Set([
-  "/users",
-  "/planes",
-  "/pagos",
-  "/roles",
-  "/catalogs",
-  "/audit",
-  "/rutas",
-]);
+// Operador: orden por frecuencia de uso real. Primero el día a día
+// (inventario, pedidos, alertas, faltantes, fiado); después la configuración
+// de la red (tiendas, distribuidores) y al final la analítica.
+// Entradas SOLO-admin: usuarios, roles, catálogos, auditoría, planificación de
+// rutas y la administración de planes/pagos. Nunca aparecen acá.
+const OPERATOR_ITEMS: readonly NavItem[] = [
+  { to: "/inventario", label: "Inventario" },
+  { to: "/pedidos", label: "Pedidos" },
+  { to: "/alertas", label: "Alertas" },
+  { to: "/faltantes", label: "Faltantes" },
+  { to: "/fiado", label: "Fiado" },
+  { to: "/stores", label: "Tiendas" },
+  { to: "/distributors", label: "Mis distribuidores" },
+  { to: "/dashboard", label: "Dashboard" },
+];
 
-// Navegación del distribuidor: productos (lectura), su ruta, sus pedidos,
-// sus alertas y el dashboard de lo suyo. Los faltantes NO van acá: el
-// distribuidor solo se entera del faltante cuando el operador le crea un
-// pedido (0023).
+// Navegación del distribuidor: primero lo que usa a diario (ruta, pedidos,
+// movimientos, catálogo), después el seguimiento (alertas, dashboard) y al
+// final la acción de configuración (vincular tienda). Los faltantes NO van
+// acá: el distribuidor solo se entera del faltante cuando el operador le crea
+// un pedido (0023).
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
   { to: "/movimientos", label: "Movimientos" },
-  { to: "/vincular", label: "Vincular tienda" },
-  { to: "/alertas", label: "Alertas" },
-  { to: "/asistente", label: "Asistente" },
-  { to: "/dashboard", label: "Dashboard" },
   { to: "/products", label: "Productos" },
+  { to: "/alertas", label: "Alertas" },
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/vincular", label: "Vincular tienda" },
 ];
 
 // Derivación rol → entradas de nav. Rol null (inactivo o fila ausente) ⇒
 // cero controles privilegiados: solo lectura de productos.
 export function visibleNavItems(role: RoleName | null): NavItem[] {
   if (role === "admin") return [...NAV_ITEMS];
-  if (role === "operador") {
-    // 0024: el catálogo y la asignación de productos viven en /inventario
-    // (pestaña «Productos»); /products redirige ahí, así que no va en el nav.
-    return NAV_ITEMS.filter(
-      (item) => !ADMIN_ONLY_PATHS.has(item.to) && item.to !== "/products",
-    );
-  }
+  if (role === "operador") return [...OPERATOR_ITEMS];
   if (role === "distribuidor") return [...DISTRIBUTOR_ITEMS];
   return [{ to: "/products", label: "Productos" }];
 }
@@ -87,9 +88,5 @@ export function roleLabel(role: RoleName | null): string {
 
 // Primera ruta permitida del mapa §S2 por rol (Home "/" la ofrece como entrada).
 export function firstAllowedRoute(role: RoleName | null): NavItem {
-  if (role === "admin" || role === "operador") {
-    return NAV_ITEMS[0] ?? { to: "/products", label: "Productos" };
-  }
-  if (role === "distribuidor") return { to: "/mi-ruta", label: "Mi ruta" };
-  return { to: "/products", label: "Productos" };
+  return visibleNavItems(role)[0] ?? { to: "/products", label: "Productos" };
 }

@@ -121,7 +121,7 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPagina("operador");
 
-    expect(await screen.findByRole("heading", { name: "Distribuidores" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Mis distribuidores" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Tienda")).toHaveValue("3");
     expect(
       await screen.findByText(/Todavía no vinculaste ningún distribuidor/),

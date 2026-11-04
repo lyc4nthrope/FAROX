@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 export interface PremiumLockProps {
   title: string;
@@ -98,6 +99,24 @@ export function PremiumLock({ title, benefits, preview, children }: PremiumLockP
           </span>
           Un administrador activa Premium desde Usuarios → detalle del usuario.
         </p>
+        <Link
+          to="/premium"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+        >
+          Ver planes
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+          >
+            <path d="M5 12h14m-6-6 6 6-6 6" />
+          </svg>
+        </Link>
       </div>
     </section>
   );

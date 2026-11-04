@@ -56,14 +56,16 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     cleanup();
   });
 
-  it("operador: distribuidores, inventario y tiendas; sin /users ni /products", async () => {
+  it("operador: inventario, pedidos y mis distribuidores; sin /users ni /products", async () => {
     renderShell("operador");
-    expect(await screen.findByRole("link", { name: "Distribuidores" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Inventario" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mis distribuidores" })).toBeInTheDocument();
     // 0024: Productos se fusionó en Inventario.
     expect(screen.queryByRole("link", { name: "Productos" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Inventario" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tiendas" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    // El asistente vive en el widget flotante, no en el nav.
+    expect(screen.queryByRole("link", { name: "Asistente" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Perfil" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Salir" })).toBeInTheDocument();
   });

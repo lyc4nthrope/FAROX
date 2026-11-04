@@ -6,6 +6,7 @@ import { fetchOpenOrdersCount } from "../../features/orders/api";
 import { AssistantWidget } from "../../features/assistant";
 import { PremiumDowngradeModal } from "../../features/premium";
 import { useLoad } from "../../shared/hooks/useLoad";
+import { SectionIcon } from "../../shared/ui";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -204,6 +205,7 @@ export function AppShell() {
               >
                 {({ isActive }) => (
                   <>
+                    <SectionIcon to={item.to} className="mr-1.5 h-4 w-4" />
                     {item.label}
                     {item.to === "/pedidos" && orderCount > 0 && (
                       <span

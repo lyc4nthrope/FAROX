@@ -84,7 +84,7 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     renderPage("distribuidor");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Pendiente" }));
+    await user.click(await screen.findByRole("button", { name: "Devolver a pendiente" }));
 
     expect(ordersApi.updateOrderStatus).toHaveBeenCalledWith(2, "pending", null);
   });
@@ -94,7 +94,7 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     renderPage("distribuidor");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Entregar" }));
+    await user.click(await screen.findByRole("button", { name: "Entregar todo" }));
 
     expect(confirm).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(ordersApi.confirmFullDelivery).toHaveBeenCalledWith(2));
@@ -106,7 +106,7 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     renderPage("distribuidor");
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Entregar" }));
+    await user.click(await screen.findByRole("button", { name: "Entregar todo" }));
 
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(ordersApi.confirmFullDelivery).not.toHaveBeenCalled();
@@ -118,6 +118,6 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
 
     expect((await screen.findAllByText("Tienda Centro")).length).toBe(2);
     expect(screen.queryByRole("button", { name: "En ruta" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Entregar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Entregar todo" })).not.toBeInTheDocument();
   });
 });

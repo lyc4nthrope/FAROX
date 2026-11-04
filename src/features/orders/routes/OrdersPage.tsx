@@ -58,7 +58,7 @@ export function OrdersPage() {
   function deliver(orderId: number): void {
     if (
       !window.confirm(
-        `¿Marcar el pedido #${orderId} como entregado y sumar todas las cantidades al stock?`,
+        `¿Entregar todo el pedido #${orderId} y sumar las cantidades al stock?`,
       )
     ) {
       return;
@@ -195,7 +195,7 @@ export function OrdersPage() {
                                   )
                                 }
                               >
-                                Pendiente
+                                Devolver a pendiente
                               </button>
                               <button
                                 className={`${buttonClass} px-2.5 py-1 text-xs`}
@@ -203,7 +203,7 @@ export function OrdersPage() {
                                 disabled={busyId === o.id}
                                 onClick={() => deliver(o.id)}
                               >
-                                Entregar
+                                Entregar todo
                               </button>
                             </>
                           )}

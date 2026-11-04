@@ -15,7 +15,6 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/fiado",
       "/rutas",
       "/dashboard",
-      "/asistente",
       "/users",
       "/planes",
       "/pagos",
@@ -25,18 +24,17 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     ]);
   });
 
-  it("operador: operación diaria y SIN ninguna entrada solo-admin", () => {
+  it("operador: operación diaria primero y SIN ninguna entrada solo-admin", () => {
     const visibles = visibleNavItems("operador").map((item) => item.to);
     expect(visibles).toEqual([
-      "/distributors",
-      "/stores",
       "/inventario",
-      "/alertas",
       "/pedidos",
+      "/alertas",
       "/faltantes",
       "/fiado",
+      "/stores",
+      "/distributors",
       "/dashboard",
-      "/asistente",
     ]);
     for (const adminOnly of [
       "/users",
@@ -53,20 +51,21 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
     expect(visibles).not.toContain("/products");
   });
 
-  it("distribuidor: su ruta, sus pedidos, alertas, dashboard y productos (lectura)", () => {
+  it("distribuidor: su ruta, sus pedidos y su catálogo, en orden de uso", () => {
     expect(visibleNavItems("distribuidor").map((item) => item.to)).toEqual([
       "/mi-ruta",
       "/pedidos",
       "/movimientos",
-      "/vincular",
-      "/alertas",
-      "/asistente",
-      "/dashboard",
       "/products",
+      "/alertas",
+      "/dashboard",
+      "/vincular",
     ]);
     // 0023: los faltantes pasaron a ser del operador; el distribuidor se
     // entera por el pedido, no por una vista de faltantes.
     expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/faltantes");
+    // El asistente vive en el widget flotante, no como entrada de nav.
+    expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/asistente");
   });
 
   it("sin rol (my_role() NULL): cero controles privilegiados (V0-3)", () => {
@@ -84,9 +83,9 @@ describe("roleLabel", () => {
 });
 
 describe("firstAllowedRoute (Home §S2)", () => {
-  it("admin y operador entran por distribuidores; distribuidor por su ruta; sin rol por productos", () => {
+  it("admin entra por distribuidores, operador por inventario, distribuidor por su ruta y sin rol por productos", () => {
     expect(firstAllowedRoute("admin").to).toBe("/distributors");
-    expect(firstAllowedRoute("operador").to).toBe("/distributors");
+    expect(firstAllowedRoute("operador").to).toBe("/inventario");
     expect(firstAllowedRoute("distribuidor").to).toBe("/mi-ruta");
     expect(firstAllowedRoute(null).to).toBe("/products");
   });
