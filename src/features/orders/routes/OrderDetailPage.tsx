@@ -261,6 +261,59 @@ export function OrderDetailPage() {
       </p>
       <Status loading={order.loading} error={order.error ?? msg.error} ok={msg.ok} />
 
+      {o && open && canDispatch && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+            Acciones
+          </span>
+          {o.status === "pending" && (
+            <button
+              className={buttonClass}
+              type="button"
+              onClick={() =>
+                void act(() => updateOrderStatus(orderId, "in_route", null), "Pedido en ruta.")
+              }
+            >
+              Marcar en ruta
+            </button>
+          )}
+          {o.status === "in_route" && canDispatch && (
+            <button
+              className={secondaryButtonClass}
+              type="button"
+              onClick={() =>
+                void act(
+                  () => updateOrderStatus(orderId, "pending", null),
+                  "Pedido devuelto a pendiente.",
+                )
+              }
+            >
+              Volver a pendiente
+            </button>
+          )}
+          <button className={buttonClass} type="button" onClick={onConfirm}>
+            Confirmar entrega
+          </button>
+          {role === "admin" && (
+            <button
+              className={`${secondaryButtonClass} border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800`}
+              type="button"
+              onClick={() => {
+                const reason = window.prompt("Motivo de la cancelación");
+                if (reason) {
+                  void act(
+                    () => updateOrderStatus(orderId, "cancelled", reason),
+                    "Pedido cancelado.",
+                  );
+                }
+              }}
+            >
+              Cancelar pedido
+            </button>
+          )}
+        </div>
+      )}
+
       {o && (
         <Box title="Resumen">
           <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
@@ -470,58 +523,6 @@ export function OrderDetailPage() {
                 }}
               >
                 Quitar fecha
-              </button>
-            )}
-          </div>
-        </Box>
-      )}
-
-      {o && open && canDispatch && (
-        <Box title="Acciones">
-          <div className="flex flex-wrap gap-2">
-            {o.status === "pending" && (
-              <button
-                className={buttonClass}
-                type="button"
-                onClick={() =>
-                  void act(() => updateOrderStatus(orderId, "in_route", null), "Pedido en ruta.")
-                }
-              >
-                Marcar en ruta
-              </button>
-            )}
-            {o.status === "in_route" && canDispatch && (
-              <button
-                className={secondaryButtonClass}
-                type="button"
-                onClick={() =>
-                  void act(
-                    () => updateOrderStatus(orderId, "pending", null),
-                    "Pedido devuelto a pendiente.",
-                  )
-                }
-              >
-                Volver a pendiente
-              </button>
-            )}
-            <button className={buttonClass} type="button" onClick={onConfirm}>
-              Confirmar entrega
-            </button>
-            {role === "admin" && (
-              <button
-                className={`${secondaryButtonClass} border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800`}
-                type="button"
-                onClick={() => {
-                  const reason = window.prompt("Motivo de la cancelación");
-                  if (reason) {
-                    void act(
-                      () => updateOrderStatus(orderId, "cancelled", reason),
-                      "Pedido cancelado.",
-                    );
-                  }
-                }}
-              >
-                Cancelar pedido
               </button>
             )}
           </div>
