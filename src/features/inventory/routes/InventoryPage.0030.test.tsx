@@ -18,6 +18,7 @@ vi.mock("../api", () => ({
   fetchStoreName: vi.fn(),
   registerMovement: vi.fn(),
   registerMovementsBulk: vi.fn(),
+  fetchMovementRanking: vi.fn(),
   fetchMovementTemplates: vi.fn(),
   saveMovementTemplate: vi.fn(),
   deleteMovementTemplate: vi.fn(),
@@ -101,6 +102,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(inventoryApi.fetchMovementRanking).mockResolvedValue({ data: new Map(), error: null });
   added = false;
   purchasePrice = 1000;
   salePrice = 3000;

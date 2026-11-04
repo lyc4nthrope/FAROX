@@ -18,6 +18,7 @@ vi.mock("../api", () => ({
   fetchStoreName: vi.fn(),
   registerMovement: vi.fn(),
   registerMovementsBulk: vi.fn(),
+  fetchMovementRanking: vi.fn(),
   fetchMovementTemplates: vi.fn(),
   saveMovementTemplate: vi.fn(),
   deleteMovementTemplate: vi.fn(),
@@ -76,6 +77,7 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(inventoryApi.fetchMovementRanking).mockResolvedValue({ data: new Map(), error: null });
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "admin", premium: true });
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});

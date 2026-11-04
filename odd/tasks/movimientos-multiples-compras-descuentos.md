@@ -72,10 +72,16 @@ El usuario eligió **con migración**: se agrega ledger de compras del distribui
 - `npm run ci` en verde: 762 tests.
 
 ### L8 — tickets recurrentes (2026-11-03)
-
 - **S16.** Desde el ticket se puede **guardar como recurrente** con un nombre; se guarda producto + cantidad (sin precios históricos).
 - **S17.** Las recurrentes aparecen como chips sobre el ticket; un toque **suma sus líneas** al ticket actual resolviendo el precio vigente del catálogo.
 - **S18.** El alcance es por tienda (operador/admin) o por distribuidora; RLS + guard en las RPC impiden ver o borrar plantillas de otro alcance.
 - **S19.** Guardar con el mismo nombre reemplaza las líneas de esa plantilla. Se puede eliminar desde el chip.
 - Migración `20261103000038_tickets_recurrentes.sql` (pendiente de aplicar en Supabase).
 - `npm run ci` en verde: 764 tests.
+
+### L9 - orden del ticket por ventas (2026-11-03)
+
+- **S20.** La lista de productos del ticket se ordena por unidades vendidas en los ultimos 90 dias; los productos sin ventas quedan al final, alfabeticos.
+- RPC `movement_product_ranking(p_store, p_days)` (migracion 0040): tienda para admin/operador, ventas propias para distribuidor, excluye movimientos revertidos.
+- Front: `sortBySalesRanking` (funcion pura con test) en ambas pantallas; se recarga el ranking despues de registrar un ticket.
+- `npm run ci` en verde: 300 archivos bajo src/.

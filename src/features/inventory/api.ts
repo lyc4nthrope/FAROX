@@ -222,8 +222,7 @@ export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRo
 /** 0037: catálogo del distribuidor con stock y precios para el ticket. */
 export async function fetchDistributorMovementOptions(): Promise<
   LoadResult<MovementProductOption[]>
-> {
-  const { data, error } = await supabase
+> {  const { data, error } = await supabase
     .from("distributor_products")
     .select(
       "product_id,quantity,purchase_price,sale_price,product:products!inner(name,is_active,barcode,brand:brands(name))",
@@ -503,4 +502,27 @@ export async function setPrice(
     p_currency: "COP",
   });
   return { error };
+}
+
+/**
+ * 0040: unidades vendidas por producto en la ventana (90 días por defecto).
+ * `storeId` null ⇒ ventas del distribuidor autenticado.
+ */
+export async function fetchMovementRanking(input: {
+  storeId: number | null;
+  days?: number;
+}): Promise<LoadResult<Map<number, number>>> {
+  const { data, error } = await supabase.rpc("movement_product_ranking", {
+    p_store: input.storeId,
+    p_days: input.days ?? 90,
+  });
+  if (error !== null) return { data: null, error };
+  const rows = (data ?? []) as { product_id: number | string; quantity: number | string }[];
+  const ranking = new Map<number, number>();
+  for (const row of rows) {
+    const id = Number(row.product_id);
+    const quantity = Number(row.quantity);
+    if (Number.isFinite(id) && Number.isFinite(quantity)) ranking.set(id, quantity);
+  }
+  return { data: ranking, error: null };
 }

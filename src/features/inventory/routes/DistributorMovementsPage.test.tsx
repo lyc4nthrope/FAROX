@@ -12,6 +12,7 @@ vi.mock("../api", () => ({
   fetchDistributorPurchases: vi.fn(),
   fetchDistributorMovementOptions: vi.fn(),
   fetchDistributorStores: vi.fn(),
+  fetchMovementRanking: vi.fn(),
   fetchMovementTemplates: vi.fn(),
   saveMovementTemplate: vi.fn(),
   deleteMovementTemplate: vi.fn(),
@@ -119,6 +120,7 @@ function renderNonPremium() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(inventoryApi.fetchMovementRanking).mockResolvedValue({ data: new Map(), error: null });
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
   vi.mocked(authApi.signOut).mockResolvedValue(undefined);
   vi.mocked(inventoryApi.fetchDistributorMovements).mockResolvedValue({

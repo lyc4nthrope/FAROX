@@ -14,11 +14,13 @@ import {
 import { Modal } from "../../../shared/ui/Modal";
 import { MovementList } from "../components/MovementList";
 import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
+import { sortBySalesRanking } from "../ranking";
 import {
   fetchDistributorMovementOptions,
   fetchDistributorMovements,
   fetchDistributorPurchases,
   fetchDistributorStores,
+  fetchMovementRanking,
   deleteMovementTemplate,
   fetchMovementTemplates,
   registerDistributorPurchasesBulk,
@@ -62,6 +64,8 @@ export function DistributorMovementsPage() {
     if (!premium) return { data: [], error: null };
     return fetchDistributorMovementOptions();
   }, [premium]);
+  // 0040: ranking por ventas para ordenar el ticket.
+  const ranking = useLoad(() => fetchMovementRanking({ storeId: null }), []);
 
   const [type, setType] = useState<TypeFilter>("all");
   const [mode, setMode] = useState<Mode | null>(null);
@@ -88,6 +92,12 @@ export function DistributorMovementsPage() {
     .filter((movement) => type === "all" || (movement.direction ?? movement.type) === type)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
   const empty = (movements.data ?? []).length === 0 && (purchases.data ?? []).length === 0;
+
+  // 0040: catálogo ordenado por ventas, con los sin ventas alfabéticos al final.
+  const options = useMemo(
+    () => sortBySalesRanking(products.data ?? [], ranking.data ?? new Map()),
+    [products.data, ranking.data],
+  );
 
   // 0038: últimos productos vendidos (una venta es direction "exit" para el
   // distribuidor), para los atajos del ticket.
@@ -181,11 +191,12 @@ export function DistributorMovementsPage() {
     movements.reload();
     purchases.reload();
     products.reload();
+    ranking.reload();
   }
 
   const cart = (
     <MovementCart
-      options={products.data ?? []}
+      options={options}
       loading={products.loading}
       error={products.error}
       lines={lines}

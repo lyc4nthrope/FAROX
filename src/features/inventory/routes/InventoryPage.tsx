@@ -15,6 +15,7 @@ import {
 } from "../../../shared/ui/Box";
 import { MovementList } from "../components/MovementList";
 import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
+import { sortBySalesRanking } from "../ranking";
 import { EmptyState, PremiumLock, ProductPicker, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
@@ -22,6 +23,7 @@ import { fetchStorePurchasePrices } from "../../products/api";
 import {
   fetchMotives,
   fetchMovements,
+  fetchMovementRanking,
   fetchMyStores,
   fetchPrices,
   fetchStockOptions,
@@ -214,6 +216,8 @@ export function InventoryPage() {
   // 0030: coste privado de la tienda (tabla con RLS operator/admin).
   const purchasePrices = useLoad(() => fetchStorePurchasePrices(storeId), [storeId]);
   const motives = useLoad(() => fetchMotives(), []);
+  // 0040: ranking por ventas para ordenar el ticket.
+  const ranking = useLoad(() => fetchMovementRanking({ storeId }), [storeId]);
 
   const stockPickerOptions = useMemo<ProductPickerOption[]>(
     () =>
@@ -240,6 +244,7 @@ export function InventoryPage() {
     movements.reload();
     prices.reload();
     purchasePrices.reload();
+    ranking.reload();
     setCatalogVersion((value) => value + 1);
   };
 
@@ -365,10 +370,11 @@ export function InventoryPage() {
   const motiveOptions =
     motives.data?.filter((m) => m.suggested_type === null || m.suggested_type === mov.type) ?? [];
 
-  // Opciones del ticket: stock de la tienda + precios de compra/venta vigentes.
+  // Opciones del ticket: stock de la tienda + precios de compra/venta vigentes,
+  // ordenadas por ventas (0040) para que lo que más rota quede primero.
   const movementOptions = useMemo<MovementProductOption[]>(() => {
     const salePrices = new Map((prices.data ?? []).map((row) => [row.product_id, row.price]));
-    return (stockOptions.data ?? []).map((row) => ({
+    const options = (stockOptions.data ?? []).map((row) => ({
       id: row.product_id,
       name: row.product_name,
       brand: row.brand,
@@ -377,7 +383,8 @@ export function InventoryPage() {
       purchasePrice: purchasePrices.data?.get(row.product_id) ?? null,
       salePrice: salePrices.get(row.product_id) ?? null,
     }));
-  }, [stockOptions.data, purchasePrices.data, prices.data]);
+    return sortBySalesRanking(options, ranking.data ?? new Map());
+  }, [stockOptions.data, purchasePrices.data, prices.data, ranking.data]);
   const visibleMovements = (movements.data ?? []).filter(
     (movement) => moveFilter === "all" || movement.type === moveFilter,
   );
