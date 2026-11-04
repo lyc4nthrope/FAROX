@@ -89,11 +89,73 @@ function ShortageRequest({ storeId, rows }: { storeId: number; rows: ShortageRow
 // operador de esa tienda (el admin, todas). El distribuidor no tiene vista de
 // faltantes: se entera cuando el operador le crea el pedido. La RPC
 // list_shortage_products() resuelve el alcance y el cliente no filtra nada.
-export function ShortagePage() {
+// Contenido de faltantes reutilizable: la página standalone y la pestaña de
+// Pedidos comparten exactamente la misma lista y el mismo flujo de solicitud.
+export function ShortagePanel() {
   const { role } = useAuth();
   const { data, error, loading } = useLoad(fetchShortageProducts, []);
   const groups = useMemo(() => groupByStore(data ?? []), [data]);
 
+  return (
+    <div className="space-y-4">
+      {loading && (
+        <p role="status" className="text-sm text-gray-500">
+          Cargando…
+        </p>
+      )}
+      {error !== null && <ErrorBanner message={error} />}
+      {!loading && error === null && groups.length === 0 && (
+        <EmptyState
+          title="No hay faltantes marcados"
+          hint="Cuando marques un producto como faltante, va a aparecer acá."
+        />
+      )}
+
+      {groups.map((group) => (
+        <Box key={group.storeId} title={group.storeName}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Marca</th>
+                  <th>Categoría</th>
+                  <th>Unidad</th>
+                  <th>Stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.rows.map((row) => (
+                  <tr key={`${row.store_id}:${row.product_id}`}>
+                    <td className="font-medium text-gray-900">{row.name}</td>
+                    <td>{row.brand ?? "—"}</td>
+                    <td>{row.category ?? "—"}</td>
+                    <td>{row.unit ?? "—"}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {formatQty(row.quantity)} / {formatQty(row.base_quantity)}
+                        </span>
+                        {row.quantity === 0 ? (
+                          <Badge tone="red">Sin stock</Badge>
+                        ) : (
+                          <Badge tone="amber">Reponer</Badge>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {role === "operador" && <ShortageRequest storeId={group.storeId} rows={group.rows} />}
+        </Box>
+      ))}
+    </div>
+  );
+}
+
+export function ShortagePage() {
   return (
     <section>
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
@@ -105,60 +167,8 @@ export function ShortagePage() {
         llega cuando le hacés el pedido.
       </p>
 
-      <div className="mt-4 space-y-4">
-        {loading && (
-          <p role="status" className="text-sm text-gray-500">
-            Cargando…
-          </p>
-        )}
-        {error !== null && <ErrorBanner message={error} />}
-        {!loading && error === null && groups.length === 0 && (
-          <EmptyState
-            title="No hay faltantes marcados"
-            hint="Cuando marques un producto como faltante, va a aparecer acá."
-          />
-        )}
-
-        {groups.map((group) => (
-          <Box key={group.storeId} title={group.storeName}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr>
-                    <th>Producto</th>
-                    <th>Marca</th>
-                    <th>Categoría</th>
-                    <th>Unidad</th>
-                    <th>Stock</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.map((row) => (
-                    <tr key={`${row.store_id}:${row.product_id}`}>
-                      <td className="font-medium text-gray-900">{row.name}</td>
-                      <td>{row.brand ?? "—"}</td>
-                      <td>{row.category ?? "—"}</td>
-                      <td>{row.unit ?? "—"}</td>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <span>
-                            {formatQty(row.quantity)} / {formatQty(row.base_quantity)}
-                          </span>
-                          {row.quantity === 0 ? (
-                            <Badge tone="red">Sin stock</Badge>
-                          ) : (
-                            <Badge tone="amber">Reponer</Badge>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {role === "operador" && <ShortageRequest storeId={group.storeId} rows={group.rows} />}
-          </Box>
-        ))}
+      <div className="mt-4">
+        <ShortagePanel />
       </div>
     </section>
   );

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as ordersApi from "../api";
+import * as productsApi from "../../products/api";
 import type { OrderRow } from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { OrdersPage } from "./OrdersPage";
@@ -19,6 +20,12 @@ vi.mock("../api", () => ({
   fetchOrders: vi.fn(),
   updateOrderStatus: vi.fn(),
   confirmFullDelivery: vi.fn(),
+}));
+vi.mock("../../products/api", () => ({
+  fetchShortageProducts: vi.fn(),
+}));
+vi.mock("../../store-links/api", () => ({
+  fetchLinkedDistributorOptions: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -64,6 +71,7 @@ beforeEach(() => {
   vi.mocked(ordersApi.fetchOrders).mockResolvedValue({ data: ORDERS, error: null });
   vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
   vi.mocked(ordersApi.confirmFullDelivery).mockResolvedValue({ error: null });
+  vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({ data: [], error: null });
 });
 
 afterEach(() => {
@@ -119,5 +127,18 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     expect((await screen.findAllByText("Tienda Centro")).length).toBe(2);
     expect(screen.queryByRole("button", { name: "En ruta" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Entregar todo" })).not.toBeInTheDocument();
+  });
+
+  it("operador: los faltantes viven en una pestaña de Pedidos", async () => {
+    renderPage("operador");
+    const user = userEvent.setup();
+
+    const tab = await screen.findByRole("tab", { name: "Faltantes" });
+    expect(tab).toHaveAttribute("aria-selected", "false");
+
+    await user.click(tab);
+
+    expect(tab).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("No hay faltantes marcados")).toBeInTheDocument();
   });
 });

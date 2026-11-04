@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { EmptyState } from "../../../shared/ui";
+import { ShortagePanel } from "../../products";
 import {
   Badge,
   Box,
@@ -34,8 +35,10 @@ const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
 export function OrdersPage() {
   const { role } = useAuth();
   const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [view, setView] = useState<"orders" | "shortages">("orders");
   const orders = useLoad(() => fetchOrders(status), [status]);
   const canCreate = role === "admin" || role === "operador";
+  const canSeeShortages = role === "admin" || role === "operador";
   const distributor = role === "distribuidor";
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
@@ -80,7 +83,7 @@ export function OrdersPage() {
             Pedidos a distribuidores, estado de la entrega y lo que llega a cada tienda.
           </p>
         </div>
-        {canCreate && (
+        {canCreate && view === "orders" && (
           <Link className={buttonClass} to="/pedidos/nuevo">
             <svg
               aria-hidden="true"
@@ -98,7 +101,43 @@ export function OrdersPage() {
         )}
       </div>
 
-      <Box title="Listado">
+      {canSeeShortages && (
+        <div
+          role="tablist"
+          aria-label="Pedidos y faltantes"
+          className="mt-4 inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "orders"}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+              view === "orders"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+            onClick={() => setView("orders")}
+          >
+            Pedidos
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "shortages"}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${
+              view === "shortages"
+                ? "bg-gray-900 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+            onClick={() => setView("shortages")}
+          >
+            Faltantes
+          </button>
+        </div>
+      )}
+
+      {view === "orders" ? (
+        <Box title="Listado">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-48">
             <Field label="Estado">
@@ -220,6 +259,11 @@ export function OrdersPage() {
           </div>
         )}
       </Box>
+      ) : (
+        <div className="mt-4">
+          <ShortagePanel />
+        </div>
+      )}
     </section>
   );
 }
