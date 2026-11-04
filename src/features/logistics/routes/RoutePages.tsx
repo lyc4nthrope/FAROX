@@ -424,6 +424,12 @@ export function MyRoutePage() {
                 title="No hay tiendas con solicitudes abiertas"
                 hint="Cuando tengas pedidos pendientes o en ruta, sus tiendas van a aparecer acá."
               />
+              <p className="mt-3 text-center text-sm text-gray-600">
+                ¿No ves tus tiendas?{" "}
+                <Link className="font-medium underline underline-offset-4" to="/vincular">
+                  Vinculá una tienda
+                </Link>
+              </p>
             </div>
           ) : (
             <ul className="max-h-[24rem] divide-y divide-gray-200 overflow-y-auto lg:max-h-[34rem]">

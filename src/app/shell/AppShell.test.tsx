@@ -78,6 +78,8 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    // Vincular tienda es contextual, no una entrada fija del nav.
+    expect(screen.queryByRole("link", { name: "Vincular tienda" })).not.toBeInTheDocument();
     // Perfil es utilidad de cuenta en el header, no una entrada de entidad.
     expect(screen.getByRole("link", { name: "Perfil" })).toBeInTheDocument();
   });

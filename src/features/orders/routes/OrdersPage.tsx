@@ -217,10 +217,20 @@ export function OrdersPage() {
         <Status loading={orders.loading} error={orders.error} />
         <Status error={msg.error} ok={msg.ok} />
         {orders.data?.length === 0 && !orders.loading && (
-          <EmptyState
-            title="No hay pedidos"
-            hint="Cuando se cree un pedido o cambie el filtro, la lista se actualiza acá."
-          />
+          <>
+            <EmptyState
+              title="No hay pedidos"
+              hint="Cuando se cree un pedido o cambie el filtro, la lista se actualiza acá."
+            />
+            {distributor && (
+              <p className="mt-3 text-sm text-gray-600">
+                ¿Todavía no vinculaste una tienda?{" "}
+                <Link className="font-medium underline underline-offset-4" to="/vincular">
+                  Vincular tienda
+                </Link>
+              </p>
+            )}
+          </>
         )}
         {orders.data !== null && orders.data.length > 0 && (
           <ResponsiveTable

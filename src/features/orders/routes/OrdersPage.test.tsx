@@ -141,4 +141,16 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
     expect(tab).toHaveAttribute("aria-selected", "true");
     expect(await screen.findByText("No hay faltantes marcados")).toBeInTheDocument();
   });
+
+  it("distribuidor sin pedidos: ofrece vincular tienda en el estado vacío", async () => {
+    vi.mocked(ordersApi.fetchOrders).mockResolvedValue({ data: [], error: null });
+
+    renderPage("distribuidor");
+
+    expect(await screen.findByText("No hay pedidos")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Vincular tienda" })).toHaveAttribute(
+      "href",
+      "/vincular",
+    );
+  });
 });

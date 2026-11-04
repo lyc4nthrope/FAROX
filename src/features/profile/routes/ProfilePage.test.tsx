@@ -78,6 +78,17 @@ describe("ProfilePage (§S2 fila /profile)", () => {
     expect(screen.getByText("Gratis")).toBeInTheDocument();
   });
 
+  it("distribuidor: ofrece vincular tienda desde Perfil", async () => {
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "distribuidor", premium: false });
+
+    renderPerfil();
+
+    expect(await screen.findByRole("link", { name: "Vincular tienda" })).toHaveAttribute(
+      "href",
+      "/vincular",
+    );
+  });
+
   it("guarda enviando SOLO las 3 columnas de perfil (§S2 profile-column-limit)", async () => {
     const user = userEvent.setup();
     renderPerfil();

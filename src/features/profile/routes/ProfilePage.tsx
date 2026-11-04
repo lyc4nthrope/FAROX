@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
-import { Box } from "../../../shared/ui/Box";
+import { Box, buttonClass } from "../../../shared/ui/Box";
 import { PremiumStatusCard } from "../../premium";
 import { fetchMyProfile, updateMyProfile } from "../api";
 import { ProfileForm, type ProfileFormErrors } from "../components/ProfileForm";
@@ -17,7 +18,7 @@ const EMPTY_VALUES: ProfileFormValues = {
 // guardar envía SOLO { full_name, phone_number, contact_preference } —
 // el §S2 profile-column-limit es el AC cargante.
 export function ProfilePage() {
-  const { userId, email } = useAuth();
+  const { userId, email, role } = useAuth();
   const [values, setValues] = useState<ProfileFormValues>(EMPTY_VALUES);
   const [errors, setErrors] = useState<ProfileFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -122,6 +123,19 @@ export function ProfilePage() {
           />
         </Box>
       </div>
+      {role === "distribuidor" && (
+        <div className="mt-6">
+          <Box title="Tiendas">
+            <p className="text-sm text-gray-600">
+              Vinculá tu distribuidora con las tiendas que atendés escaneando su QR o escribiendo el
+              código.
+            </p>
+            <Link className={`${buttonClass} mt-3`} to="/vincular">
+              Vincular tienda
+            </Link>
+          </Box>
+        </div>
+      )}
     </section>
   );
 }

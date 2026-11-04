@@ -47,10 +47,11 @@ const OPERATOR_ITEMS: readonly NavItem[] = [
 ];
 
 // Navegación del distribuidor: primero lo que usa a diario (ruta, pedidos,
-// movimientos, catálogo), después el seguimiento (alertas, dashboard) y al
-// final la acción de configuración (vincular tienda). Los faltantes NO van
-// acá: el distribuidor solo se entera del faltante cuando el operador le crea
-// un pedido (0023).
+// movimientos, catálogo), después el seguimiento (alertas, dashboard).
+// «Vincular tienda» es una acción de configuración: vive en Perfil y en los
+// estados vacíos de pedidos/ruta, no como entrada permanente del nav. Los
+// faltantes NO van acá: el distribuidor solo se entera del faltante cuando el
+// operador le crea un pedido (0023).
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
@@ -58,7 +59,6 @@ const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/products", label: "Productos" },
   { to: "/alertas", label: "Alertas" },
   { to: "/dashboard", label: "Dashboard" },
-  { to: "/vincular", label: "Vincular tienda" },
 ];
 
 // Derivación rol → entradas de nav. Rol null (inactivo o fila ausente) ⇒
