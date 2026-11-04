@@ -356,7 +356,30 @@ export function MyRoutePage() {
 
       <Status loading={requests.loading} error={requests.error} />
 
-      <div className="mt-5 grid border border-gray-300 bg-white lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
+      <div className="mt-5">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Tu ruta de hoy
+        </h2>
+        <div className="mt-2">
+          <Status loading={route.loading} error={route.error} />
+          {!route.loading && route.data === null && !route.error && (
+            <EmptyState
+              title="No tenés ruta asignada para hoy"
+              hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
+            />
+          )}
+          {route.data && <RouteView route={route.data} onChanged={route.reload} />}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Planificar el recorrido
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          Marcá las tiendas con solicitudes y guardá las paradas de hoy.
+        </p>
+        <div className="mt-2 grid border border-gray-300 bg-white lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
         <section
           aria-label="Mapa de tiendas"
           className="min-w-0 border-b border-gray-300 lg:border-b-0 lg:border-r"
@@ -514,20 +537,6 @@ export function MyRoutePage() {
         </div>
       )}
 
-      <div className="mt-8">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-          Ruta asignada de hoy
-        </h2>
-        <div className="mt-2">
-          <Status loading={route.loading} error={route.error} />
-          {!route.loading && route.data === null && !route.error && (
-            <EmptyState
-              title="No tenés ruta asignada para hoy"
-              hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
-            />
-          )}
-          {route.data && <RouteView route={route.data} onChanged={route.reload} />}
-        </div>
       </div>
     </section>
   );
