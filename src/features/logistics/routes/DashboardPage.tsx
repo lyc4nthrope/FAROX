@@ -4,7 +4,8 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { supabase } from "../../../shared/lib/supabase/client";
 import { Box, Field, Status, inputClass } from "../../../shared/ui/Box";
-import { EmptyState, ExampleDashboard, PremiumBadge, PremiumLock } from "../../../shared/ui";
+import { EmptyState, ExampleDashboard, PremiumBadge, PremiumLock, ResponsiveTable } from "../../../shared/ui";
+import type { ResponsiveTableColumn } from "../../../shared/ui";
 import { formatCOP } from "../../../shared/lib/format";
 
 interface DashboardRow {
@@ -188,6 +189,27 @@ export function DashboardPage() {
         },
   ];
 
+  const dayColumns: ResponsiveTableColumn<DashboardRow>[] = [
+    {
+      key: "day",
+      header: "Día",
+      primary: true,
+      className: "whitespace-nowrap",
+      render: (row) => formatDay(row.day),
+    },
+  ];
+  if (!esDistribuidor) {
+    dayColumns.push({
+      key: "distributor",
+      header: "Distribuidor",
+      render: (row) => label(row.distributor_id),
+    });
+  }
+  dayColumns.push(
+    { key: "entries", header: "Entradas", render: (row) => row.entries_count },
+    { key: "exits", header: "Salidas", render: (row) => row.exits_count },
+  );
+
   return (
     <section>
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
@@ -340,28 +362,12 @@ export function DashboardPage() {
             hint="Probá con un rango más amplio o registrá entradas y salidas."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr>
-                  <th>Día</th>
-                  {!esDistribuidor && <th>Distribuidor</th>}
-                  <th>Entradas</th>
-                  <th>Salidas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((r) => (
-                  <tr key={`${r.day}-${r.distributor_id}`}>
-                    <td className="whitespace-nowrap">{formatDay(r.day)}</td>
-                    {!esDistribuidor && <td>{label(r.distributor_id)}</td>}
-                    <td>{r.entries_count}</td>
-                    <td>{r.exits_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            caption="Movimientos por día"
+            columns={dayColumns}
+            rows={data}
+            rowKey={(row) => `${row.day}-${row.distributor_id}`}
+          />
         )}
       </Box>
     </section>

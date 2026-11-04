@@ -14,6 +14,8 @@ export interface DataTableColumn<Row> {
   header: string;
   /** Renderiza la celda de esta fila (el caller decide badge, link, etc.). */
   render: (row: Row) => ReactNode;
+  /** Encabeza la tarjeta en móvil. Por defecto, la primera columna. */
+  primary?: boolean;
 }
 
 export interface DataTableAction<Row> {
@@ -75,9 +77,11 @@ export function DataTable<Row>({
   const visibles = (row: Row): DataTableAction<Row>[] =>
     (actions ?? []).filter((action) => action.visible?.(row) ?? true);
 
+  const primaryKey = columns.find((column) => column.primary)?.key ?? columns[0]?.key;
+
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full border-collapse text-left text-sm">
+      <table className="responsive-table w-full border-collapse text-left text-sm">
         <thead>
           <tr>
             {columns.map((column) => (
@@ -90,10 +94,16 @@ export function DataTable<Row>({
           {rows.map((row) => (
             <tr key={rowKey(row)} className="transition-colors">
               {columns.map((column) => (
-                <td key={column.key}>{column.render(row)}</td>
+                <td
+                  key={column.key}
+                  data-label={column.header}
+                  className={column.key === primaryKey ? "responsive-primary" : undefined}
+                >
+                  {column.render(row)}
+                </td>
               ))}
               {(actions ?? []).length > 0 && (
-                <td>
+                <td data-label="Acciones">
                   <span className="flex flex-wrap gap-1.5">
                     {visibles(row).map((action) => (
                       <button

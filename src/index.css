@@ -25,3 +25,74 @@
     @apply text-gray-900;
   }
 }
+
+/* Tablas responsive: en pantallas angostas cada fila se convierte en una
+   tarjeta legible, con el rótulo de cada columna a la izquierda. Solo aplica
+   a tablas marcadas con .responsive-table, así las tablas densas de admin
+   conservan su scroll horizontal. */
+@media (max-width: 639px) {
+  main table.responsive-table {
+    display: block;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  main table.responsive-table thead {
+    display: none;
+  }
+  main table.responsive-table tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  main table.responsive-table tbody,
+  main table.responsive-table tr,
+  main table.responsive-table td {
+    width: 100%;
+  }
+  main table.responsive-table tr {
+    display: block;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #fff;
+    overflow: hidden;
+  }
+  main table.responsive-table tbody tr:nth-child(even) {
+    background: #fff;
+  }
+  main table.responsive-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0;
+    border-bottom: 1px solid #f3f4f6;
+    padding: 0.5rem 0.75rem;
+    text-align: right;
+  }
+  main table.responsive-table tr td:last-child {
+    border-bottom: 0;
+  }
+  main table.responsive-table td::before {
+    content: attr(data-label);
+    flex: 0 0 38%;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+  main table.responsive-table td.responsive-primary {
+    display: block;
+    padding: 0.625rem 0.75rem;
+    background: #f9fafb;
+    text-align: left;
+    font-weight: 600;
+    color: #111827;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  main table.responsive-table td.responsive-primary::before {
+    display: none;
+  }
+  main table.responsive-table td > * {
+    min-width: 0;
+  }
+}

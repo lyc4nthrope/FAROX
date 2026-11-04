@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { EmptyState } from "../../../shared/ui";
+import { EmptyState, ResponsiveTable } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import {
   Badge,
@@ -274,48 +274,62 @@ export function CreditsPage() {
 
       {rows.length > 0 && (
         <Box title="Créditos">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr>
-                  <th>Crédito</th>
-                  <th>Tienda</th>
-                  <th>Saldo</th>
-                  <th>Total</th>
-                  <th>Vence</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((credit) => (
-                  <tr key={credit.id}>
-                    <td className="font-medium text-gray-900">#{credit.id}</td>
-                    <td>{credit.store_name}</td>
-                    <td className="tabular-nums">{formatCOP(credit.balance)}</td>
-                    <td className="tabular-nums">{formatCOP(credit.total_amount)}</td>
-                    <td className="whitespace-nowrap">
-                      {credit.due_date === null ? "—" : formatDate(credit.due_date)}
-                    </td>
-                    <td>
-                      <Badge tone={creditTone(credit)}>
-                        {CREDIT_LABELS[credit.status] ?? credit.status}
-                      </Badge>
-                    </td>
-                    <td>
-                      <button
-                        className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-                        type="button"
-                        onClick={() => setSelectedId(credit.id)}
-                      >
-                        Ver detalle
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            caption="Cartera de créditos"
+            columns={[
+              {
+                key: "store",
+                header: "Tienda",
+                primary: true,
+                render: (credit) => (
+                  <span className="font-medium text-gray-900">{credit.store_name}</span>
+                ),
+              },
+              {
+                key: "id",
+                header: "Crédito",
+                render: (credit) => `#${credit.id}`,
+              },
+              {
+                key: "balance",
+                header: "Saldo",
+                className: "tabular-nums",
+                render: (credit) => formatCOP(credit.balance),
+              },
+              {
+                key: "total",
+                header: "Total",
+                className: "tabular-nums",
+                render: (credit) => formatCOP(credit.total_amount),
+              },
+              {
+                key: "due",
+                header: "Vence",
+                className: "whitespace-nowrap",
+                render: (credit) => (credit.due_date === null ? "—" : formatDate(credit.due_date)),
+              },
+              {
+                key: "status",
+                header: "Estado",
+                render: (credit) => (
+                  <Badge tone={creditTone(credit)}>
+                    {CREDIT_LABELS[credit.status] ?? credit.status}
+                  </Badge>
+                ),
+              },
+            ]}
+            rows={rows}
+            rowKey={(credit) => String(credit.id)}
+            actions={(credit) => (
+              <button
+                className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                type="button"
+                onClick={() => setSelectedId(credit.id)}
+              >
+                Ver detalle
+              </button>
+            )}
+          />
         </Box>
       )}
 

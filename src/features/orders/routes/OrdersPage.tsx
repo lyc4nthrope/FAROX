@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { EmptyState } from "../../../shared/ui";
+import { EmptyState, ResponsiveTable } from "../../../shared/ui";
 import { ShortagePanel } from "../../products";
 import {
   Badge,
@@ -21,6 +21,7 @@ import {
   confirmFullDelivery,
   fetchOrders,
   updateOrderStatus,
+  type OrderRow,
   type OrderStatus,
 } from "../api";
 
@@ -67,6 +68,58 @@ export function OrdersPage() {
       return;
     }
     void act(orderId, () => confirmFullDelivery(orderId), "Pedido entregado.");
+  }
+
+  function renderActions(o: OrderRow) {
+    return (
+      <>
+        {o.status === "pending" && (
+          <button
+            className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+            type="button"
+            disabled={busyId === o.id}
+            onClick={() =>
+              void act(
+                o.id,
+                () => updateOrderStatus(o.id, "in_route", null),
+                "Pedido en ruta.",
+              )
+            }
+          >
+            En ruta
+          </button>
+        )}
+        {o.status === "in_route" && (
+          <>
+            <button
+              className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+              type="button"
+              disabled={busyId === o.id}
+              onClick={() =>
+                void act(
+                  o.id,
+                  () => updateOrderStatus(o.id, "pending", null),
+                  "Pedido devuelto a pendiente.",
+                )
+              }
+            >
+              Devolver a pendiente
+            </button>
+            <button
+              className={`${buttonClass} px-2.5 py-1 text-xs`}
+              type="button"
+              disabled={busyId === o.id}
+              onClick={() => deliver(o.id)}
+            >
+              Entregar todo
+            </button>
+          </>
+        )}
+        {o.status !== "pending" && o.status !== "in_route" && (
+          <span className="text-xs text-gray-400">—</span>
+        )}
+      </>
+    );
   }
 
   return (
@@ -170,93 +223,51 @@ export function OrdersPage() {
           />
         )}
         {orders.data !== null && orders.data.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Estado</th>
-                  <th>Tienda</th>
-                  <th>Distribuidor</th>
-                  <th>Fecha prometida</th>
-                  {distributor && <th>Acciones</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {orders.data.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <Link
-                        className="font-medium text-gray-900 underline-offset-4 hover:underline"
-                        to={`/pedidos/${o.id}`}
-                      >
-                        #{o.id}
-                      </Link>
-                    </td>
-                    <td>
-                      <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
-                    </td>
-                    <td>{o.store_name}</td>
-                    <td>{o.distributor_name || "—"}</td>
-                    <td className="whitespace-nowrap">
-                      {o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—"}
-                    </td>
-                    {distributor && (
-                      <td>
-                        <span className="flex flex-wrap gap-1.5">
-                          {o.status === "pending" && (
-                            <button
-                              className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-                              type="button"
-                              disabled={busyId === o.id}
-                              onClick={() =>
-                                void act(
-                                  o.id,
-                                  () => updateOrderStatus(o.id, "in_route", null),
-                                  "Pedido en ruta.",
-                                )
-                              }
-                            >
-                              En ruta
-                            </button>
-                          )}
-                          {o.status === "in_route" && (
-                            <>
-                              <button
-                                className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-                                type="button"
-                                disabled={busyId === o.id}
-                                onClick={() =>
-                                  void act(
-                                    o.id,
-                                    () => updateOrderStatus(o.id, "pending", null),
-                                    "Pedido devuelto a pendiente.",
-                                  )
-                                }
-                              >
-                                Devolver a pendiente
-                              </button>
-                              <button
-                                className={`${buttonClass} px-2.5 py-1 text-xs`}
-                                type="button"
-                                disabled={busyId === o.id}
-                                onClick={() => deliver(o.id)}
-                              >
-                                Entregar todo
-                              </button>
-                            </>
-                          )}
-                          {o.status !== "pending" && o.status !== "in_route" && (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </span>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            caption="Pedidos"
+            columns={[
+              {
+                key: "store",
+                header: "Tienda",
+                primary: true,
+                render: (o) => <span className="font-medium text-gray-900">{o.store_name}</span>,
+              },
+              {
+                key: "id",
+                header: "#",
+                render: (o) => (
+                  <Link
+                    className="font-medium text-gray-900 underline-offset-4 hover:underline"
+                    to={`/pedidos/${o.id}`}
+                  >
+                    #{o.id}
+                  </Link>
+                ),
+              },
+              {
+                key: "status",
+                header: "Estado",
+                render: (o) => (
+                  <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                ),
+              },
+              {
+                key: "distributor",
+                header: "Distribuidor",
+                render: (o) => o.distributor_name || "—",
+              },
+              {
+                key: "expected",
+                header: "Fecha prometida",
+                className: "whitespace-nowrap",
+                render: (o) =>
+                  o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—",
+              },
+            ]}
+            rows={orders.data}
+            rowKey={(o) => String(o.id)}
+            actions={distributor ? renderActions : undefined}
+          />
         )}
       </Box>
       ) : (

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { EmptyState, ErrorBanner } from "../../../shared/ui";
+import { EmptyState, ErrorBanner, ResponsiveTable } from "../../../shared/ui";
 import { Badge, buttonClass } from "../../../shared/ui/Box";
 import type { StoreListRow } from "../types";
 
@@ -63,40 +63,49 @@ export function StoreList({ rows, loading, error, canCreate }: StoreListProps) {
       )}
       {error === null && loading && <p className="mt-4 text-sm text-gray-500">Cargando…</p>}
       {error === null && !loading && rows.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead>
-              <tr>
-                <th>Nombre</th>
-                <th>Ciudad</th>
-                <th>Latitud</th>
-                <th>Longitud</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <Link
-                      to={`/stores/${row.id}`}
-                      className="font-medium text-gray-900 underline-offset-4 hover:underline"
-                    >
-                      {row.name}
-                    </Link>
-                  </td>
-                  <td>{row.city ?? "—"}</td>
-                  <td className="tabular-nums text-gray-500">{row.lat}</td>
-                  <td className="tabular-nums text-gray-500">{row.lng}</td>
-                  <td>
-                    <Badge tone={row.is_active ? "green" : "gray"}>
-                      {row.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <ResponsiveTable
+            caption="Tiendas"
+            columns={[
+              {
+                key: "name",
+                header: "Nombre",
+                primary: true,
+                render: (row) => (
+                  <Link
+                    to={`/stores/${row.id}`}
+                    className="font-medium text-gray-900 underline-offset-4 hover:underline"
+                  >
+                    {row.name}
+                  </Link>
+                ),
+              },
+              { key: "city", header: "Ciudad", render: (row) => row.city ?? "—" },
+              {
+                key: "lat",
+                header: "Latitud",
+                className: "tabular-nums text-gray-500",
+                render: (row) => row.lat,
+              },
+              {
+                key: "lng",
+                header: "Longitud",
+                className: "tabular-nums text-gray-500",
+                render: (row) => row.lng,
+              },
+              {
+                key: "status",
+                header: "Estado",
+                render: (row) => (
+                  <Badge tone={row.is_active ? "green" : "gray"}>
+                    {row.is_active ? "Activo" : "Inactivo"}
+                  </Badge>
+                ),
+              },
+            ]}
+            rows={rows}
+            rowKey={(row) => String(row.id)}
+          />
         </div>
       )}
     </div>

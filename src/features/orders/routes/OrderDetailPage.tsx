@@ -13,6 +13,7 @@ import {
   runAction,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
+import { ResponsiveTable, type ResponsiveTableColumn } from "../../../shared/ui";
 import { formatCOP } from "../../../shared/lib/format";
 import {
   ORDER_STATUS_LABELS,
@@ -25,6 +26,7 @@ import {
   setOrderExpectedAt,
   setOrderPrices,
   updateOrderStatus,
+  type OrderItemRow,
 } from "../api";
 
 const LINE_LABELS: Record<string, string> = {
@@ -232,6 +234,47 @@ export function OrderDetailPage() {
   const showQuoteReadOnly =
     !canQuote && (quoteRows.data ?? []).some((row) => row.distributor_price !== null);
 
+  const itemColumns: ResponsiveTableColumn<OrderItemRow>[] = [
+    {
+      key: "product",
+      header: "Producto",
+      primary: true,
+      render: (item) => <span className="font-medium text-gray-900">{item.product_name}</span>,
+    },
+    { key: "quantity", header: "Pedido", render: (item) => item.quantity },
+    { key: "received", header: "Recibido", render: (item) => item.received_quantity ?? "—" },
+    {
+      key: "lineStatus",
+      header: "Estado línea",
+      render: (item) => (
+        <Badge
+          tone={
+            item.status === "received" ? "green" : item.status === "partial" ? "amber" : "gray"
+          }
+        >
+          {LINE_LABELS[item.status] ?? item.status}
+        </Badge>
+      ),
+    },
+  ];
+  if (showPrice) {
+    itemColumns.push({
+      key: "price",
+      header: "Precio unitario",
+      render: (item) => (item.unit_price === null ? "—" : formatCOP(item.unit_price)),
+    });
+  }
+  if (showQuoteReadOnly) {
+    itemColumns.push({
+      key: "quote",
+      header: "Cotización",
+      render: (item) => {
+        const saved = savedQuotes.get(item.product_id);
+        return saved == null ? "—" : formatCOP(saved);
+      },
+    });
+  }
+
   return (
     <section>
       <Link
@@ -365,67 +408,33 @@ export function OrderDetailPage() {
 
       <Box title="Productos">
         <Status loading={items.loading} error={items.error} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Pedido</th>
-                <th>Recibido</th>
-                <th>Estado línea</th>
-                {showPrice && <th>Precio unitario</th>}
-                {showQuoteReadOnly && <th>Cotización</th>}
-                {open && canDispatch && <th>Recibir</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {items.data?.map((i) => (
-                <tr key={i.id}>
-                  <td className="font-medium text-gray-900">{i.product_name}</td>
-                  <td>{i.quantity}</td>
-                  <td>{i.received_quantity ?? "—"}</td>
-                  <td>
-                    <Badge
-                      tone={
-                        i.status === "received"
-                          ? "green"
-                          : i.status === "partial"
-                            ? "amber"
-                            : "gray"
+        {items.data !== null && items.data.length > 0 && (
+          <ResponsiveTable
+            caption="Productos del pedido"
+            columns={itemColumns}
+            rows={items.data}
+            rowKey={(item) => String(item.id)}
+            actions={
+              open && canDispatch
+                ? (item) => (
+                    <input
+                      aria-label={`Recibido de ${item.product_name}`}
+                      className={`${inputClass} max-w-28`}
+                      type="number"
+                      min="0"
+                      max={item.quantity}
+                      step="0.001"
+                      value={received[item.product_id] ?? ""}
+                      onChange={(e) =>
+                        setReceived({ ...received, [item.product_id]: e.target.value })
                       }
-                    >
-                      {LINE_LABELS[i.status] ?? i.status}
-                    </Badge>
-                  </td>
-                  {showPrice && <td>{i.unit_price === null ? "—" : formatCOP(i.unit_price)}</td>}
-                  {showQuoteReadOnly && (
-                    <td>
-                      {savedQuotes.get(i.product_id) == null
-                        ? "—"
-                        : formatCOP(savedQuotes.get(i.product_id) as number)}
-                    </td>
-                  )}
-                  {open && canDispatch && (
-                    <td>
-                      <input
-                        aria-label={`Recibido de ${i.product_name}`}
-                        className={`${inputClass} max-w-28`}
-                        type="number"
-                        min="0"
-                        max={i.quantity}
-                        step="0.001"
-                        value={received[i.product_id] ?? ""}
-                        onChange={(e) =>
-                          setReceived({ ...received, [i.product_id]: e.target.value })
-                        }
-                      />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    />
+                  )
+                : undefined
+            }
+            actionsHeader="Recibir"
+          />
+        )}
         {items.data?.length === 0 && !items.loading && (
           <p className="mt-3 text-sm text-gray-500">Este pedido no tiene líneas.</p>
         )}

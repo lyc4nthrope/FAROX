@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { formatQty } from "../../../shared/lib/format";
-import { EmptyState, ErrorBanner } from "../../../shared/ui";
+import { EmptyState, ErrorBanner, ResponsiveTable } from "../../../shared/ui";
 import { Badge, Box, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
 import { fetchLinkedDistributorOptions } from "../../store-links/api";
 import { fetchShortageProducts } from "../api";
@@ -113,41 +113,38 @@ export function ShortagePanel() {
 
       {groups.map((group) => (
         <Box key={group.storeId} title={group.storeName}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr>
-                  <th>Producto</th>
-                  <th>Marca</th>
-                  <th>Categoría</th>
-                  <th>Unidad</th>
-                  <th>Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {group.rows.map((row) => (
-                  <tr key={`${row.store_id}:${row.product_id}`}>
-                    <td className="font-medium text-gray-900">{row.name}</td>
-                    <td>{row.brand ?? "—"}</td>
-                    <td>{row.category ?? "—"}</td>
-                    <td>{row.unit ?? "—"}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <span>
-                          {formatQty(row.quantity)} / {formatQty(row.base_quantity)}
-                        </span>
-                        {row.quantity === 0 ? (
-                          <Badge tone="red">Sin stock</Badge>
-                        ) : (
-                          <Badge tone="amber">Reponer</Badge>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            caption={`Faltantes de ${group.storeName}`}
+            columns={[
+              {
+                key: "product",
+                header: "Producto",
+                primary: true,
+                render: (row) => <span className="font-medium text-gray-900">{row.name}</span>,
+              },
+              { key: "brand", header: "Marca", render: (row) => row.brand ?? "—" },
+              { key: "category", header: "Categoría", render: (row) => row.category ?? "—" },
+              { key: "unit", header: "Unidad", render: (row) => row.unit ?? "—" },
+              {
+                key: "stock",
+                header: "Stock",
+                render: (row) => (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span>
+                      {formatQty(row.quantity)} / {formatQty(row.base_quantity)}
+                    </span>
+                    {row.quantity === 0 ? (
+                      <Badge tone="red">Sin stock</Badge>
+                    ) : (
+                      <Badge tone="amber">Reponer</Badge>
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+            rows={group.rows}
+            rowKey={(row) => `${row.store_id}:${row.product_id}`}
+          />
           {role === "operador" && <ShortageRequest storeId={group.storeId} rows={group.rows} />}
         </Box>
       ))}

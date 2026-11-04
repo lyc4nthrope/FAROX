@@ -5,6 +5,8 @@ export type { DataTableColumn, DataTableAction } from "./DataTable/DataTable";
 export { EmptyState } from "./EmptyState";
 export { ErrorBanner } from "./ErrorBanner";
 export { SectionIcon } from "./icons";
+export { ResponsiveTable } from "./ResponsiveTable";
+export type { ResponsiveTableColumn, ResponsiveTableProps } from "./ResponsiveTable";
 export { ExampleDashboard } from "./ExampleDashboard";
 export type { ExampleDashboardProps, ExampleDashboardStat } from "./ExampleDashboard";
 export { PasswordInput } from "./PasswordInput";
