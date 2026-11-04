@@ -10,6 +10,8 @@ export type { ExampleDashboardProps, ExampleDashboardStat } from "./ExampleDashb
 export { PasswordInput } from "./PasswordInput";
 export { PremiumLock } from "./PremiumLock";
 export type { PremiumLockProps } from "./PremiumLock";
+export { PremiumBadge } from "./PremiumBadge";
+export type { PremiumBadgeProps } from "./PremiumBadge";
 export { ProductPicker } from "./ProductPicker";
 export type { ProductPickerOption, ProductPickerProps } from "./ProductPicker";
 export { QuantityStepper } from "./QuantityStepper";

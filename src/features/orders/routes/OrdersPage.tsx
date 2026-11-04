@@ -71,7 +71,7 @@ export function OrdersPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Operación
       </p>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-3">

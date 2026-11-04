@@ -52,7 +52,7 @@ function AdminDistributorsPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Red</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Red</p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Distribuidores</h1>
         {!list.loading && (

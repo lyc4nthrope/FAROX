@@ -16,7 +16,7 @@ import {
 import { MovementList } from "../components/MovementList";
 import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
 import { sortBySalesRanking } from "../ranking";
-import { EmptyState, PremiumLock, ProductPicker, type ProductPickerOption } from "../../../shared/ui";
+import { EmptyState, PremiumLock, ProductPicker, SectionIcon, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
 import { fetchStorePurchasePrices } from "../../products/api";
@@ -44,7 +44,7 @@ export function InventoryStoresPage() {
   const stores = useLoad(() => fetchMyStores(role === "admin"), [role]);
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Inventario
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventario</h1>
@@ -160,10 +160,10 @@ function Icon({ children }: { children: ReactNode }) {
 type InventoryTab = "products" | "movements" | "prices";
 type ModalKind = "movement" | "price";
 
-const TABS: readonly { id: InventoryTab; label: string }[] = [
-  { id: "products", label: "Productos" },
-  { id: "movements", label: "Movimientos" },
-  { id: "prices", label: "Precios" },
+const TABS: readonly { id: InventoryTab; label: string; icon: string }[] = [
+  { id: "products", label: "Productos", icon: "/products" },
+  { id: "movements", label: "Movimientos", icon: "/movimientos" },
+  { id: "prices", label: "Precios", icon: "/precios" },
 ];
 
 const PANEL_CLASS = "mt-3 rounded-2xl border border-gray-200/80 bg-white p-4 shadow-sm sm:p-5";
@@ -232,6 +232,7 @@ function InventoryTabBar({
                 : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             }`}
           >
+            <SectionIcon to={tab.icon} className="h-4 w-4" />
             {tab.label}
           </button>
         );
@@ -586,7 +587,7 @@ export function InventoryPage() {
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
             Inventario
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">

@@ -54,7 +54,7 @@ describe("PremiumLock", () => {
       </MemoryRouter>,
     );
 
-    const preview = container.querySelector('[aria-hidden="true"]');
+    const preview = container.querySelector('div[aria-hidden="true"]');
     expect(preview).not.toBeNull();
     expect(preview).toContainElement(screen.getByText("Vista de ejemplo"));
   });

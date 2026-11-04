@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { PremiumBadge } from "./PremiumBadge";
+
 export interface PremiumLockProps {
   title: string;
   /** Lo que desbloquea Premium, en frases cortas y concretas. */
@@ -46,8 +48,8 @@ export function PremiumLock({ title, benefits, preview, children }: PremiumLockP
               Función Premium
             </p>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 shadow-sm before:h-1.5 before:w-1.5 before:rounded-full before:bg-amber-500 before:content-['']">
-            Premium
+          <span className="ml-auto">
+            <PremiumBadge tone="outline" />
           </span>
         </div>
 

@@ -6,7 +6,7 @@ import { fetchOpenOrdersCount } from "../../features/orders/api";
 import { AssistantWidget } from "../../features/assistant";
 import { PremiumDowngradeModal } from "../../features/premium";
 import { useLoad } from "../../shared/hooks/useLoad";
-import { SectionIcon } from "../../shared/ui";
+import { PremiumBadge, SectionIcon } from "../../shared/ui";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -99,19 +99,7 @@ export function AppShell() {
             <span className="sr-only sm:not-sr-only">{roleLabel(role)}</span>
           </span>
 
-          {verInsigniaPremium && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 sm:px-2.5">
-              <svg
-                aria-hidden="true"
-                className="h-3 w-3 shrink-0"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
-              </svg>
-              <span className="sr-only sm:not-sr-only">Premium</span>
-            </span>
-          )}
+          {verInsigniaPremium && <PremiumBadge hideLabelOnMobile />}
 
           <div className="ml-auto flex shrink-0 items-center gap-1 text-sm">
             <Link

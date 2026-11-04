@@ -247,7 +247,7 @@ export function StoreQrPage() {
         </svg>
         Inventario de la tienda
       </Link>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Vínculos
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -305,7 +305,7 @@ export function LinkStorePage() {
 
   return (
     <section className="mx-auto max-w-xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Vínculos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Vínculos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Vincular tienda</h1>
       <p className="mt-1 text-sm text-gray-500">
         Escaneá el QR que te compartió la tienda o escribí el código para quedar vinculado.

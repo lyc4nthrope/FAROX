@@ -4,7 +4,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { supabase } from "../../../shared/lib/supabase/client";
 import { Box, Field, Status, inputClass } from "../../../shared/ui/Box";
-import { EmptyState, ExampleDashboard, PremiumLock } from "../../../shared/ui";
+import { EmptyState, ExampleDashboard, PremiumBadge, PremiumLock } from "../../../shared/ui";
 import { formatCOP } from "../../../shared/lib/format";
 
 interface DashboardRow {
@@ -86,7 +86,7 @@ export function DashboardPage() {
   if (!premium) {
     return (
       <section>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
           Analítica
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
@@ -190,17 +190,12 @@ export function DashboardPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Analítica
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
-          <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
-          </svg>
-          Premium
-        </span>
+        <PremiumBadge />
       </div>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         {esDistribuidor

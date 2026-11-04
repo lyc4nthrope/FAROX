@@ -21,7 +21,7 @@ export function MyDistributorsPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Vínculos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Vínculos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Mis distribuidores</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Estos son los distribuidores vinculados a tus tiendas. Para vincular uno nuevo, compartí el

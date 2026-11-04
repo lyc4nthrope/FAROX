@@ -25,7 +25,7 @@ export function PremiumResultPage() {
 
   return (
     <section className="mx-auto max-w-xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Mercado Pago
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Estado del pago</h1>

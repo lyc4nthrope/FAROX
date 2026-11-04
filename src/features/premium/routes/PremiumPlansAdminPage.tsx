@@ -171,7 +171,7 @@ export function PremiumPlansAdminPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Administración
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Planes y precios</h1>

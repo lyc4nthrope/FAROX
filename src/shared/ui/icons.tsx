@@ -118,6 +118,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M12 3.5 14.4 9l6 .5-4.6 4 1.5 5.9L12 16.2 6.7 19.4l1.5-5.9L3.6 9.5l6-.5L12 3.5Z" />
     </>
   ),
+  // Precios: etiqueta.
+  "/precios": (
+    <>
+      <path d="M4 5a1 1 0 0 1 1-1h9l6 6-9 9-7-7V5Z" />
+      <circle cx="8.5" cy="8.5" r="1.2" />
+    </>
+  ),
 };
 
 /** Icono de una sección de la app, identificado por su ruta. */

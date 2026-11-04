@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-import { ExampleDashboard, SectionIcon, type ExampleDashboardStat } from "../../shared/ui";
+import { ExampleDashboard, PremiumBadge, SectionIcon, type ExampleDashboardStat } from "../../shared/ui";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -116,9 +116,7 @@ export function HomePage() {
                   <span className="flex items-center gap-1.5 font-medium text-gray-900">
                     {item.label}
                     {item.to === "/dashboard" && !premium && (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                        Premium
-                      </span>
+                      <PremiumBadge size="sm" />
                     )}
                   </span>
                   <svg

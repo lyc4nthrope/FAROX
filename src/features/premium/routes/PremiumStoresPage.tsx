@@ -72,7 +72,7 @@ export function PremiumStoresPage() {
 
   return (
     <section className="mx-auto max-w-3xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Plan</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Plan</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Mis tiendas</h1>
       <p className="mt-1 text-sm text-gray-500">
         {active.length} de 3 tiendas activas. Las pausadas por plan conservan stock, pedidos, rutas

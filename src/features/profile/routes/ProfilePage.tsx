@@ -88,7 +88,7 @@ export function ProfilePage() {
 
   return (
     <section className="mx-auto max-w-2xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Cuenta</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Cuenta</p>
       <div className="mt-2 flex items-center gap-4">
         <span
           aria-hidden="true"

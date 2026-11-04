@@ -245,9 +245,6 @@ export function DistributorMovementsPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-        Movimientos
-      </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Movimientos</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Tus ventas a tiendas y tus compras a proveedor en un solo historial. Para vos una venta es

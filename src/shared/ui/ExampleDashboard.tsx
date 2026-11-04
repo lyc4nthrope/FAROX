@@ -36,7 +36,7 @@ export function ExampleDashboard({
   return (
     <div className="relative rounded-2xl border border-gray-200 bg-white p-4 shadow-xl shadow-gray-200/60">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
           {eyebrow}
         </span>
         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">

@@ -268,7 +268,7 @@ export function NewOrderPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Pedidos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Pedidos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Nuevo pedido</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         {admin

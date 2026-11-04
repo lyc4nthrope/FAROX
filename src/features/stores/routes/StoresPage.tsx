@@ -5,6 +5,7 @@ import { fetchStores, type StoreListScope } from "../api";
 import { StoreList } from "../components/StoreList";
 import type { StoreListRow } from "../types";
 import { Pager } from "../../../shared/ui/Pager";
+import { PremiumBadge } from "../../../shared/ui/PremiumBadge";
 
 // Contenedor de /stores (§S2 fila Store list · STORE-2, spec #483 S6 ·
 // idea:68/207 CRUD de Tiendas): lista paginada vía useList (D4 — refetch al
@@ -33,7 +34,7 @@ export function StoresPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Red</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Red</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Tiendas</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Tus tiendas, su ubicación y el estado de cada una. Desde acá entrás al inventario y al QR de
@@ -59,9 +60,7 @@ export function StoresPage() {
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
               Límite del plan
-              <span className="rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-800">
-                Premium
-              </span>
+              <PremiumBadge tone="outline" size="sm" />
             </p>
             <p className="mt-1 text-sm text-gray-700">{STORE_CAP_MESSAGE}</p>
           </div>
