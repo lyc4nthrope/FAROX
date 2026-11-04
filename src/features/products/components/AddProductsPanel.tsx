@@ -389,7 +389,7 @@ export function AddProductsPanel({
       )}
       {list.error === null && !list.loading && list.rows.length > 0 && (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-sm">
+          <table className="responsive-table w-full table-fixed border-collapse text-left text-sm sm:min-w-[720px]">
             <colgroup>
               {target.kind === "store" && canSetPrice ? (
                 <>
@@ -437,13 +437,19 @@ export function AddProductsPanel({
                         : "cursor-pointer transition-colors hover:bg-gray-50"
                     }`}
                   >
-                    <td className="min-w-0 py-2 pr-3 align-top">
+                    <td
+                      className="responsive-primary min-w-0 py-2 pr-3 align-top"
+                      data-label="Producto"
+                    >
                       <p className="break-words font-medium text-gray-900">{row.name}</p>
                       {meta !== "" && (
                         <p className="break-words text-xs text-gray-500">{meta}</p>
                       )}
                     </td>
-                    <td className="py-2 pr-3 align-top">
+                    <td
+                      className="py-2 pr-3 align-top"
+                      data-label={target.kind === "store" ? "En la tienda" : "En el catálogo"}
+                    >
                       {assigned ? (
                         <Badge tone="green">
                           {target.kind === "store"
@@ -457,6 +463,7 @@ export function AddProductsPanel({
                     {target.kind === "store" && canSetPrice && (
                       <td
                         className="py-2 pr-3 align-top"
+                        data-label="Precio de venta"
                         onClick={(event) => event.stopPropagation()}
                       >
                         {assigned ? (
@@ -480,8 +487,12 @@ export function AddProductsPanel({
                         )}
                       </td>
                     )}
-                    <td className="py-2 align-top" onClick={(event) => event.stopPropagation()}>
-                      <span className="flex items-center justify-end gap-2 whitespace-nowrap">
+                    <td
+                      className="py-2 align-top"
+                      data-label="Acción"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span className="flex flex-wrap items-center justify-end gap-2">
                         {target.kind === "store" && !assigned && (
                           <QuantityStepper
                             label={row.name}
