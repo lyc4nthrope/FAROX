@@ -63,7 +63,8 @@ async function fetchDistributorNames() {
  * Conteos y valores; nunca se suman cantidades de productos distintos.
  */
 export function DashboardPage() {
-  const { premium } = useAuth();
+  const { premium, role } = useAuth();
+  const esDistribuidor = role === "distribuidor";
   const [from, setFrom] = useState(isoDaysAgo(30));
   const [to, setTo] = useState(isoDaysAgo(0));
   const rangeOk = from <= to;
@@ -74,7 +75,13 @@ export function DashboardPage() {
         : Promise.resolve({ data: [] as DashboardRow[], error: null }),
     [from, to, premium],
   );
-  const names = useLoad(() => fetchDistributorNames(), []);
+  const names = useLoad(
+    () =>
+      esDistribuidor
+        ? Promise.resolve({ data: {} as Record<number, string>, error: null })
+        : fetchDistributorNames(),
+    [esDistribuidor],
+  );
 
   if (!premium) {
     return (
@@ -84,15 +91,25 @@ export function DashboardPage() {
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-500">
-          El pulso de tu operación: qué entró, qué salió y cuánto se movió en cada distribuidor.
+          {esDistribuidor
+            ? "El pulso de tu operación: qué entró, qué salió y cuánto se movió en el período."
+            : "El pulso de tu operación: qué entró, qué salió y cuánto se movió en cada distribuidor."}
         </p>
         <PremiumLock
           title="Dashboard analítico"
-          benefits={[
-            "Entradas y salidas por día y por distribuidor.",
-            "Totales y valores en pesos del rango que elijas.",
-            "Compará el movimiento de cada distribuidor en el mismo período.",
-          ]}
+          benefits={
+            esDistribuidor
+              ? [
+                  "Tus entradas y salidas por día.",
+                  "Totales y valores en pesos del rango que elijas.",
+                  "Tu movimiento del período, sin mezclar cantidades de productos distintos.",
+                ]
+              : [
+                  "Entradas y salidas por día y por distribuidor.",
+                  "Totales y valores en pesos del rango que elijas.",
+                  "Compará el movimiento de cada distribuidor en el mismo período.",
+                ]
+          }
           preview={
             <ExampleDashboard
               stats={[
@@ -108,6 +125,7 @@ export function DashboardPage() {
   }
 
   const data = rows.data ?? [];
+  const diasConMovimiento = new Set(data.map((row) => row.day)).size;
   const totals = data.reduce(
     (acc, r) => ({
       entries: acc.entries + r.entries_count,
@@ -155,12 +173,19 @@ export function DashboardPage() {
       hint: "Entradas y salidas juntas",
       tone: "light" as const,
     },
-    {
-      label: "Distribuidores",
-      value: rows.loading ? "—" : String(distributorRows.length),
-      hint: "Con movimiento en el rango",
-      tone: "light" as const,
-    },
+    esDistribuidor
+      ? {
+          label: "Días",
+          value: rows.loading ? "—" : String(diasConMovimiento),
+          hint: "Con movimiento en el rango",
+          tone: "light" as const,
+        }
+      : {
+          label: "Distribuidores",
+          value: rows.loading ? "—" : String(distributorRows.length),
+          hint: "Con movimiento en el rango",
+          tone: "light" as const,
+        },
   ];
 
   return (
@@ -178,8 +203,9 @@ export function DashboardPage() {
         </span>
       </div>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Entradas y salidas por día y por distribuidor. Los conteos y valores nunca mezclan
-        cantidades de productos distintos.
+        {esDistribuidor
+          ? "Tus entradas y salidas por día. Los conteos y valores nunca mezclan cantidades de productos distintos."
+          : "Entradas y salidas por día y por distribuidor. Los conteos y valores nunca mezclan cantidades de productos distintos."}
       </p>
 
       <Box title="Rango">
@@ -272,7 +298,7 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {distributorRows.length > 0 && (
+      {!esDistribuidor && distributorRows.length > 0 && (
         <Box title="Por distribuidor">
           <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
             <span className="inline-flex items-center gap-1.5">
@@ -324,7 +350,7 @@ export function DashboardPage() {
               <thead>
                 <tr>
                   <th>Día</th>
-                  <th>Distribuidor</th>
+                  {!esDistribuidor && <th>Distribuidor</th>}
                   <th>Entradas</th>
                   <th>Salidas</th>
                 </tr>
@@ -333,7 +359,7 @@ export function DashboardPage() {
                 {data.map((r) => (
                   <tr key={`${r.day}-${r.distributor_id}`}>
                     <td className="whitespace-nowrap">{formatDay(r.day)}</td>
-                    <td>{label(r.distributor_id)}</td>
+                    {!esDistribuidor && <td>{label(r.distributor_id)}</td>}
                     <td>{r.entries_count}</td>
                     <td>{r.exits_count}</td>
                   </tr>
