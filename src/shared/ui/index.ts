@@ -1,5 +1,15 @@
 // B3 (T3.2 · D1/D4, obs #486): componentes compartidos de listados.
 // sdd/admin-console T-B2: primitiva compartida de listados (D-M1).
+export { BarChart, DonutChart, LineChart } from "./charts";
+export type {
+  BarChartItem,
+  BarChartProps,
+  BarChartSeries,
+  DonutChartProps,
+  DonutSlice,
+  LineChartProps,
+  LineChartSeries,
+} from "./charts";
 export { DataTable } from "./DataTable/DataTable";
 export type { DataTableColumn, DataTableAction } from "./DataTable/DataTable";
 export { EmptyState } from "./EmptyState";

@@ -2,26 +2,43 @@ import { useState } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
+import { formatCOP, formatQty } from "../../../shared/lib/format";
 import { supabase } from "../../../shared/lib/supabase/client";
 import { Box, Field, Status, inputClass } from "../../../shared/ui/Box";
-import { EmptyState, ExampleDashboard, PremiumBadge, PremiumLock, ResponsiveTable } from "../../../shared/ui";
-import type { ResponsiveTableColumn } from "../../../shared/ui";
-import { formatCOP } from "../../../shared/lib/format";
-
-interface DashboardRow {
-  day: string;
-  distributor_id: number;
-  entries_count: number;
-  exits_count: number;
-  entries_value: number;
-  exits_value: number;
-}
-
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toLocaleDateString("en-CA");
-}
+import {
+  BarChart,
+  DonutChart,
+  EmptyState,
+  ExampleDashboard,
+  LineChart,
+  PremiumBadge,
+  PremiumLock,
+  ResponsiveTable,
+} from "../../../shared/ui";
+import type {
+  BarChartItem,
+  BarChartSeries,
+  DonutSlice,
+  LineChartSeries,
+  ResponsiveTableColumn,
+} from "../../../shared/ui";
+import {
+  buildDailyPoints,
+  daysBetween,
+  distributorTotals,
+  formatDay,
+  formatMetricAxis,
+  formatMetricValue,
+  formatShortDay,
+  movingAverage,
+  purchasesOf,
+  salesByWeekday,
+  salesOf,
+  topDistributors,
+  topSalesDays,
+  totalPoint,
+} from "../dashboardData";
+import type { DashboardMetric, DashboardRow } from "../dashboardData";
 
 const RANGE_PRESETS = [
   { label: "7 días", days: 7 },
@@ -29,25 +46,40 @@ const RANGE_PRESETS = [
   { label: "90 días", days: 90 },
 ] as const;
 
-function formatDay(day: string): string {
-  const date = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return day;
-  return date.toLocaleDateString("es-CO", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+const MAX_RANGE_DAYS = 366;
+
+// Colores del sistema: las ventas conservan el verde que ya usaba «Salidas»
+// y las compras el gris oscuro de «Entradas». La dona usa una paleta corta
+// para distinguir categorías sin convertir el dashboard en un semáforo.
+const SALES_COLOR = "#059669";
+const PURCHASES_COLOR = "#111827";
+const AVERAGE_COLOR = "#64748b";
+const CATEGORY_COLORS = [
+  "#059669",
+  "#0ea5e9",
+  "#f59e0b",
+  "#8b5cf6",
+  "#f43f5e",
+  "#64748b",
+  "#14b8a6",
+];
+const ZERO_SLICE_COLOR = "#d1d5db";
+
+function isoDaysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toLocaleDateString("en-CA");
 }
 
 async function fetchDashboard(from: string, to: string) {
   const { data, error } = await supabase.rpc("get_dashboard", { p_from: from, p_to: to });
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    day: String(r.day),
-    distributor_id: Number(r.distributor_id),
-    entries_count: Number(r.entries_count),
-    exits_count: Number(r.exits_count),
-    entries_value: Number(r.entries_value),
-    exits_value: Number(r.exits_value),
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    day: String(row.day),
+    distributor_id: Number(row.distributor_id),
+    entries_count: Number(row.entries_count),
+    exits_count: Number(row.exits_count),
+    entries_value: Number(row.entries_value),
+    exits_value: Number(row.exits_value),
   }));
   return { data: rows, error };
 }
@@ -55,33 +87,49 @@ async function fetchDashboard(from: string, to: string) {
 async function fetchDistributorNames() {
   const { data, error } = await supabase.from("distributors").select("id,name").limit(500);
   const map: Record<number, string> = {};
-  for (const d of (data ?? []) as { id: number; name: string }[]) map[d.id] = d.name;
+  for (const distributor of (data ?? []) as { id: number; name: string }[]) {
+    map[distributor.id] = distributor.name;
+  }
   return { data: map, error };
 }
 
 /**
  * /dashboard — INT-01: entradas y salidas por día y por distribuidor.
- * Conteos y valores; nunca se suman cantidades de productos distintos.
+ * Los gráficos son una lectura visual del mismo agregado; el detalle exacto
+ * sigue disponible en la tabla. Conteos y valores nunca se suman entre sí.
  */
 export function DashboardPage() {
   const { premium, role } = useAuth();
   const esDistribuidor = role === "distribuidor";
+  const scope = esDistribuidor ? "distributor" : "network";
   const [from, setFrom] = useState(isoDaysAgo(30));
   const [to, setTo] = useState(isoDaysAgo(0));
-  const rangeOk = from <= to;
+  const [metric, setMetric] = useState<DashboardMetric>("value");
+
+  const rangeDays = daysBetween(from, to);
+  const invertedRange = from > to;
+  const rangeError = invertedRange
+    ? "La fecha inicial debe ser anterior o igual a la final."
+    : rangeDays > MAX_RANGE_DAYS
+      ? `El rango no puede superar los ${MAX_RANGE_DAYS} días.`
+      : rangeDays === 0
+        ? "Elegí un rango de fechas válido."
+        : null;
+  const rangeOk = rangeError === null;
+
   const rows = useLoad(
     () =>
       premium && rangeOk
         ? fetchDashboard(from, to)
         : Promise.resolve({ data: [] as DashboardRow[], error: null }),
-    [from, to, premium],
+    [from, to, premium, rangeOk],
   );
   const names = useLoad(
     () =>
-      esDistribuidor
+      !premium || esDistribuidor
         ? Promise.resolve({ data: {} as Record<number, string>, error: null })
         : fetchDistributorNames(),
-    [esDistribuidor],
+    [esDistribuidor, premium],
   );
 
   if (!premium) {
@@ -93,29 +141,29 @@ export function DashboardPage() {
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-500">
           {esDistribuidor
-            ? "El pulso de tu operación: qué entró, qué salió y cuánto se movió en el período."
-            : "El pulso de tu operación: qué entró, qué salió y cuánto se movió en cada distribuidor."}
+            ? "El pulso de tu operación: cuánto vendés y cómo se mueve tu negocio en el período."
+            : "El pulso de tu operación: cuánto se vende, cómo se mueve cada distribuidor y la tendencia del período."}
         </p>
         <PremiumLock
           title="Dashboard analítico"
           benefits={
             esDistribuidor
               ? [
-                  "Tus entradas y salidas por día.",
+                  "Gráfico de líneas con tus ventas y su promedio semanal.",
+                  "Barras con tus mejores días y participación por día de la semana.",
                   "Totales y valores en pesos del rango que elijas.",
-                  "Tu movimiento del período, sin mezclar cantidades de productos distintos.",
                 ]
               : [
-                  "Entradas y salidas por día y por distribuidor.",
+                  "Gráfico de líneas con ventas y compras día por día.",
+                  "Participación de ventas y comparativa por distribuidor.",
                   "Totales y valores en pesos del rango que elijas.",
-                  "Compará el movimiento de cada distribuidor en el mismo período.",
                 ]
           }
           preview={
             <ExampleDashboard
               stats={[
-                { label: "Entradas del rango", value: "128", hint: "valor $1.240.000" },
-                { label: "Salidas del rango", value: "94", hint: "valor $860.000" },
+                { label: "Ventas del rango", value: "$1.240.000", hint: "94 salidas" },
+                { label: "Compras del rango", value: "$860.000", hint: "128 entradas" },
               ]}
               stops={["Sin distribuidor (manual)", "Distribuidora Norte", "Distribuidora Sur"]}
             />
@@ -126,68 +174,153 @@ export function DashboardPage() {
   }
 
   const data = rows.data ?? [];
-  const diasConMovimiento = new Set(data.map((row) => row.day)).size;
-  const totals = data.reduce(
-    (acc, r) => ({
-      entries: acc.entries + r.entries_count,
-      exits: acc.exits + r.exits_count,
-      entriesValue: acc.entriesValue + r.entries_value,
-      exitsValue: acc.exitsValue + r.exits_value,
-    }),
-    { entries: 0, exits: 0, entriesValue: 0, exitsValue: 0 },
+  const dailyPoints = buildDailyPoints(data, from, to);
+  const totals = totalPoint(dailyPoints);
+  const daysWithMovement = dailyPoints.filter(
+    (point) => point.entriesCount + point.exitsCount > 0,
+  ).length;
+  const distributorRows = distributorTotals(data, names.data ?? {});
+  const distributorSales = (item: (typeof distributorRows)[number]) =>
+    metric === "value" ? item.exitsValue : item.exitsCount;
+
+  const donutDistributors = topDistributors(
+    distributorRows.filter((item) => distributorSales(item) > 0),
+    5,
+    true,
   );
-  const byDistributor = new Map<number, { entries: number; exits: number; value: number }>();
-  for (const r of data) {
-    const cur = byDistributor.get(r.distributor_id) ?? { entries: 0, exits: 0, value: 0 };
-    byDistributor.set(r.distributor_id, {
-      entries: cur.entries + r.entries_count,
-      exits: cur.exits + r.exits_count,
-      value: cur.value + r.entries_value,
-    });
-  }
-  const distributorRows = [...byDistributor.entries()].sort(
-    (a, b) => b[1].entries + b[1].exits - (a[1].entries + a[1].exits),
+  const barDistributors = topDistributors(distributorRows, 6, false);
+  const weekdaySales = salesByWeekday(dailyPoints, scope, metric);
+  const topDays = topSalesDays(dailyPoints, scope, metric, 7);
+
+  const dailySales = dailyPoints.map((point) => salesOf(point, scope, metric));
+  const dailyPurchases = dailyPoints.map(
+    (point) => purchasesOf(point, scope, metric) ?? 0,
   );
-  const maxFlow = Math.max(1, ...distributorRows.map(([, v]) => Math.max(v.entries, v.exits)));
+  const averageSales = movingAverage(dailySales, 7);
+  const lineLabels = dailyPoints.map((point) => formatShortDay(point.day));
+
+  const lineSeries: LineChartSeries[] = esDistribuidor
+    ? [
+        { key: "sales", label: "Ventas", color: SALES_COLOR, values: dailySales },
+        {
+          key: "average",
+          label: "Promedio 7 días",
+          color: AVERAGE_COLOR,
+          values: averageSales,
+          dashed: true,
+        },
+      ]
+    : [
+        { key: "sales", label: "Ventas", color: SALES_COLOR, values: dailySales },
+        {
+          key: "purchases",
+          label: "Compras",
+          color: PURCHASES_COLOR,
+          values: dailyPurchases,
+        },
+      ];
+
+  const donutSlices: DonutSlice[] = esDistribuidor
+    ? weekdaySales.map((bucket, index) => ({
+        key: bucket.key,
+        label: bucket.label,
+        value: bucket.value,
+        color:
+          bucket.value > 0
+            ? (CATEGORY_COLORS[index % CATEGORY_COLORS.length] ?? ZERO_SLICE_COLOR)
+            : ZERO_SLICE_COLOR,
+      }))
+    : donutDistributors.map((item, index) => ({
+        key: String(item.id),
+        label: item.label,
+        value: distributorSales(item),
+        color: CATEGORY_COLORS[index % CATEGORY_COLORS.length] ?? ZERO_SLICE_COLOR,
+      }));
+
+  const barItems: BarChartItem[] = esDistribuidor
+    ? topDays.map((bucket) => ({
+        key: bucket.key,
+        label: bucket.label,
+        values: [bucket.value],
+      }))
+    : barDistributors.map((item) => ({
+        key: String(item.id),
+        label: item.label,
+        values: [
+          metric === "value" ? item.entriesValue : item.entriesCount,
+          metric === "value" ? item.exitsValue : item.exitsCount,
+        ],
+      }));
+
+  const barSeries: BarChartSeries[] = esDistribuidor
+    ? [{ key: "sales", label: "Ventas", color: SALES_COLOR }]
+    : [
+        { key: "purchases", label: "Compras", color: PURCHASES_COLOR },
+        { key: "sales", label: "Ventas", color: SALES_COLOR },
+      ];
+
+  const salesTotal = salesOf(totals, scope, metric);
+  const count = (value: number) => formatQty(Math.round(value));
+  const money = (value: number) => formatCOP(value);
   const label = (id: number) =>
     id === 0 ? "Sin distribuidor (manual)" : (names.data?.[id] ?? `#${id}`);
-  const activePreset = RANGE_PRESETS.find(
-    (preset) => from === isoDaysAgo(preset.days) && to === isoDaysAgo(0),
-  );
 
-  const kpis = [
-    {
-      label: "Entradas",
-      value: rows.loading ? "—" : String(totals.entries),
-      hint: `Valor ${formatCOP(totals.entriesValue)}`,
-      tone: "dark" as const,
-    },
-    {
-      label: "Salidas",
-      value: rows.loading ? "—" : String(totals.exits),
-      hint: `Valor ${formatCOP(totals.exitsValue)}`,
-      tone: "light" as const,
-    },
-    {
-      label: "Movimientos",
-      value: rows.loading ? "—" : String(totals.entries + totals.exits),
-      hint: "Entradas y salidas juntas",
-      tone: "light" as const,
-    },
+  const kpis: { label: string; value: string; hint: string; tone: "dark" | "light" }[] =
     esDistribuidor
-      ? {
-          label: "Días",
-          value: rows.loading ? "—" : String(diasConMovimiento),
-          hint: "Con movimiento en el rango",
-          tone: "light" as const,
-        }
-      : {
-          label: "Distribuidores",
-          value: rows.loading ? "—" : String(distributorRows.length),
-          hint: "Con movimiento en el rango",
-          tone: "light" as const,
-        },
-  ];
+      ? [
+          {
+            label: "Ventas",
+            value: rows.loading ? "—" : money(totals.entriesValue),
+            hint: `${count(totals.entriesCount)} ventas a tiendas`,
+            tone: "dark",
+          },
+          {
+            label: "Promedio diario",
+            value: rows.loading
+              ? "—"
+              : money(totals.entriesValue / Math.max(1, dailyPoints.length)),
+            hint: "Sobre los días del rango",
+            tone: "light",
+          },
+          {
+            label: "Movimientos",
+            value: rows.loading ? "—" : count(totals.entriesCount + totals.exitsCount),
+            hint: "Ventas y salidas juntas",
+            tone: "light",
+          },
+          {
+            label: "Días",
+            value: rows.loading ? "—" : String(daysWithMovement),
+            hint: "Con movimiento en el rango",
+            tone: "light",
+          },
+        ]
+      : [
+          {
+            label: "Ventas",
+            value: rows.loading ? "—" : money(totals.exitsValue),
+            hint: `${count(totals.exitsCount)} salidas`,
+            tone: "dark",
+          },
+          {
+            label: "Compras",
+            value: rows.loading ? "—" : money(totals.entriesValue),
+            hint: `${count(totals.entriesCount)} entradas`,
+            tone: "light",
+          },
+          {
+            label: "Movimientos",
+            value: rows.loading ? "—" : count(totals.entriesCount + totals.exitsCount),
+            hint: "Entradas y salidas juntas",
+            tone: "light",
+          },
+          {
+            label: "Distribuidores",
+            value: rows.loading ? "—" : String(distributorRows.length),
+            hint: "Con movimiento en el rango",
+            tone: "light",
+          },
+        ];
 
   const dayColumns: ResponsiveTableColumn<DashboardRow>[] = [
     {
@@ -206,8 +339,30 @@ export function DashboardPage() {
     });
   }
   dayColumns.push(
-    { key: "entries", header: "Entradas", render: (row) => row.entries_count },
-    { key: "exits", header: "Salidas", render: (row) => row.exits_count },
+    {
+      key: "entries",
+      header: esDistribuidor ? "Ventas" : "Entradas",
+      render: (row) => formatQty(row.entries_count),
+    },
+    { key: "exits", header: "Salidas", render: (row) => formatQty(row.exits_count) },
+    {
+      key: "sales",
+      header: esDistribuidor ? "Valor ventas" : "Ventas",
+      className: "whitespace-nowrap",
+      render: (row) => formatCOP(esDistribuidor ? row.entries_value : row.exits_value),
+    },
+  );
+  if (!esDistribuidor) {
+    dayColumns.push({
+      key: "purchases",
+      header: "Compras",
+      className: "whitespace-nowrap",
+      render: (row) => formatCOP(row.entries_value),
+    });
+  }
+
+  const activePreset = RANGE_PRESETS.find(
+    (preset) => from === isoDaysAgo(preset.days) && to === isoDaysAgo(0),
   );
 
   return (
@@ -221,8 +376,8 @@ export function DashboardPage() {
       </div>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         {esDistribuidor
-          ? "Tus entradas y salidas por día. Los conteos y valores nunca mezclan cantidades de productos distintos."
-          : "Entradas y salidas por día y por distribuidor. Los conteos y valores nunca mezclan cantidades de productos distintos."}
+          ? "Tus ventas a tiendas y el movimiento del período. Los gráficos resumen la operación; la tabla deja el detalle exacto."
+          : "Ventas, compras y movimiento del período por día y por distribuidor. Los gráficos resumen la operación; la tabla deja el detalle exacto."}
       </p>
 
       <Box title="Rango">
@@ -232,7 +387,7 @@ export function DashboardPage() {
               className={inputClass}
               type="date"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(event) => setFrom(event.target.value)}
             />
           </Field>
           <Field label="Hasta">
@@ -240,7 +395,7 @@ export function DashboardPage() {
               className={inputClass}
               type="date"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(event) => setTo(event.target.value)}
             />
           </Field>
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -265,9 +420,35 @@ export function DashboardPage() {
             ))}
           </div>
         </div>
-        {!rangeOk && (
-          <p className="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-            La fecha inicial debe ser anterior a la final.
+
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-gray-100 pt-3">
+          <span className="text-xs font-medium text-gray-500">Mostrar gráficos en</span>
+          <div
+            role="group"
+            aria-label="Métrica de los gráficos"
+            className="inline-flex rounded-full border border-gray-200 bg-white p-0.5"
+          >
+            {(["value", "count"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={metric === option}
+                className={
+                  metric === option
+                    ? "rounded-full bg-gray-900 px-3 py-1.5 text-xs font-medium text-white shadow-sm"
+                    : "rounded-full px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
+                }
+                onClick={() => setMetric(option)}
+              >
+                {option === "value" ? "Valor (COP)" : "Cantidad"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {rangeError !== null && (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {rangeError}
           </p>
         )}
         <Status loading={rows.loading} error={rows.error} />
@@ -290,7 +471,7 @@ export function DashboardPage() {
               className={
                 kpi.tone === "dark"
                   ? "text-[11px] font-medium uppercase tracking-[0.14em] text-gray-400"
-                  : "text-[11px] font-medium uppercase tracking-[0.14em] text-gray-400"
+                  : "text-[11px] font-medium uppercase tracking-[0.14em] text-gray-500"
               }
             >
               {kpi.label}
@@ -298,8 +479,8 @@ export function DashboardPage() {
             <p
               className={
                 kpi.tone === "dark"
-                  ? "mt-2 text-3xl font-semibold tracking-tight"
-                  : "mt-2 text-3xl font-semibold tracking-tight text-gray-900"
+                  ? "mt-2 break-words text-xl font-semibold tracking-tight tabular-nums sm:text-3xl"
+                  : "mt-2 break-words text-xl font-semibold tracking-tight tabular-nums text-gray-900 sm:text-3xl"
               }
             >
               {kpi.value}
@@ -315,61 +496,86 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {!esDistribuidor && distributorRows.length > 0 && (
-        <Box title="Por distribuidor">
-          <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-gray-500">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-gray-900" />
-              Entradas
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Salidas
-            </span>
-          </div>
-          <ul className="space-y-3">
-            {distributorRows.map(([id, v]) => (
-              <li key={id} className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <span className="truncate text-sm font-medium text-gray-900">{label(id)}</span>
-                  <span className="text-xs text-gray-500">
-                    {v.entries} entradas · {v.exits} salidas
-                  </span>
-                </div>
-                <div className="mt-2 flex h-2 gap-1 overflow-hidden rounded-full bg-gray-200/70">
-                  <span
-                    className="h-full rounded-full bg-gray-900"
-                    style={{ width: `${(v.entries / maxFlow) * 100}%` }}
-                  />
-                  <span
-                    className="h-full rounded-full bg-emerald-500"
-                    style={{ width: `${(v.exits / maxFlow) * 100}%` }}
-                  />
-                </div>
-                <p className="mt-1.5 text-[11px] text-gray-500">
-                  Valor entradas {formatCOP(v.value)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Box>
-      )}
-
-      <Box title="Por día">
-        {!rows.loading && data.length === 0 ? (
+      {!rows.loading && rangeOk && rows.error === null && data.length === 0 && (
+        <Box title="Gráficos">
           <EmptyState
             title="Sin movimientos en el rango"
             hint="Probá con un rango más amplio o registrá entradas y salidas."
           />
-        ) : (
-          <ResponsiveTable
-            caption="Movimientos por día"
-            columns={dayColumns}
-            rows={data}
-            rowKey={(row) => `${row.day}-${row.distributor_id}`}
-          />
-        )}
-      </Box>
+        </Box>
+      )}
+
+      {rangeOk && data.length > 0 && (
+        <>
+          <Box title="Evolución del período">
+            <p className="mb-3 text-xs text-gray-500">
+              {esDistribuidor
+                ? "Tus ventas a tiendas y el promedio de los últimos 7 días."
+                : "Ventas de las tiendas y compras de abastecimiento, día por día."}
+            </p>
+            <LineChart
+              labels={lineLabels}
+              series={lineSeries}
+              formatValue={(value) => formatMetricValue(value, metric)}
+              formatAxis={(value) => formatMetricAxis(value, metric)}
+              ariaLabel={`Evolución de ${
+                esDistribuidor ? "tus ventas" : "ventas y compras"
+              } entre el ${formatDay(from)} y el ${formatDay(to)}`}
+            />
+          </Box>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <Box
+              title={esDistribuidor ? "Ventas por día de la semana" : "Participación de ventas"}
+              className="mt-0"
+            >
+              <DonutChart
+                slices={donutSlices}
+                centerLabel="Ventas"
+                centerValue={formatMetricAxis(salesTotal, metric)}
+                formatValue={(value) => formatMetricValue(value, metric)}
+                ariaLabel={
+                  esDistribuidor
+                    ? "Participación de ventas por día de la semana"
+                    : "Participación de ventas por distribuidor"
+                }
+              />
+            </Box>
+
+            <Box
+              title={
+                esDistribuidor ? "Mejores días del rango" : "Ventas y compras por distribuidor"
+              }
+              className="mt-0"
+            >
+              <BarChart
+                items={barItems}
+                series={barSeries}
+                formatValue={(value) => formatMetricValue(value, metric)}
+                ariaLabel={
+                  esDistribuidor
+                    ? "Mejores días del rango por ventas"
+                    : "Ventas y compras por distribuidor"
+                }
+                emptyText={
+                  esDistribuidor
+                    ? "Sin ventas registradas en el rango."
+                    : "Sin movimientos por distribuidor en el rango."
+                }
+              />
+            </Box>
+          </div>
+
+          <Box title="Detalle por día">
+            <ResponsiveTable
+              caption="Movimientos por día"
+              columns={dayColumns}
+              rows={data}
+              rowKey={(row) => `${row.day}-${row.distributor_id}`}
+            />
+          </Box>
+        </>
+      )}
     </section>
   );
 }

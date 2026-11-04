@@ -53,7 +53,18 @@ function renderPage(role: RoleName, premium: boolean) {
   );
 }
 
-describe("DashboardPage · alcance del distribuidor", () => {
+function mockDistributorNames() {
+  vi.mocked(supabase.from).mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      limit: vi.fn().mockResolvedValue({
+        data: [{ id: 1, name: "Distribuidora Norte" }],
+        error: null,
+      }),
+    }),
+  } as never);
+}
+
+describe("DashboardPage · gráficos por rol", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
@@ -75,5 +86,18 @@ describe("DashboardPage · alcance del distribuidor", () => {
     expect(screen.queryByText("Distribuidores")).not.toBeInTheDocument();
     expect(screen.queryByText("Por distribuidor")).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Distribuidor" })).not.toBeInTheDocument();
+    // Los gráficos esperan además la respuesta de get_dashboard.
+    expect(await screen.findByText("Evolución del período")).toBeInTheDocument();
+    expect(screen.getByText("Ventas por día de la semana")).toBeInTheDocument();
+    expect(screen.getByText("Mejores días del rango")).toBeInTheDocument();
+  });
+
+  it("muestra la participación por distribuidor al operador", async () => {
+    mockDistributorNames();
+    renderPage("operador", true);
+
+    expect(await screen.findByText("Participación de ventas")).toBeInTheDocument();
+    expect(screen.getByText("Ventas y compras por distribuidor")).toBeInTheDocument();
+    expect((await screen.findAllByText("Distribuidora Norte")).length).toBeGreaterThan(0);
   });
 });
