@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.mocked(assistantApi.sendMessage).mockResolvedValue({ error: null });
   vi.mocked(assistantApi.askAgent).mockResolvedValue({
     reply: "Hay 12 unidades en Tienda Centro.",
+    action: null,
     error: null,
   });
 });
@@ -61,6 +62,7 @@ describe("AssistantPage · asistente de consultas (0039)", () => {
   it("muestra el error del asistente sin perder la conversación", async () => {
     vi.mocked(assistantApi.askAgent).mockResolvedValue({
       reply: null,
+      action: null,
       error: "No pude responder ahora. Probá de nuevo en un rato.",
     });
     render(<AssistantPage />);

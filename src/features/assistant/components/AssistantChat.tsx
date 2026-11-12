@@ -3,14 +3,17 @@ import { useState, type FormEvent } from "react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
+import { LIMITS } from "../../../shared/lib/limits";
 import { Status, buttonClass, inputClass } from "../../../shared/ui/Box";
 import { fetchDistributorStores, fetchMyStores } from "../../inventory/api";
 import {
   askAgent,
   createConversation,
   sendMessage,
+  type AssistantAction,
   type AssistantMessage,
 } from "../api";
+import { PendingActionCard } from "./PendingActionCard";
 
 const SUGGESTIONS: readonly string[] = [
   "¿Cuánto hay de arroz?",
@@ -33,14 +36,17 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
   const [storeId, setStoreId] = useState("");
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [actions, setActions] = useState<AssistantAction[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const writesEnabled = import.meta.env.VITE_AGENT_WRITES_ENABLED === "true";
 
   function resetConversation(nextStore = storeId): void {
     setStoreId(nextStore);
     setConversationId(null);
     setMessages([]);
+    setActions([]);
     setError(null);
   }
 
@@ -97,6 +103,9 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
         created_at: new Date().toISOString(),
       },
     ]);
+    if (writesEnabled && answer.action !== null) {
+      setActions((current) => [...current, answer.action as AssistantAction]);
+    }
   }
 
   function onSubmit(event: FormEvent): void {
@@ -127,6 +136,7 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
             <select
               className={`${inputClass} w-full px-2 py-1 text-xs`}
               value={storeId}
+              disabled={sending}
               onChange={(event) => resetConversation(event.target.value)}
             >
               <option value="">Todas las tiendas</option>
@@ -191,6 +201,9 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
             Pensando…
           </p>
         )}
+        {actions.map((action) => (
+          <PendingActionCard key={action.action_id} action={action} />
+        ))}
       </div>
 
       <form className="border-t border-gray-100 p-3" onSubmit={onSubmit}>
@@ -201,7 +214,7 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
             aria-label="Consulta para el asistente"
             placeholder="Ej.: ¿cuánto hay de arroz?"
             value={input}
-            maxLength={800}
+            maxLength={LIMITS.chatMessage}
             disabled={sending}
             onChange={(event) => setInput(event.target.value)}
           />
@@ -214,13 +227,22 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
           </button>
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="text-[11px] text-gray-500">
-            Solo consultas por ahora.
+          <p
+            className={`text-[11px] ${
+              input.length > LIMITS.chatMessage - 100 ? "text-amber-700" : "text-gray-500"
+            }`}
+          >
+            {input.length > LIMITS.chatMessage - 100
+              ? `${input.length}/${LIMITS.chatMessage} caracteres`
+              : writesEnabled
+                ? "Consultas y operaciones con confirmación."
+                : "Solo consultas por ahora."}
           </p>
           {conversationId !== null && (
             <button
               type="button"
-              className="shrink-0 text-xs font-medium text-gray-500 transition hover:text-gray-900"
+              className="shrink-0 text-xs font-medium text-gray-500 transition hover:text-gray-900 disabled:opacity-50"
+              disabled={sending}
               onClick={() => resetConversation()}
             >
               Nueva conversación

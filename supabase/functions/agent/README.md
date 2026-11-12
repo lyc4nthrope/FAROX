@@ -2,7 +2,8 @@
 
 Un solo endpoint para todos los usuarios: la identidad sale del JWT y cada
 herramienta corre como RPC con el cliente del usuario, así que la RLS decide
-qué datos ve. **No escribe movimientos**: fase 1 solo consulta.
+qué datos ve. En fase 2 puede **preparar borradores** de ventas, compras,
+faltantes y precios; la escritura real requiere confirmación humana.
 
 ## Contrato
 
@@ -18,15 +19,40 @@ qué datos ve. **No escribe movimientos**: fase 1 solo consulta.
 - `503` si `AGENT_ENABLED` no es `true`; `401` sin sesión; `429` al pasar 60
   consultas por hora; `502` si el proveedor falla.
 
-## Herramientas (solo lectura)
+## Herramientas de lectura
 
 | Tool | RPC | Qué devuelve |
 |---|---|---|
 | `buscar_producto` | `agent_search_products` | hasta 8 productos por nombre, marca o código |
 | `consultar_stock` | `agent_stock` | stock por tienda, o «Mi catálogo» si es distribuidor |
 | `dias_sin_pedido` | `agent_last_order` | último pedido por tienda y días transcurridos |
+| `listar_tiendas` | `stores` / `store_distributors` | tiendas accesibles con `id` y nombre; evita inventar `store_id` |
+| `consultar_dashboard` | `get_dashboard` | ventas/compras agregadas por día/mes, top días y top distribuidores; rol-aware y solo Premium |
 
-Las tres viven en la migración `0039_asistente_consultas.sql`.
+Las tres de productos viven en la migración `0039_asistente_consultas.sql`.
+
+`consultar_dashboard` agrega en el servidor (`_shared/dashboard.ts`) y devuelve un resumen compacto; nunca manda las 366 filas al modelo. Para admin/operador, ventas = salidas y compras = entradas; para distribuidor, ventas = entradas (ventas a tiendas).
+
+## Alcance
+
+Solo responde sobre la operación de FARØX. Si la pregunta es de otro tema,
+declina en una frase y ofrece una consulta relacionada. Es una restricción de
+prompt (capa 1): reduce el uso fuera de alcance, no es una garantía dura.
+
+## Herramientas de escritura (fase 2)
+
+Solo se ofrecen si `AGENT_WRITES_ENABLED=true`. Preparan un borrador en
+`agent_actions`; no escriben hasta que el usuario confirma en la tarjeta.
+
+| Tool | Kind | Ejecuta al confirmar |
+|---|---|---|
+| `preparar_salida_tienda` | `store_exit` | `register_movements_bulk` |
+| `preparar_venta_distribuidor` | `distributor_sale` | `register_distributor_sales_bulk` |
+| `preparar_compra_distribuidor` | `distributor_purchase` | `register_distributor_purchases` |
+| `preparar_cambio_precios` | `price_update` | `set_store_prices_bulk` / `set_distributor_prices_bulk` (solo web) |
+| `preparar_faltante` | `shortage_toggle` | `set_store_shortage` |
+
+El frontend muestra las tarjetas con `VITE_AGENT_WRITES_ENABLED=true`. Los precios solo se cambian en la web; el wrapper de WhatsApp rechaza `price_update`. La tienda activa de la conversación se pasa al modelo; si no hay, `listar_tiendas` entrega los IDs reales.
 
 ## Secrets
 
@@ -36,7 +62,8 @@ supabase secrets set \
   AGENT_BASE_URL="https://generativelanguage.googleapis.com/v1beta/openai" \
   AGENT_MODEL="gemini-2.5-flash" \
   AGENT_FALLBACK_MODEL="gemini-2.5-flash-lite" \
-  AGENT_ENABLED="true"
+  AGENT_ENABLED="true" \
+  AGENT_WRITES_ENABLED="true"
 ```
 
 `AGENT_ENABLED` es el interruptor de lanzamiento: si falta o es `false`, la

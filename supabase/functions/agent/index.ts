@@ -39,12 +39,36 @@ Deno.serve(async (request) => {
   // Respaldo ante obsolescencia: si el primario deja de existir, el turno
   // sigue con este modelo sin tocar código.
   const fallbackModel = Deno.env.get("AGENT_FALLBACK_MODEL") ?? "gemini-2.5-flash-lite";
+  const writesEnabled = Deno.env.get("AGENT_WRITES_ENABLED") === "true";
 
   const client = userClient(header);
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError !== null || userData.user === null) {
     return errorJson("Sesión inválida.", 401, true);
   }
+
+  // Rol y Premium salen del servidor, nunca del body. El dashboard los necesita
+  // para saber si "ventas" son salidas (admin/operador) o entradas (distribuidor).
+  const privilegesClient = serviceClient();
+  const { data: privileges } = await privilegesClient
+    .from("users")
+    .select("premium, premium_until, role:roles(name)")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+  const roleRaw = (privileges as { role?: unknown } | null)?.role;
+  const roleRow = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
+  const roleName =
+    typeof roleRow === "object" && roleRow !== null
+      ? String((roleRow as { name?: unknown }).name ?? "")
+      : "";
+  const premiumFlag = (privileges as { premium?: unknown } | null)?.premium === true;
+  const premiumUntilRaw = (privileges as { premium_until?: unknown } | null)?.premium_until;
+  const premiumActive =
+    premiumFlag &&
+    (premiumUntilRaw === null ||
+      (typeof premiumUntilRaw === "string" && Date.parse(premiumUntilRaw) > Date.now()));
+  // is_premium(): admin siempre; el resto, premium vigente.
+  const premium = roleName === "admin" || premiumActive;
 
   let body: Record<string, unknown>;
   try {
@@ -100,6 +124,31 @@ Deno.serve(async (request) => {
     }
   }
 
+  // La tienda activa de la conversación es la única fuente confiable de
+  // store_id para las operaciones. El modelo nunca debe inventar un ID.
+  const { data: conversationRow } = await client
+    .from("chat_conversations")
+    .select("store_id")
+    .eq("id", activeId)
+    .maybeSingle();
+  let storeContext: { id: number; name: string } | null = null;
+  const conversationStoreId = Number(
+    (conversationRow as { store_id?: unknown } | null)?.store_id,
+  );
+  if (Number.isFinite(conversationStoreId) && conversationStoreId > 0) {
+    const { data: storeRow } = await client
+      .from("stores")
+      .select("id,name")
+      .eq("id", conversationStoreId)
+      .maybeSingle();
+    if (storeRow !== null) {
+      storeContext = {
+        id: Number((storeRow as { id: unknown }).id),
+        name: String((storeRow as { name: unknown }).name),
+      };
+    }
+  }
+
   // Historial ANTES de guardar el mensaje nuevo: runAgent agrega el actual.
   const { data: historyRows } = await client
     .from("chat_messages")
@@ -126,6 +175,14 @@ Deno.serve(async (request) => {
   try {
     const { reply, toolLog } = await runAgent({
       client,
+      role: roleName,
+      premium,
+      conversationId: activeId,
+      writesEnabled,
+      store: storeContext,
+      channel: "web",
+      actorUserId: userData.user.id,
+      actorWaId: null,
       apiKey,
       baseUrl,
       model,
@@ -133,6 +190,15 @@ Deno.serve(async (request) => {
       message,
       history,
     });
+
+    const actionEntry = [...toolLog]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.name.startsWith("preparar_") &&
+          typeof (entry.result as { action_id?: unknown } | null)?.action_id === "number",
+      );
+    const action = actionEntry?.result ?? null;
 
     // assistant/tool no son escribibles desde el navegador (REVOKE): se
     // guardan con service_role DESPUÉS de validar la conversación con el JWT.
@@ -149,9 +215,13 @@ Deno.serve(async (request) => {
       conversation_id: activeId,
       role: "assistant",
       content: reply,
+      payload:
+        action !== null && typeof action === "object"
+          ? { action_id: (action as { action_id: number }).action_id }
+          : null,
     });
 
-    return json({ conversation_id: activeId, reply }, 200, true);
+    return json({ conversation_id: activeId, reply, action }, 200, true);
   } catch (error) {
     if (error instanceof ModelUnavailableError) {
       // Línea estable para alertas de log: el modelo configurado ya no existe.
