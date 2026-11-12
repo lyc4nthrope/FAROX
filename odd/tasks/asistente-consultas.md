@@ -76,7 +76,6 @@ La búsqueda es `LIKE` normalizado, no fuzzy: un error de tipeo ("arrox") no enc
 - `npm run ci` en verde.
 
 ### L9 — proveedor genérico y canales alternativos (2026-11-03)
-
 - **S12.** El adaptador habla la API **compatible con OpenAI** (`POST {AGENT_BASE_URL}/chat/completions` con `tools`), así que OpenAI, OpenRouter, Groq, DeepSeek, Mistral, Together, Ollama/vLLM y el endpoint compatible de Gemini funcionan sin tocar código.
 - **S13.** Cambiar de proveedor es `AGENT_API_KEY` + `AGENT_BASE_URL` + `AGENT_MODEL` (+ `AGENT_FALLBACK_MODEL`) y `functions deploy agent`.
 - `AGENT_API_KEY` cae a `GEMINI_API_KEY` si existe, para no romper un despliegue previo.
