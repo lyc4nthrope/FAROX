@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
-import { Box, buttonClass } from "../../../shared/ui/Box";
+import { Box, buttonClass, runAction } from "../../../shared/ui/Box";
 import { PremiumStatusCard } from "../../premium";
-import { fetchMyProfile, updateMyProfile } from "../api";
+import { fetchMyProfile, setMyMargin, updateMyProfile } from "../api";
+import { MarginCard } from "../components/MarginCard";
+import { PhoneVerificationCard } from "../components/PhoneVerificationCard";
 import { ProfileForm, type ProfileFormErrors } from "../components/ProfileForm";
 import { profileSchema, type ProfileFormValues } from "../schemas";
 
@@ -24,6 +26,9 @@ export function ProfilePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
+  const [savedPhone, setSavedPhone] = useState("");
+  const [margin, setMargin] = useState<number | null>(null);
 
   useEffect(() => {
     if (userId === null) return;
@@ -41,12 +46,30 @@ export function ProfilePage() {
           phone_number: row.phone_number ?? "",
           contact_preference: row.contact_preference,
         });
+        setVerifiedAt(row.phone_verified_at);
+        setSavedPhone(row.phone_number ?? "");
+        setMargin(row.default_margin_pct);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [userId]);
+
+  async function refreshProfile(): Promise<void> {
+    if (userId === null) return;
+    const { row, error } = await fetchMyProfile(userId);
+    if (error !== null || row === null) return;
+    if (row.phone_verified_at !== null) {
+      // La confirmación normaliza a E.164: reflejamos el número canónico.
+      setValues((current) => ({
+        ...current,
+        phone_number: row.phone_number ?? current.phone_number,
+      }));
+      setSavedPhone(row.phone_number ?? "");
+    }
+    setVerifiedAt(row.phone_verified_at);
+  }
 
   function handleSubmit(): void {
     if (userId === null) return;
@@ -72,6 +95,12 @@ export function ProfilePage() {
         if (error !== null) {
           setFormError("No se pudo guardar tu perfil. Intentá de nuevo.");
           return;
+        }
+        // El trigger de 0042 borra la verificación si el número cambia; el
+        // estado local lo refleja sin esperar otro fetch.
+        if (parsed.data.phone_number.trim() !== savedPhone.trim()) {
+          setVerifiedAt(null);
+          setSavedPhone(parsed.data.phone_number.trim());
         }
         setNotice("Perfil actualizado.");
       } catch {
@@ -100,8 +129,8 @@ export function ProfilePage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight">Perfil</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {email === null ? "" : `${email} · `}solo podés editar tu nombre, teléfono y preferencia
-            de contacto.
+            {email === null ? "" : `${email} · `}solo podés editar tus datos de contacto y tu margen
+            de precios.
           </p>
         </div>
       </div>
@@ -121,6 +150,11 @@ export function ProfilePage() {
             onChange={setValues}
             onSubmit={handleSubmit}
           />
+          <PhoneVerificationCard
+            phone={values.phone_number}
+            verifiedAt={verifiedAt}
+            onRefresh={refreshProfile}
+          />
         </Box>
       </div>
       {role === "distribuidor" && (
@@ -136,6 +170,18 @@ export function ProfilePage() {
           </Box>
         </div>
       )}
+      <div className="mt-6">
+        <Box title="Precios">
+          <MarginCard
+            initial={margin}
+            onSave={async (value) => {
+              const failure = await runAction(() => setMyMargin(value));
+              if (failure === null) setMargin(value);
+              return failure;
+            }}
+          />
+        </Box>
+      </div>
     </section>
   );
 }

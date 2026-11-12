@@ -72,6 +72,7 @@ vi.mock("../features/products/api", () => ({
 vi.mock("../features/profile/api", () => ({
   fetchMyProfile: vi.fn(),
   updateMyProfile: vi.fn(),
+  startPhoneVerification: vi.fn(),
 }));
 vi.mock("../features/inventory/alertsApi", () => ({
   fetchOpenAlerts: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -189,6 +190,8 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
         full_name: "Ada Lovelace",
         phone_number: "555-1234",
         contact_preference: "whatsapp",
+        phone_verified_at: null,
+        default_margin_pct: null,
       },
       error: null,
     });
