@@ -1,5 +1,6 @@
 import type { ProfileFormValues } from "../schemas";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../types";
+import { LIMITS } from "../../../shared/lib/limits";
 import { buttonClass, inputClass } from "../../../shared/ui/Box";
 
 export interface ProfileFormErrors {
@@ -73,6 +74,7 @@ export function ProfileForm({
           autoComplete="name"
           className={`${inputClass} mt-1 w-full`}
           value={values.full_name}
+          maxLength={LIMITS.userName}
           aria-invalid={errors.full_name !== undefined}
           aria-describedby={errors.full_name === undefined ? undefined : "profile-full-name-error"}
           onChange={(event) => onChange({ ...values, full_name: event.target.value })}
@@ -96,6 +98,7 @@ export function ProfileForm({
           autoComplete="tel"
           className={`${inputClass} mt-1 w-full`}
           value={values.phone_number}
+          maxLength={LIMITS.userPhone}
           aria-invalid={errors.phone_number !== undefined}
           aria-describedby={errors.phone_number === undefined ? undefined : "profile-phone-error"}
           onChange={(event) => onChange({ ...values, phone_number: event.target.value })}

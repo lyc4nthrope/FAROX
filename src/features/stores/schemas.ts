@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LIMITS } from "../../shared/lib/limits";
+
 // Validación Zod ANTES de cualquier request (idea:198 "validación Zod en cada
 // formulario" — STORE-1 exige bloquear coordenadas omitidas en el cliente).
 // store_type_id y las coordenadas viajan como strings (valores crudos de
@@ -20,11 +22,24 @@ function esRango(value: string, min: number, max: number): boolean {
 }
 
 export const storeSchema = z.object({
-  name: z.string().trim().min(1, "Ingresá el nombre de la tienda"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Ingresá el nombre de la tienda")
+    .max(LIMITS.storeName, `Máximo ${LIMITS.storeName} caracteres`),
   store_type_id: z.string().trim().refine(esIdDeCatalogo, "Elegí un tipo de tienda"),
-  address: z.string().trim(),
-  city: z.string().trim(),
-  phone: z.string().trim(),
+  address: z
+    .string()
+    .trim()
+    .max(LIMITS.storeAddress, `Máximo ${LIMITS.storeAddress} caracteres`),
+  city: z
+    .string()
+    .trim()
+    .max(LIMITS.storeCity, `Máximo ${LIMITS.storeCity} caracteres`),
+  phone: z
+    .string()
+    .trim()
+    .max(LIMITS.storePhone, `Máximo ${LIMITS.storePhone} caracteres`),
   // D3 (#486) SUPERSEDE: la ubicación ya no son campos numéricos manuales —
   // se elige en el MAPA (shared/ui/LocationPicker). Coordenadas
   // OBLIGATORIAS: stores.location NOT NULL (0002:131) mientras p_location es

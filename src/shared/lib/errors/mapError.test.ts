@@ -216,3 +216,81 @@ describe("mapError — solicitudes tienda ↔ distribuidor (0021)", () => {
     );
   });
 });
+
+// 0040/0041: límites de almacenamiento y rate limit del chat. El mensaje de
+// PostgREST incluye el nombre del constraint; el de las RPC, el texto del RAISE.
+describe("mapError — límites de longitud y rate limit (0040/0041)", () => {
+  it("CHECK de longitud con constraint conocido", () => {
+    expect(
+      mapError({
+        code: "23514",
+        message:
+          'new row for relation "users" violates check constraint "users_full_name_maxlen"',
+      }),
+    ).toBe("El nombre es demasiado largo (máximo 120 caracteres).");
+    expect(
+      mapError({
+        code: "23514",
+        message:
+          'new row for relation "products" violates check constraint "products_description_maxlen"',
+      }),
+    ).toBe("La descripción es demasiado larga (máximo 2000 caracteres).");
+  });
+
+  it("CHECK de longitud sin regla específica cae al genérico", () => {
+    expect(
+      mapError({
+        code: "23514",
+        message: 'violates check constraint "alerts_message_maxlen"',
+      }),
+    ).toBe("Uno de los campos supera el largo permitido.");
+  });
+
+  it("jsonb demasiado grande", () => {
+    expect(
+      mapError({
+        code: "23514",
+        message: 'violates check constraint "payment_events_payload_maxbytes"',
+      }),
+    ).toBe("El contenido es demasiado grande.");
+  });
+
+  it("otro 23514 no se confunde con longitud", () => {
+    expect(
+      mapError({
+        code: "23514",
+        message: 'violates check constraint "orders_delivered_requires_at"',
+      }),
+    ).toBe("Ocurrió un error inesperado. Intentá de nuevo.");
+  });
+
+  it("rate limit de mensajes y conversaciones", () => {
+    expect(mapError({ message: "send_message: límite de 120 mensajes por hora" })).toBe(
+      "Alcanzaste el límite de mensajes por hora. Probá más tarde.",
+    );
+    expect(mapError({ message: "create_chat: límite de 30 conversaciones por hora" })).toBe(
+      "Alcanzaste el límite de conversaciones nuevas por hora. Probá más tarde.",
+    );
+  });
+
+  it("mensaje de chat de más de 800 caracteres", () => {
+    expect(mapError({ message: "send_message: content supera 800 caracteres" })).toBe(
+      "El mensaje supera los 800 caracteres.",
+    );
+  });
+
+  it("errores del asistente (429/503/502)", () => {
+    expect(
+      mapError({ message: "Llegaste al límite de consultas por hora. Probá más tarde." }),
+    ).toBe("Llegaste al límite de consultas por hora. Probá más tarde.");
+    expect(
+      mapError({ message: "El asistente todavía no está habilitado." }),
+    ).toBe("El asistente todavía no está habilitado.");
+    expect(
+      mapError({ message: "El asistente está en mantenimiento. Probá más tarde." }),
+    ).toBe("El asistente está en mantenimiento. Probá más tarde.");
+    expect(
+      mapError({ message: "No pude responder ahora. Probá de nuevo en un rato." }),
+    ).toBe("El asistente no pudo responder ahora. Probá de nuevo en un rato.");
+  });
+});

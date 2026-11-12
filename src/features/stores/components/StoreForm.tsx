@@ -1,3 +1,4 @@
+import { LIMITS } from "../../../shared/lib/limits";
 import { MapLocationField } from "../../../shared/ui/LocationPicker/MapLocationField";
 import type { StoreFormValues } from "../schemas";
 import type { StoreTypeRef } from "../types";
@@ -96,6 +97,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.name}
+          maxLength={LIMITS.storeName}
           aria-invalid={errors.name !== undefined}
           aria-describedby={errors.name === undefined ? undefined : "store-name-error"}
           onChange={(event) => onChange({ ...values, name: event.target.value })}
@@ -142,6 +144,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.address}
+          maxLength={LIMITS.storeAddress}
           onChange={(event) => onChange({ ...values, address: event.target.value })}
         />
       </div>
@@ -155,6 +158,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.city}
+          maxLength={LIMITS.storeCity}
           onChange={(event) => onChange({ ...values, city: event.target.value })}
         />
       </div>
@@ -168,6 +172,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.phone}
+          maxLength={LIMITS.storePhone}
           onChange={(event) => onChange({ ...values, phone: event.target.value })}
         />
       </div>

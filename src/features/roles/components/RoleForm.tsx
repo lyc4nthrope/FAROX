@@ -1,3 +1,4 @@
+import { LIMITS } from "../../../shared/lib/limits";
 import { ROLE_NAMES } from "../../auth/types";
 import type { RoleFormState } from "../schemas";
 
@@ -111,6 +112,7 @@ export function RoleForm({
           rows={3}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.description}
+          maxLength={LIMITS.catalogDescription}
           aria-invalid={errors.description !== undefined}
           aria-describedby={
             errors.description === undefined

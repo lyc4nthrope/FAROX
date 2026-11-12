@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LIMITS } from "../../shared/lib/limits";
 import { ROLE_NAMES } from "../auth/types";
 
 // sdd/admin-console T-C1 (design #599 §2.5, mitigación R3). Zod valida ANTES
@@ -19,7 +20,10 @@ export const roleSchema = z.object({
   }),
   // roles.description es nullable (0002:44): "" viaja como NULL (convención
   // profile/api → users/api updateUserProfile).
-  description: z.string().trim(),
+  description: z
+    .string()
+    .trim()
+    .max(LIMITS.catalogDescription, `Máximo ${LIMITS.catalogDescription} caracteres`),
 });
 
 export type RoleFormValues = z.infer<typeof roleSchema>;

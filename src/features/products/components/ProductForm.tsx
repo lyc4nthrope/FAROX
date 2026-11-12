@@ -1,5 +1,6 @@
 import type { ProductFormValues } from "../schemas";
 import type { CatalogRef } from "../types";
+import { LIMITS } from "../../../shared/lib/limits";
 import { BarcodeScanner } from "./BarcodeScanner";
 
 export interface ProductFormErrors {
@@ -89,6 +90,7 @@ export function ProductForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.name}
+          maxLength={LIMITS.productName}
           aria-invalid={errors.name !== undefined}
           aria-describedby={errors.name === undefined ? undefined : "product-name-error"}
           onChange={(event) => onChange({ ...values, name: event.target.value })}
@@ -108,6 +110,7 @@ export function ProductForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.description}
+          maxLength={LIMITS.productDescription}
           onChange={(event) => onChange({ ...values, description: event.target.value })}
         />
       </div>

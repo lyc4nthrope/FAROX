@@ -23,10 +23,43 @@ const FRIENDLY = {
   userNotFound: "No se encontró el usuario.",
   invalidCredentials: "Email o contraseña incorrectos.",
   network: "No se pudo conectar, revisá tu conexión.",
+  // Límites de almacenamiento (0040/0041). PostgREST incluye el nombre del
+  // constraint en el mensaje, así que se puede dar un texto por campo.
+  tooLong: "Uno de los campos supera el largo permitido.",
+  tooBig: "El contenido es demasiado grande.",
+  rateConversations: "Alcanzaste el límite de conversaciones nuevas por hora. Probá más tarde.",
+  rateMessages: "Alcanzaste el límite de mensajes por hora. Probá más tarde.",
+  messageTooLong: "El mensaje supera los 800 caracteres.",
+  agentDisabled: "El asistente todavía no está habilitado.",
+  agentMaintenance: "El asistente está en mantenimiento. Probá más tarde.",
+  agentUnavailable: "El asistente no pudo responder ahora. Probá de nuevo en un rato.",
   // Fallback propio (no está en la tabla D5): necesario para cumplir su
   // "raw text never rendered" ante cualquier error no catalogado.
   unexpected: "Ocurrió un error inesperado. Intentá de nuevo.",
 } as const;
+
+// CHECK de longitud (0040/0041). El nombre del constraint es estable y aparece
+// en el mensaje de PostgREST: `violates check constraint "users_full_name_maxlen"`.
+const LENGTH_RULES: ReadonlyArray<readonly [string, string]> = [
+  ["users_full_name_maxlen", "El nombre es demasiado largo (máximo 120 caracteres)."],
+  ["users_phone_number_maxlen", "El teléfono es demasiado largo (máximo 32 caracteres)."],
+  ["products_name_maxlen", "El nombre del producto es demasiado largo (máximo 160 caracteres)."],
+  ["products_description_maxlen", "La descripción es demasiado larga (máximo 2000 caracteres)."],
+  ["stores_name_maxlen", "El nombre de la tienda es demasiado largo (máximo 160 caracteres)."],
+  ["stores_address_maxlen", "La dirección es demasiado larga (máximo 255 caracteres)."],
+  ["stores_city_maxlen", "La ciudad es demasiado larga (máximo 80 caracteres)."],
+  ["stores_phone_maxlen", "El teléfono es demasiado largo (máximo 32 caracteres)."],
+  ["stores_website_url_maxlen", "El sitio web es demasiado largo (máximo 500 caracteres)."],
+  ["distributors_name_maxlen", "El nombre del distribuidor es demasiado largo (máximo 160 caracteres)."],
+  ["distributors_nit_maxlen", "El NIT es demasiado largo (máximo 32 caracteres)."],
+  ["distributors_contact_name_maxlen", "El nombre de contacto es demasiado largo (máximo 120 caracteres)."],
+  ["distributors_phone_maxlen", "El teléfono es demasiado largo (máximo 32 caracteres)."],
+  ["distributors_email_maxlen", "El email es demasiado largo (máximo 255 caracteres)."],
+  ["orders_notes_maxlen", "Las notas son demasiado largas (máximo 2000 caracteres)."],
+  ["orders_cancelled_reason_maxlen", "El motivo es demasiado largo (máximo 500 caracteres)."],
+  ["chat_messages_content_maxlen", "El mensaje es demasiado largo."],
+  ["chat_conversations_title_maxlen", "El título es demasiado largo (máximo 120 caracteres)."],
+];
 
 // sdd/admin-console T-E2: el hint del tope D34 de /stores REUTILIZA este copy
 // en vez de duplicarlo — única fuente de verdad del string (mapError lo
@@ -36,6 +69,20 @@ export const STORE_CAP_MESSAGE = FRIENDLY.storeCap;
 // Mensajes de RAISE EXCEPTION de las RPC (migraciones 0004–0015), en minúsculas.
 // El orden importa: el primero que coincide gana.
 const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
+  // Asistente y chat (0040/0041). Van primero: "asistente todavía no está
+  // habilitado" debe ganarle al "todavía no está habilitado" de Mercado Pago.
+  ["content supera 800 caracteres", "El mensaje supera los 800 caracteres."],
+  ["límite de 120 mensajes por hora", "Alcanzaste el límite de mensajes por hora. Probá más tarde."],
+  ["límite de 30 conversaciones por hora", "Alcanzaste el límite de conversaciones nuevas por hora. Probá más tarde."],
+  ["límite de consultas por hora", "Llegaste al límite de consultas por hora. Probá más tarde."],
+  ["asistente todavía no está habilitado", "El asistente todavía no está habilitado."],
+  ["asistente está en mantenimiento", "El asistente está en mantenimiento. Probá más tarde."],
+  ["no pude responder ahora", "El asistente no pudo responder ahora. Probá de nuevo en un rato."],
+  // Teléfono verificado (0042).
+  ["ese teléfono ya está verificado en otra cuenta", "Ese número ya está verificado en otra cuenta."],
+  ["límite de 3 códigos por hora", "Pediste demasiados códigos. Esperá una hora e intentá de nuevo."],
+  ["phone: número inválido", "Ese número no parece válido. Usá el formato 300 222 3333 o el prefijo internacional."],
+  ["phone: número requerido", "Escribí un número de teléfono."],
   ["ya existe un distribuidor con ese nit", "Ya hay un distribuidor registrado con ese NIT. Si es tu empresa, contactá al administrador."],
   ["ya tenés un distribuidor asociado", "Tu cuenta ya tiene un distribuidor asociado."],
   ["ya registraste un distribuidor", "Ya registraste un distribuidor; pedile al administrador cualquier cambio."],
@@ -157,6 +204,18 @@ export function mapError(error: unknown): string {
   }
   if (code === "PGRST116") {
     return FRIENDLY.notFound; // .single() sin fila
+  }
+
+  // CHECK de longitud (0040/0041): solo los constraints *_maxlen/_maxbytes.
+  // Otros 23514 (precios > 0, stock >= 0, fechas de entrega) siguen su curso
+  // y caen al fallback de siempre.
+  if (message.includes("_maxlen") || message.includes("_maxbytes")) {
+    for (const [needle, friendly] of LENGTH_RULES) {
+      if (message.includes(needle)) {
+        return friendly;
+      }
+    }
+    return message.includes("_maxbytes") ? FRIENDLY.tooBig : FRIENDLY.tooLong;
   }
 
   // 2) Substrings — RAISE de RPC/triggers y errores de auth de supabase-js.
