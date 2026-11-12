@@ -43,6 +43,14 @@ const RULES = [
   },
 ];
 
+// C5 (dashboard INT-01): Base D32 eligió realtime sobre polling por costo, así
+// que el canal se permite SOLO en los archivos del dashboard. El resto del
+// front sigue sin realtime (§S8-4).
+const REALTIME_ALLOWED = new Set([
+  "src/features/logistics/routes/DashboardPage.tsx",
+  "src/features/logistics/routes/DashboardPage.test.tsx",
+]);
+
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
@@ -61,9 +69,12 @@ for await (const file of walk(SRC)) {
   if (!/\.(ts|tsx)$/.test(file)) continue;
   scanned += 1;
   const content = await readFile(file, "utf8");
+  const rel = relative(process.cwd(), file).split("\\").join("/");
+  const realtimeAllowed = REALTIME_ALLOWED.has(rel);
   for (const rule of RULES) {
+    if (realtimeAllowed && rule.name.startsWith("canal de realtime")) continue;
     if (rule.regex.test(content)) {
-      violations.push(`${relative(process.cwd(), file)} → ${rule.name}`);
+      violations.push(`${rel} → ${rule.name}`);
     }
   }
 }

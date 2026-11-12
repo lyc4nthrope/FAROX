@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,8 @@ vi.mock("../../../shared/lib/supabase/client", () => ({
   supabase: {
     rpc: vi.fn(),
     from: vi.fn(),
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
   },
 }));
 vi.mock("../../auth/api", () => ({
@@ -65,8 +67,17 @@ function mockDistributorNames() {
 }
 
 describe("DashboardPage · gráficos por rol", () => {
+  const realtimeChannel = {
+    on: vi.fn(),
+    subscribe: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    realtimeChannel.on.mockReturnValue(realtimeChannel);
+    realtimeChannel.subscribe.mockReturnValue(realtimeChannel);
+    vi.mocked(supabase.channel).mockReturnValue(realtimeChannel as never);
+    vi.mocked(supabase.removeChannel).mockResolvedValue("ok" as never);
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
     vi.mocked(supabase.rpc).mockResolvedValue({ data: ROWS, error: null } as never);
@@ -99,5 +110,38 @@ describe("DashboardPage · gráficos por rol", () => {
     expect(await screen.findByText("Participación de ventas")).toBeInTheDocument();
     expect(screen.getByText("Ventas y compras por distribuidor")).toBeInTheDocument();
     expect((await screen.findAllByText("Distribuidora Norte")).length).toBeGreaterThan(0);
+  });
+
+  it("escucha dashboard_daily y recarga al recibir un cambio", async () => {
+    const view = renderPage("operador", true);
+    await screen.findByText("Participación de ventas");
+
+    const subscription = realtimeChannel.on.mock.calls.find(
+      ([event]) => event === "postgres_changes",
+    );
+    expect(subscription).toBeDefined();
+    expect(subscription?.[1]).toEqual({
+      event: "*",
+      schema: "public",
+      table: "dashboard_daily",
+    });
+
+    const callback = subscription?.[2] as (() => void) | undefined;
+    expect(callback).toBeTypeOf("function");
+
+    const callsBefore = vi.mocked(supabase.rpc).mock.calls.length;
+    act(() => {
+      callback?.();
+    });
+
+    await waitFor(
+      () => {
+        expect(vi.mocked(supabase.rpc).mock.calls.length).toBeGreaterThan(callsBefore);
+      },
+      { timeout: 2000 },
+    );
+
+    view.unmount();
+    expect(supabase.removeChannel).toHaveBeenCalled();
   });
 });

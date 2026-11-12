@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -47,6 +47,7 @@ const RANGE_PRESETS = [
 ] as const;
 
 const MAX_RANGE_DAYS = 366;
+const REALTIME_RELOAD_DEBOUNCE_MS = 500;
 
 // Colores del sistema: las ventas conservan el verde que ya usaba «Salidas»
 // y las compras el gris oscuro de «Entradas». La dona usa una paleta corta
@@ -131,6 +132,48 @@ export function DashboardPage() {
         : fetchDistributorNames(),
     [esDistribuidor, premium],
   );
+
+  const reload = rows.reload;
+
+  // dashboard_daily ya está publicada en Realtime (migración 0007) y 0048 deja
+  // un solo upsert por ticket: un evento = un refresco. El debounce agrupa
+  // ráfagas y el foco/visibilidad cubren eventos perdidos en segundo plano.
+  useEffect(() => {
+    if (!premium) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        reload();
+      }, REALTIME_RELOAD_DEBOUNCE_MS);
+    };
+
+    const channel = supabase
+      .channel(`dashboard-daily-${crypto.randomUUID()}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dashboard_daily" },
+        scheduleReload,
+      )
+      .subscribe();
+
+    const onFocus = () => scheduleReload();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") scheduleReload();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      void supabase.removeChannel(channel);
+    };
+  }, [premium, reload]);
 
   if (!premium) {
     return (
