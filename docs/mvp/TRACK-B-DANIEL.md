@@ -4,23 +4,31 @@
 > **Antes de empezar:** leer `docs/mvp/PLAN.md` §0–§6.
 > **Rol especial:** Daniel es el **único que aplica migraciones al remoto** (gate H1) y tiene la última palabra sobre la BD. Revisa todo PR que toque `supabase/`.
 
+> **Actualización 2026-11-12 — documento histórico.** El esquema vigente llega a la migración 0051; 0016 nunca se creó y 0015/0017 ya están aplicadas. El estado real está en `PLAN.md` → "Estado real al 2026-11-12".
+
 > **Orden:** primero la Fase 0 (B0.1–B0.5; **B0.1 es lo más urgente del proyecto**), después las funcionalidades (B3–B10).
 
 | ID | Tarea | Día | Depende de | Estado |
 |---|---|---|---|---|
-| **B0.1** | Corregir 0011 (`session_user`) + estado real del remoto + aplicar 0011–0014 | 1 | — | ⬜ |
-| **B0.2** | Doc-first de 0013/0014 en el doc de BD + nota de 0012 | 1 | B0.1 | ⬜ |
-| **B0.3** | `schema-check` dinámico y parser con salida real | 2 | B0.1 | ⬜ |
-| **B0.4** | Proteger `main` + endurecer el backup + permisos de CI | 2 | B0.3 | ⬜ |
-| **B0.5** | Higiene: `.atl`, Node, Prettier, `check-scope`, README | 3 | B0.4 | ⬜ |
-| B3 | Harness pgTAP + plantilla | 3 | B0.3 | ⬜ |
-| B4 | Inventario: asignar producto ↔ tienda + umbral | 4 | Fase 0 | ⬜ |
-| B5 | Movimientos: entrada, salida, reverso | 5 | B4 | ⬜ |
-| B6 | Alertas + realtime | 6 | B5 | ⬜ |
-| B7 | Precios | 6 | B4 | ⬜ |
-| B8 | Fiado (créditos y pagos) | 7 | C4 | ⬜ |
-| B9 | Despliegue del front (Azure SWA) | 7–8 | B0.4 | ⬜ |
-| B10 | Baseline + aplicar todo al remoto + verificación final | 9–10 | A0.1, A1, A5, todas | ⬜ |
+| **B0.1** | Corregir 0011 (`session_user`) + estado real del remoto + aplicar 0011–0014 | 1 | — | ✅ |
+| **B0.2** | Doc-first de 0013/0014 en el doc de BD + nota de 0012 | 1 | B0.1 | 🟡 Doc de BD actualizado con el índice 0013-0051; §2-§4 sigue siendo el baseline |
+| **B0.3** | `schema-check` dinámico y parser con salida real | 2 | B0.1 | ✅ |
+| **B0.4** | Proteger `main` + endurecer el backup + permisos de CI | 2 | B0.3 | 🟡 CI y `schema-check` ✅; backup con `schedule` desactivado y sin `age`; protección de `main` no verificable desde el repo |
+| **B0.5** | Higiene: `.atl`, Node, Prettier, `check-scope`, README | 3 | B0.4 | 🟡 Prettier/Node/check-scope ✅; `.atl/skill-registry.md` sigue con rutas absolutas y `format:check` no está en CI |
+| B3 | Harness pgTAP + plantilla | 3 | B0.3 | ❌ No existe `supabase/tests/` |
+| B4 | Inventario: asignar producto ↔ tienda + umbral | 4 | Fase 0 | ✅ RPC reales: `add_store_product`, `update_store_product_full` (no `assign_product_to_store`) |
+| B5 | Movimientos: entrada, salida, reverso | 5 | B4 | ✅ Incluye movimientos masivos y reversos |
+| B6 | Alertas + realtime | 6 | B5 | 🟡 Listado y marcar leída ✅; realtime de alertas pendiente |
+| B7 | Precios | 6 | B4 | ✅ Incluye carga masiva, autollenado, margen y costo manual |
+| B8 | Fiado (créditos y pagos) | 7 | C4 | ✅ Bajo `src/features/orders` (`CreditsPage`) |
+| B9 | Despliegue del front (Azure SWA) | 7–8 | B0.4 | ✅ `deploy-front.yml` + `public/staticwebapp.config.json` |
+| B10 | Baseline + aplicar todo al remoto + verificación final | 9–10 | A0.1, A1, A5, todas | ✅ Historial remoto baselineado hasta 0051 (0001-0048 marcadas, 0049-0051 aplicadas) |
+
+**Notas de actualización (2026-11-12):**
+
+- **B3:** el harness pgTAP sigue sin existir. La cobertura de BD es `scripts/smoke-local.mjs` (H1-H3 + QR + fiado).
+- **B4:** el nombre real de las RPC de asignación es `add_store_product` / `update_store_product_full`; `assign_product_to_store` no existe en el esquema actual.
+- **B10:** el baseline se hizo marcando 0001-0048 como aplicadas y aplicando después 0049-0051. `0016` nunca se creó. Hay dos archivos "0040" (`ranking_productos` y `limites_texto`) con timestamps distintos.
 
 (Las antiguas B1 y B2 quedaron dentro de B0.1, B0.2 y B0.3.)
 

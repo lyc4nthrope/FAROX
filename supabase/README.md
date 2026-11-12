@@ -1,5 +1,7 @@
 # FAROX — Migraciones Supabase (Sprint 1)
 
+> **Estado al 2026-11-12:** este README describe el Sprint 1 (0001-0012) y se conserva como registro. El esquema vigente llega a **0051**; la lista completa y el orden real viven en `supabase/migrations/`. Ver "Migraciones 0013-0051" abajo.
+
 Materialización del esquema según `Base de datos FAROX.md` (documento **autoridad**).
 12 migraciones numeradas que se ejecutan **en orden estricto** — el orden numérico
 del filename ES el orden de materialización del §7. Las 4 últimas (0009→0012)
@@ -21,6 +23,34 @@ son el hardening de `sprint1-hardening` y comparten UNA ventana de mantenimiento
 | 10 | `20261016000010_perf.sql` | Performance: `confirm_delivery` con dedup y UN solo upsert de dashboard (1 evento realtime por entrega), índices parciales (`stock.expiry_date`, `orders.expected_at`, `alerts.store_id`), `audit_diff` precalculado, `get_dashboard` ≤366 días, `create_order` set-based |
 | 11 | `20261016000011_seguridad.sql` | Seguridad: `assert_admin()` (guard admin NULL-safe) + lockdown de grants deny-by-default (REVOKE de PUBLIC — bug PG #8685 —, whitelist de 31 firmas, PostGIS re-grant, `anon` sin DML) |
 | 12 | `20261016000012_verify_hardening.sql` | Verificación del hardening — no modifica nada (checks H1-H4) |
+
+---
+
+## Migraciones 0013-0051 (estado 2026-11-12)
+
+El esquema creció bastante más allá del Sprint 1. Estas son las migraciones posteriores, en orden de filename. El orden real es el timestamp completo; los prefijos cortos se conservan solo como referencia.
+
+| Rango | Área | Hitos |
+|---|---|---|
+| 0013-0015 | Registro y alcance | `create_store` con ubicación, `register_distributor`, `user_stores` SELECT, guards del último admin |
+| 0017-0018 | QR y RLS | `store_distributors`, `link_code`, RPC de vínculo; fix de recursión de policies en rutas/stock |
+| 0019-0022 | Catálogo por rol | Catálogo de tienda/distribuidor/admin, vínculo para operadores, solicitudes a distribuidores |
+| 0023-0030 | Pedidos, inventario y precios | Faltantes y fiado del operador, cotización, ciclo del pedido, alta/edición de inventario, precios Premium, entregas y ventas, relaciones producto↔tienda/distribuidor |
+| 0031-0036 | Alertas y Premium | Alertas del distribuidor, vencimiento/planes, downgrade de tiendas, gestión de tiendas, Mercado Pago, avisos admin |
+| 0037-0038 | Tickets | Ventas/compras multi-producto, descuentos y tickets recurrentes |
+| 0039 | Asistente fase 1 | `create_chat(p_title, p_store)` con tienda, tools `agent_search_products`, `agent_stock`, `agent_last_order` |
+| 0040-0041 | Límites | Topes de texto/jsonb, rate limit de chat en la BD; ranking de productos (`20261103000040`) |
+| 0042 | Teléfono | `phone_verifications`, normalización E.164, unicidad del teléfono verificado |
+| 0043-0047 | Precios | Carga masiva tienda/distribuidor, autollenado, margen global y por producto, costo manual |
+| 0048 | Pulido | Normalización de teléfono, rate limit por hora, batching del dashboard, egreso de chat |
+| 0049-0051 | Asistente fase 2 | `agent_actions`, ejecución única, WhatsApp (`*_for_user`, `whatsapp_inbound`), fix de conversaciones por usuario |
+
+**Notas:**
+
+- **Dos "0040":** `20261103000040_ranking_productos.sql` y `20261104000040_limites_texto.sql`. No colisionan porque el timestamp completo es distinto, pero el número corto se repite.
+- **0016 no existe:** el `append_chat_reply` planificado nunca se creó. El asistente escribe `assistant`/`tool` desde la Edge Function con `service_role`, después de validar el JWT.
+- **Baseline remoto:** el historial de `supabase_migrations.schema_migrations` se marcó hasta 0048 y luego se aplicaron 0049-0051. `supabase migration list` no debe mostrar diferencias.
+- **Edge Functions:** `agent` (verify_jwt), `whatsapp-webhook` (verify_jwt=false, valida firma de Meta), `agent-health` (verify_jwt=false, `x-cron-secret`). Deploy: `supabase functions deploy agent`, `supabase functions deploy whatsapp-webhook --no-verify-jwt`.
 
 ---
 

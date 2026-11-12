@@ -1,25 +1,33 @@
 # Track A — Cristhian
 
-> **Alcance:** chatbot (CHAT-01, CHAT-02), QR tienda↔distribuidor (INV-05), rutas y mapa (DIST-03), vistas del rol distribuidor, pasada de seguridad.
+> **Alcance:** asistente (CHAT-01, CHAT-02), QR tienda↔distribuidor (INV-05), rutas y mapa (DIST-03), vistas del rol distribuidor, pasada de seguridad.
 > **Antes de empezar:** leer `docs/mvp/PLAN.md` §0–§6 (reglas, decisiones, receta de slice, DoD).
 > **Migraciones reservadas:** 0015 (A0.1), 0016 (A1) y 0017 (A5) (PLAN §3.3). Las aplica Daniel en el remoto después del merge.
+> **Actualización 2026-11-12 — documento histórico.** El asistente no se implementó con n8n: vive en las Edge Functions `agent` y `whatsapp-webhook` (migraciones 0039-0051). A1-A4 y A8 quedaron reemplazadas; A5-A7 se implementaron. El estado real está en `PLAN.md` → "Estado real al 2026-11-12".
+
 > **Orden:** primero la Fase 0 (A0.1–A0.4), después las funcionalidades (A1–A9).
 
 | ID | Tarea | Día | Depende de | Estado |
 |---|---|---|---|---|
-| **A0.1** | Migración 0015 (guards de registro y último admin) + gate de onboarding | 1 | B0.1 | ⬜ |
-| **A0.2** | Callback de Auth + privilegios estables | 2 | — | ⬜ |
-| **A0.3** | Confirmaciones en acciones de usuario | 2 | A0.1 | ⬜ |
-| **A0.4** | Ubicación, accesibilidad del mapa y Nominatim | 3 | — | ⬜ |
-| A1 | Migración 0016 — respuestas del bot | 3 | A0.1 | ⬜ |
-| A2 | n8n en VPS + webhook con identidad verificada | 4 | — | ⬜ |
-| A3 | Tools, propuestas y confirmación en n8n | 5 | A1 aplicada, A2 | ⬜ |
-| A4 | Pantalla del asistente | 5–6 | A3 | ⬜ |
-| A5 | Migración 0017 + QR + escáner + vínculo | 6 | A1 | ⬜ |
-| A6 | Rutas: planificación (admin) | 7 | — | ⬜ |
-| A7 | Mi ruta (distribuidor) + mapa + navegación del distribuidor | 7–8 | A6, C1 | ⬜ |
-| A8 | Pruebas de seguridad del chatbot + export del workflow | 8 | A4 | ⬜ |
-| A9 | Pasada de seguridad general | 9 | todo | ⬜ |
+| **A0.1** | Migración 0015 (guards de registro y último admin) + gate de onboarding | 1 | B0.1 | ✅ |
+| **A0.2** | Callback de Auth + privilegios estables | 2 | — | ✅ |
+| **A0.3** | Confirmaciones en acciones de usuario | 2 | A0.1 | ✅ |
+| **A0.4** | Ubicación, accesibilidad del mapa y Nominatim | 3 | — | 🟡 F10, Nominatim y teselas ✅; F11 (coordenadas siempre visibles) pendiente |
+| A1 | Migración 0016 — respuestas del bot | 3 | A0.1 | ⚠️ Reemplazada: 0016 nunca se creó; la Edge Function inserta `assistant`/`tool` con `service_role` |
+| A2 | n8n en VPS + webhook con identidad verificada | 4 | — | ⚠️ Reemplazada por la Edge Function `agent`; no hay n8n |
+| A3 | Tools, propuestas y confirmación en n8n | 5 | A1 aplicada, A2 | ⚠️ Reemplazada: tools en `_shared/agent.ts` + `agent_actions` |
+| A4 | Pantalla del asistente | 5–6 | A3 | ✅ `/asistente` con tarjetas de confirmación |
+| A5 | Migración 0017 + QR + escáner + vínculo | 6 | A1 | ✅ QR, regenerar, desvincular, escáner y `/vincular`; QR masivo Premium "Próximamente" |
+| A6 | Rutas: planificación (admin) | 7 | — | ✅ |
+| A7 | Mi ruta (distribuidor) + mapa + navegación del distribuidor | 7–8 | A6, C1 | ✅ |
+| A8 | Pruebas de seguridad del chatbot + export del workflow | 8 | A4 | 🟡 Tests de identidad/confirmación en Vitest; no hay workflow n8n que exportar |
+| A9 | Pasada de seguridad general | 9 | todo | 🟡 `check-scope`, RLS y tests ✅; falta pasada formal y backup |
+
+**Notas de actualización (2026-11-12):**
+
+- **A1-A4/A8:** el asistente real es la Edge Function `agent` (JWT, proveedor compatible con OpenAI) + `whatsapp-webhook`. `append_chat_reply` no existe; la función escribe `assistant`/`tool` con `service_role` después de validar la conversación con el JWT.
+- **A5:** el QR masivo Premium nunca se implementó; `PremiumPage` lo muestra como "Próximamente" y `MyDistributorsPage` solo tiene el `PremiumLock` con vista previa.
+- **A9:** `service_role` está confinado a `supabase/functions/`; `check-scope` solo audita `src/`. La verificación formal de RLS/PostgREST sigue pendiente.
 
 ---
 

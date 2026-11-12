@@ -7,6 +7,8 @@
 
 ---
 
+> **Estado al 2026-11-12:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0051**; el índice de cambios y los pendientes vigentes están en §10.
+
 ## 0. Contexto y origen
 
 - FAROX parte de un esquema **vacío**. La base de NØSEE (app de comunidad de precios) es la fuente de sus tablas base.
@@ -925,7 +927,9 @@ END $$;
 
 ---
 
-## 9. Pendientes
+## 9. Pendientes (histórico)
+
+> **Histórico.** Varios ítems de esta lista ya se resolvieron (0015 aplicada, chat legible, n8n reemplazado). Los pendientes vigentes están en §10.3.
 
 - [x] **0018 (2026-10-24) — recursión de RLS corregida**: `routes_select` ↔ `route_stops_select` (0009) y `stock_select` (0006) formaban un ciclo (`ERROR 42P17 infinite recursion detected in policy for relation "route_stops"`): todo SELECT de un no-admin sobre `stock`/`routes`/`route_stops` fallaba. Se reemplazaron las subconsultas cruzadas por 3 helpers `SECURITY DEFINER` (`my_route_ids()`, `routes_with_my_stores()`, `stores_on_my_routes()`); la visibilidad por rol no cambia. Whitelist +3 firmas (volver a correr 0012 da FAIL esperado en el conteo exacto). Detectado con `scripts/smoke-local.mjs` (37/37 flujos en verde con 0001–0018).
 - [x] **0017 (2026-10-24) — vínculos tienda ↔ distribuidor**: `stores.link_code` (QR, no legible por SELECT directo) + `store_distributors` (§3.15) + 5 funciones. Whitelist +4 firmas ejecutables (`internal_can_manage_store` es deny-list). El `ALTER DEFAULT PRIVILEGES` de 0011 deja las funciones nuevas sin grant para clientes; cada migración trae el suyo.
@@ -972,3 +976,52 @@ END $$;
 16. `.md` llama "vista" al Dashboard (INT-01) → aquí es la **tabla** `dashboard_daily` (D20).
 17. `.md` cronograma: SEC-01 en Sprint 3 vs backlog que lo marca S2 (contradicción interna del .md).
 18. `.md` modelo: `price_publication.user_id` vs convención D4 (`created_by`) — ya corregido en §2.8 de este doc; falta renombrar en el .md.
+
+---
+
+## 10. Estado de migraciones 0013-0051 (2026-11-12)
+
+> Esta sección es el índice de lo que se agregó después del baseline §2-§4. El SQL autoritativo es `supabase/migrations/`; acá se resume el contrato y se registran los pendientes vigentes.
+
+### 10.1 Índice por área
+
+| Rango | Área | Objetos principales |
+|---|---|---|
+| 0013-0015 | Registro y alcance | `register_distributor`, guards del último admin, `create_store` con ubicación, `user_stores` SELECT |
+| 0017-0018 | QR y RLS | `stores.link_code`, `store_distributors`, `get_store_link_code`, `regenerate_store_link_code`, `unlink_distributor`, `link_distributor_to_store`; helpers `my_route_ids`, `routes_with_my_stores`, `stores_on_my_routes` |
+| 0019-0022 | Catálogo por rol | Catálogo de tienda/distribuidor/admin; `store_distributor_requests`; vínculo gestionado por operador |
+| 0023-0030 | Pedidos, inventario y precios | Faltantes y fiado del operador; cotización; ciclo del pedido; `add_store_product` / `update_store_product_full`; precios Premium; `store_product_prices` / `distributor_products`; ventas y entregas |
+| 0031-0036 | Alertas y Premium | Alertas del distribuidor; planes con vencimiento; downgrade de tiendas; gestión de tiendas; Mercado Pago; avisos admin |
+| 0037-0038 | Tickets | `register_movements_bulk`, `register_distributor_sales_bulk`, `register_distributor_purchases`; descuentos y tickets recurrentes |
+| 0039 | Asistente fase 1 | `create_chat(p_title, p_store)`; `agent_search_products`, `agent_stock`, `agent_last_order`; `chat_conversations.store_id` |
+| 0040-0041 | Límites | Topes de longitud en texto y jsonb; `enforce_chat_conversation_rate`, `send_message` con rate limit; `movement_product_ranking` |
+| 0042 | Teléfono | `users.phone_verified_at`, `phone_verifications`, `normalize_phone_e164`, `phone_verification_start`, `phone_verification_confirm_whatsapp` |
+| 0043-0047 | Precios | `set_store_prices_bulk`, `set_distributor_prices_bulk`, autollenado desde movimientos, `set_my_margin`, `store_product_margins`, `set_store_product_margin`, costo manual |
+| 0048 | Pulido | Normalización de teléfono, rate limit por hora, `internal_dashboard_upsert`, batching de movimientos |
+| 0049-0051 | Asistente fase 2 | `agent_actions`, `agent_prepare_action`, `agent_execute_action`, `agent_cancel_action`, `internal_set_actor`, `internal_assert_wa_identity`, wrappers `*_for_user`, `whatsapp_inbound` |
+
+### 10.2 Asistente: contrato de seguridad
+
+- **Lectura:** la Edge Function `agent` recibe el JWT del usuario y llama RPC con el cliente del usuario; la RLS decide qué ve. Las tools de lectura son `agent_search_products`, `agent_stock`, `agent_last_order`, `listar_tiendas` y `consultar_dashboard` (agrega en servidor y solo Premium).
+- **Escritura:** el modelo **no escribe**. `agent_prepare_action` guarda un borrador en `agent_actions` con `kind`, `summary`, `expires_at` y `confirmation_code`; `agent_execute_action` ejecuta una sola vez tras la confirmación humana.
+- **WhatsApp:** `whatsapp-webhook` valida `x-hub-signature-256`, resuelve al usuario por `phone_verified_at` y usa los wrappers `*_for_user` (solo `service_role`). La confirmación es `CONFIRMAR <code>`; `price_update` se rechaza por ese canal. La conversación es única por `(channel, external_id, user_id)`.
+- **Persistencia del chat:** el navegador solo inserta `user` (`send_message`); `assistant`/`tool` los inserta la Edge Function con `service_role` después de validar la conversación con el JWT. `append_chat_reply` no existe.
+- **Secretos:** `AGENT_API_KEY`, `AGENT_BASE_URL`, `AGENT_MODEL`, `AGENT_FALLBACK_MODEL`, `AGENT_ENABLED`, `AGENT_WRITES_ENABLED`; en el front, `VITE_AGENT_WRITES_ENABLED` y `VITE_WHATSAPP_AGENT_NUMBER`.
+
+### 10.3 Pendientes vigentes
+
+- [ ] **pgTAP**: no existe `supabase/tests/`; la cobertura de BD es `scripts/smoke-local.mjs`.
+- [ ] **Backup**: `backup-weekly.yml` sigue solo con `workflow_dispatch`, sin cifrado `age` y sin `schedule`.
+- [ ] **Privacidad (C0.6)**: quitar "interés legítimo", alinear la eliminación de cuenta y subir `PRIVACY_VERSION` (hoy 1.1).
+- [ ] **Realtime de alertas**: el dashboard ya se suscribe a `dashboard_daily`; `/alertas` no.
+- [ ] **A0.4/F11**: los inputs de lat/lng solo aparecen si falla Leaflet.
+- [ ] **Playwright H1-H4**: no hay `playwright.config.ts`, ni `e2e/`, ni dependencia.
+- [ ] **Tests de `api.ts`**: faltan `stores`, `catalogs` y `profile`; `products` solo tiene paginación.
+- [ ] **Manual e informe**: `docs/manual/USO-POR-ROL.md` es una guía rápida; el informe tiene corte al 26 oct.
+
+### 10.4 Convenciones que cambiaron
+
+- **Numeración:** desde 0019 se usa timestamp completo (`YYYYMMDDHHMMSS`). Los prefijos cortos 0015-0018 son históricos. `0016` nunca se creó.
+- **Dos "0040":** `ranking_productos` y `limites_texto` comparten número corto pero no timestamp.
+- **Grants:** deny-by-default; toda migración nueva trae su `GRANT EXECUTE` explícito.
+- **Migraciones aplicadas no se editan:** cambio de esquema = archivo nuevo.
