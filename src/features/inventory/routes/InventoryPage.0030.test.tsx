@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as productsApi from "../../products/api";
+import * as profileApi from "../../profile/api";
 import * as inventoryApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { InventoryPage } from "./InventoryPage";
@@ -24,6 +25,7 @@ vi.mock("../api", () => ({
   deleteMovementTemplate: vi.fn(),
   reverseMovement: vi.fn(),
   setPrice: vi.fn(),
+  setStorePricesBulk: vi.fn(),
 }));
 vi.mock("../../products/api", () => ({
   fetchProductCategories: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock("../../products/api", () => ({
   fetchStoreRelationPrices: vi.fn(),
   fetchDistributorCatalog: vi.fn(),
   fetchStorePurchasePrices: vi.fn(),
+  fetchStoreProductMargins: vi.fn(),
   removeStoreProduct: vi.fn(),
   removeDistributorCatalogProduct: vi.fn(),
   setStoreProductShortage: vi.fn(),
@@ -45,6 +48,9 @@ vi.mock("../../products/api", () => ({
   addStoreProduct: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   createProduct: vi.fn(),
+}));
+vi.mock("../../profile/api", () => ({
+  fetchMyMargin: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -133,8 +139,10 @@ beforeEach(() => {
   }));
   vi.mocked(productsApi.fetchStoreRelationPrices).mockImplementation(async () => ({
     data: [
-      { product_id: 2, sale_price: salePrice, purchase_price: purchasePrice },
-      ...(added ? [{ product_id: 3, sale_price: 2500, purchase_price: null }] : []),
+      { product_id: 2, sale_price: salePrice, purchase_price: purchasePrice, margin_pct: null },
+      ...(added
+        ? [{ product_id: 3, sale_price: 2500, purchase_price: null, margin_pct: null }]
+        : []),
     ],
     error: null,
   }));
@@ -162,6 +170,11 @@ beforeEach(() => {
     data: new Map([[2, purchasePrice]]),
     error: null,
   }));
+  vi.mocked(profileApi.fetchMyMargin).mockResolvedValue({ data: null, error: null });
+  vi.mocked(productsApi.fetchStoreProductMargins).mockResolvedValue({
+    data: new Map<number, number>(),
+    error: null,
+  });
   vi.mocked(productsApi.updateStoreProductFull).mockImplementation(
     async (
       _storeId: number,

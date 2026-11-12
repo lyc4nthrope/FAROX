@@ -14,12 +14,14 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { MovementList } from "../components/MovementList";
+import { BulkPriceEditor, type BulkPriceLine } from "../components/BulkPriceEditor";
 import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
 import { sortBySalesRanking } from "../ranking";
 import { EmptyState, PremiumLock, ProductPicker, SectionIcon, type ProductPickerOption } from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
-import { fetchStorePurchasePrices } from "../../products/api";
+import { fetchStoreProductMargins, fetchStorePurchasePrices } from "../../products/api";
+import { fetchMyMargin } from "../../profile/api";
 import {
   fetchMotives,
   fetchMovements,
@@ -34,6 +36,7 @@ import {
   saveMovementTemplate,
   reverseMovement,
   setPrice,
+  setStorePricesBulk,
   type MovementProductOption,
   type MovementRow,
 } from "../api";
@@ -158,7 +161,7 @@ function Icon({ children }: { children: ReactNode }) {
 }
 
 type InventoryTab = "products" | "movements" | "prices";
-type ModalKind = "movement" | "price";
+type ModalKind = "movement" | "price" | "bulkPrice";
 
 const TABS: readonly { id: InventoryTab; label: string; icon: string }[] = [
   { id: "products", label: "Productos", icon: "/products" },
@@ -244,7 +247,7 @@ function InventoryTabBar({
 /** /inventario/:storeId — productos/asignación, movimientos y precios. */
 export function InventoryPage() {
   const storeId = Number(useParams().storeId);
-  const { role, premium } = useAuth();
+  const { role, premium, userId } = useAuth();
   const isAdmin = role === "admin";
 
   const storeName = useLoad(() => fetchStoreName(storeId), [storeId]);
@@ -253,9 +256,16 @@ export function InventoryPage() {
   const prices = useLoad(() => fetchPrices(storeId), [storeId]);
   // 0030: coste privado de la tienda (tabla con RLS operator/admin).
   const purchasePrices = useLoad(() => fetchStorePurchasePrices(storeId), [storeId]);
+  // 0046: excepciones de margen por producto para la carga masiva.
+  const storeMargins = useLoad(() => fetchStoreProductMargins(storeId), [storeId]);
   const motives = useLoad(() => fetchMotives(), []);
   // 0040: ranking por ventas para ordenar el ticket.
   const ranking = useLoad(() => fetchMovementRanking({ storeId }), [storeId]);
+  // 0045: margen del usuario para sugerir precios en la carga masiva.
+  const margin = useLoad(
+    () => (userId === null ? Promise.resolve({ data: null, error: null }) : fetchMyMargin(userId)),
+    [userId],
+  );
 
   const stockPickerOptions = useMemo<ProductPickerOption[]>(
     () =>
@@ -282,6 +292,7 @@ export function InventoryPage() {
     movements.reload();
     prices.reload();
     purchasePrices.reload();
+    storeMargins.reload();
     ranking.reload();
     setCatalogVersion((value) => value + 1);
   };
@@ -399,6 +410,19 @@ export function InventoryPage() {
     }
   }
 
+  // 0043: guarda la carga masiva. El editor muestra su propio error/aviso; acá
+  // solo se recarga la tienda para que la pestaña quede al día.
+  async function onSaveBulk(lines: readonly BulkPriceLine[]): Promise<string | null> {
+    setBusy(true);
+    try {
+      const error = await runAction(() => setStorePricesBulk(storeId, lines));
+      if (error === null) reloadAll();
+      return error;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onReverse(movement: MovementRow) {
     const reason = window.prompt("Motivo del reverso");
     if (!reason) return;
@@ -445,6 +469,22 @@ export function InventoryPage() {
     prices.data?.find((row) => row.product_id === Number(price.productId)) ?? null;
   const sortedPrices = [...(prices.data ?? [])].sort((a, b) =>
     a.product_name.localeCompare(b.product_name, "es"),
+  );
+
+  // 0043: datos de la carga masiva. Se reutilizan las cargas de la pantalla
+  // para no sumar requests al abrir el diálogo.
+  const salePriceMap = useMemo(
+    () => new Map((prices.data ?? []).map((row) => [row.product_id, row.price])),
+    [prices.data],
+  );
+  const bulkProducts = useMemo(
+    () =>
+      (stockOptions.data ?? []).map((row) => ({
+        id: row.product_id,
+        name: row.product_name,
+        brand: row.brand,
+      })),
+    [stockOptions.data],
   );
 
   const movementForm = (
@@ -761,12 +801,28 @@ export function InventoryPage() {
               <p className="text-xs text-gray-500">Precio de venta publicado para cada producto.</p>
             </div>
             {(isAdmin || premium) && (
-              <button className={buttonClass} type="button" onClick={() => openModal("price")}>
-                <Icon>
-                  <path d="M12 5v14M5 12h14" />
-                </Icon>
-                Publicar precio
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={secondaryButtonClass}
+                  type="button"
+                  onClick={() => openModal("price")}
+                >
+                  <Icon>
+                    <path d="M12 5v14M5 12h14" />
+                  </Icon>
+                  Publicar precio
+                </button>
+                <button
+                  className={buttonClass}
+                  type="button"
+                  onClick={() => openModal("bulkPrice")}
+                >
+                  <Icon>
+                    <path d="M4 7h16M4 12h16M4 17h10" />
+                  </Icon>
+                  Carga masiva
+                </button>
+              </div>
             )}
           </div>
 
@@ -777,7 +833,7 @@ export function InventoryPage() {
                 title="La tienda todavía no tiene precios publicados"
                 hint={
                   isAdmin || premium
-                    ? "Usá «Publicar precio» para cargar el primero."
+                    ? "Usá «Carga masiva» para cargar los precios de todos los productos de una vez."
                     : "Cuando se publiquen precios, van a aparecer acá."
                 }
               />
@@ -830,6 +886,42 @@ export function InventoryPage() {
         <Modal title="Publicar precio" size="sm" onClose={() => setModal(null)}>
           <Status error={msg.error} />
           {priceForm}
+        </Modal>
+      )}
+
+      {modal === "bulkPrice" && (
+        <Modal title="Carga masiva de precios" size="lg" onClose={() => setModal(null)}>
+          {stockOptions.data !== null && prices.data !== null && purchasePrices.data !== null ? (
+            <>
+              {(bulkProducts.length >= 500 ||
+                salePriceMap.size >= 500 ||
+                purchasePrices.data.size >= 500) && (
+                <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Se cargan hasta 500 productos y precios. Si la tienda tiene más, algunos productos
+                  o precios pueden quedar fuera de esta tabla.
+                </p>
+              )}
+              <BulkPriceEditor
+                products={bulkProducts}
+                purchasePrices={purchasePrices.data}
+                salePrices={salePriceMap}
+                marginPct={margin.data}
+                marginOverrides={storeMargins.data ?? undefined}
+                busy={busy}
+                onSave={onSaveBulk}
+              />
+            </>
+          ) : (
+            <Status
+              loading={stockOptions.loading || prices.loading || purchasePrices.loading}
+              error={
+                stockOptions.error ??
+                prices.error ??
+                purchasePrices.error ??
+                "No se pudieron cargar los precios de la tienda."
+              }
+            />
+          )}
         </Modal>
       )}
     </section>

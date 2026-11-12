@@ -103,9 +103,7 @@ function normalizeRow(raw: Record<string, unknown>): ProductRow {
   };
 }
 
-export async function fetchProducts(
-  query: ListQuery,
-): Promise<ListResult<ProductListRow>> {
+export async function fetchProducts(query: ListQuery): Promise<ListResult<ProductListRow>> {
   const { from, to } = pageRange(query);
   const { data, count, error } = await supabase
     .from("products")
@@ -124,11 +122,7 @@ export async function fetchProducts(
 export async function fetchProduct(
   id: number,
 ): Promise<{ row: ProductRow | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("products")
-    .select(FORM_SELECT)
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("products").select(FORM_SELECT).eq("id", id).single();
   if (error !== null) {
     return { row: null, error };
   }
@@ -152,9 +146,7 @@ async function fetchCatalog(
     return { rows: [], error };
   }
   const rows = Array.isArray(data)
-    ? data
-        .map(normalizeCatalogRef)
-        .filter((ref): ref is CatalogRef => ref !== null)
+    ? data.map(normalizeCatalogRef).filter((ref): ref is CatalogRef => ref !== null)
     : [];
   return { rows, error: null };
 }
@@ -280,14 +272,8 @@ export async function deactivateProduct(
 // Paso 2: DELETE sobre la fila YA desactivada (0006:156-158). Un operador que
 // lo fuerce recibe 0 filas ⇒ RLS_NO_ROWS amigable; el control ni se ofrece
 // (SEC-01 idea:113 "✘ eliminar", idea:134 — ocultar es UX, la DB manda).
-export async function deleteProduct(
-  id: number,
-): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", id)
-    .select("id");
+export async function deleteProduct(id: number): Promise<{ error: { message: string } | null }> {
+  const { data, error } = await supabase.from("products").delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }
@@ -331,6 +317,7 @@ function normalizeCatalogEntry(
   expiryDate: string | null = null,
   purchasePrice: number | null = null,
   salePrice: number | null = null,
+  marginPct: number | null = null,
 ): CatalogEntry {
   const embedded = raw.product;
   const product =
@@ -352,6 +339,7 @@ function normalizeCatalogEntry(
     expiry_date: expiryDate,
     purchase_price: purchasePrice,
     sale_price: salePrice,
+    margin_pct: marginPct,
   };
 }
 
@@ -359,6 +347,13 @@ function normalizeOptionalPrice(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const price = typeof value === "number" ? value : Number(value);
   return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+/** 0046: porcentaje 0–1000; 0 es válido (no sugerir) y no debe perderse. */
+function normalizeOptionalPercent(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const percent = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(percent) && percent >= 0 ? percent : null;
 }
 
 function normalizeShortageRow(raw: Record<string, unknown>): ShortageRow {
@@ -469,7 +464,7 @@ export async function fetchDistributorCatalog(
   let request = supabase
     .from("distributor_products")
     .select(
-      `product_id, quantity, threshold, expiry_date, purchase_price, sale_price, ${CATALOG_PRODUCT_SELECT}`,
+      `product_id, quantity, threshold, expiry_date, purchase_price, sale_price, margin_pct, ${CATALOG_PRODUCT_SELECT}`,
       {
         count: "planned",
       },
@@ -495,9 +490,74 @@ export async function fetchDistributorCatalog(
       typeof raw.expiry_date === "string" ? raw.expiry_date : null,
       normalizeOptionalPrice(raw.purchase_price),
       normalizeOptionalPrice(raw.sale_price),
+      normalizeOptionalPercent(raw.margin_pct),
     ),
   );
   return { rows, count, error: null };
+}
+
+/** 0047: catálogo completo del distribuidor para la carga masiva de precios. */
+export interface DistributorPriceOption {
+  id: number;
+  name: string;
+  brand: string | null;
+  purchasePrice: number | null;
+  salePrice: number | null;
+  marginPct: number | null;
+}
+
+export async function fetchDistributorPriceOptions(): Promise<
+  LoadResult<DistributorPriceOption[]>
+> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select(
+      "product_id,purchase_price,sale_price,margin_pct,product:products!inner(name,brand:brands(name))",
+    )
+    .order("product_id")
+    .limit(500);
+  if (error !== null) return { data: null, error };
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) => {
+    const product = normalizeListRow(
+      typeof raw.product === "object" && raw.product !== null
+        ? (raw.product as Record<string, unknown>)
+        : { id: raw.product_id },
+    );
+    return {
+      id: normalizeId(raw.product_id),
+      name: product.name,
+      brand: product.brand?.name ?? null,
+      purchasePrice: normalizeOptionalPrice(raw.purchase_price),
+      salePrice: normalizeOptionalPrice(raw.sale_price),
+      marginPct: normalizeOptionalPercent(raw.margin_pct),
+    };
+  });
+  return { data: rows, error: null };
+}
+
+/** 0047: línea de la carga masiva del distribuidor. */
+export interface DistributorPriceLineInput {
+  productId: number;
+  purchasePrice: number | null;
+  salePrice: number | null;
+  writePurchase: boolean;
+  writeSale: boolean;
+}
+
+/** 0047: guarda el lote del distribuidor en UNA transacción. */
+export async function setDistributorPricesBulk(
+  lines: readonly DistributorPriceLineInput[],
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_distributor_prices_bulk", {
+    p_lines: lines.map((line) => ({
+      product_id: line.productId,
+      purchase_price: line.purchasePrice,
+      sale_price: line.salePrice,
+      set_purchase: line.writePurchase,
+      set_sale: line.writeSale,
+    })),
+  });
+  return { error };
 }
 
 // Registro global para elegir qué agregar. Solo productos activos, paginado:
@@ -560,9 +620,7 @@ export async function fetchDistributorProductIds(): Promise<LoadResult<number[]>
     .from("distributor_products")
     .select("product_id")
     .limit(1000);
-  const ids = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
-    normalizeId(raw.product_id),
-  );
+  const ids = ((data ?? []) as Record<string, unknown>[]).map((raw) => normalizeId(raw.product_id));
   return { data: ids, error };
 }
 
@@ -634,30 +692,40 @@ export interface StoreRelationPriceRow {
   product_id: number;
   sale_price: number | null;
   purchase_price: number | null;
+  /** 0046: excepción de margen por producto (null = usar el general; 0 = no sugerir). */
+  margin_pct: number | null;
 }
 
 /**
- * 0030: precios de la relación tienda↔producto. La venta sale de
- * price_publications (histórico activo) y la compra de store_product_prices
- * (tabla privada de la tienda). Se piden juntos para el modal.
+ * 0030/0046: relación tienda↔producto. Venta (price_publications activa),
+ * compra (store_product_prices) y margen propio (store_product_margins). Se
+ * piden juntos para el modal; cualquier fila de cualquiera de las tres aparece.
  */
 export async function fetchStoreRelationPrices(
   storeId: number,
 ): Promise<LoadResult<StoreRelationPriceRow[]>> {
-  const [sales, purchases] = await Promise.all([
+  const [sales, purchases, margins] = await Promise.all([
     supabase
       .from("price_publications")
       .select("product_id,price")
       .eq("store_id", storeId)
       .eq("is_active", true)
+      .order("product_id")
       .limit(500),
     supabase
       .from("store_product_prices")
       .select("product_id,purchase_price")
       .eq("store_id", storeId)
+      .order("product_id")
+      .limit(500),
+    supabase
+      .from("store_product_margins")
+      .select("product_id,margin_pct")
+      .eq("store_id", storeId)
+      .order("product_id")
       .limit(500),
   ]);
-  const error = sales.error ?? purchases.error;
+  const error = sales.error ?? purchases.error ?? margins.error;
   if (error !== null) {
     return { data: null, error };
   }
@@ -668,6 +736,7 @@ export async function fetchStoreRelationPrices(
       product_id: productId,
       sale_price: normalizeOptionalPrice(raw.price),
       purchase_price: null,
+      margin_pct: null,
     });
   }
   for (const raw of (purchases.data ?? []) as Record<string, unknown>[]) {
@@ -677,9 +746,64 @@ export async function fetchStoreRelationPrices(
       product_id: productId,
       sale_price: current?.sale_price ?? null,
       purchase_price: normalizeOptionalPrice(raw.purchase_price),
+      margin_pct: current?.margin_pct ?? null,
+    });
+  }
+  for (const raw of (margins.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    const current = rows.get(productId);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: current?.sale_price ?? null,
+      purchase_price: current?.purchase_price ?? null,
+      margin_pct: normalizeOptionalPercent(raw.margin_pct),
     });
   }
   return { data: [...rows.values()], error: null };
+}
+
+/** 0046: excepción de margen de la tienda por producto para la carga masiva. */
+export async function fetchStoreProductMargins(
+  storeId: number,
+): Promise<LoadResult<Map<number, number>>> {
+  const { data, error } = await supabase
+    .from("store_product_margins")
+    .select("product_id,margin_pct")
+    .eq("store_id", storeId)
+    .order("product_id")
+    .limit(500);
+  const margins = new Map<number, number>();
+  for (const raw of (data ?? []) as Record<string, unknown>[]) {
+    const margin = normalizeOptionalPercent(raw.margin_pct);
+    if (margin !== null) margins.set(normalizeId(raw.product_id), margin);
+  }
+  return { data: margins, error };
+}
+
+/** 0046: margen propio de un producto de la tienda. null lo borra. */
+export async function setStoreProductMargin(
+  storeId: number,
+  productId: number,
+  margin: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_store_product_margin", {
+    p_product: productId,
+    p_store: storeId,
+    p_margin: margin,
+  });
+  return { error };
+}
+
+/** 0046: margen propio de un producto del catálogo del distribuidor. */
+export async function setDistributorProductMargin(
+  productId: number,
+  margin: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_distributor_product_margin", {
+    p_product: productId,
+    p_margin: margin,
+  });
+  return { error };
 }
 
 /** 0030: precio de compra de la tienda por producto (para estimar entradas). */
@@ -690,6 +814,7 @@ export async function fetchStorePurchasePrices(
     .from("store_product_prices")
     .select("product_id,purchase_price")
     .eq("store_id", storeId)
+    .order("product_id")
     .limit(500);
   const prices = new Map<number, number>();
   for (const raw of (data ?? []) as Record<string, unknown>[]) {

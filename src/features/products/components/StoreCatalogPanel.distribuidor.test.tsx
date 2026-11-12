@@ -17,6 +17,10 @@ vi.mock("../api", () => ({
   updateStoreProduct: vi.fn(),
   updateStoreProductFull: vi.fn(),
   updateDistributorProductRelation: vi.fn(),
+  setStoreProductMargin: vi.fn(),
+  setDistributorProductMargin: vi.fn(),
+  fetchDistributorPriceOptions: vi.fn(),
+  setDistributorPricesBulk: vi.fn(),
   fetchActiveProductsForCatalog: vi.fn(),
   addStoreProduct: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
@@ -137,19 +141,11 @@ describe("StoreCatalogPanel · modo distribuidor (S15/S21)", () => {
 
     expect(within(dialog).getByText("Cantidad que poseo")).toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Nombre")).not.toBeInTheDocument();
-    expect(
-      within(dialog).getByText(/genera una alerta de stock/),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText(/genera una alerta de caducidad/i),
-    ).toBeInTheDocument();
-    expect(
-      within(dialog).getByText("Los precios de compra y venta son una función Premium."),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/Vacío: avisa al llegar a 0\./)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Vencimiento (opcional)")).toBeInTheDocument();
+    expect(within(dialog).getByText("Los precios son una función Premium.")).toBeInTheDocument();
 
-    await user.click(
-      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }));
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
 
     await waitFor(() =>
@@ -189,6 +185,54 @@ describe("StoreCatalogPanel · modo distribuidor (S15/S21)", () => {
         3000,
         5000,
       ),
+    );
+  });
+
+  it("abre la carga masiva y guarda el lote del distribuidor (0047)", async () => {
+    vi.mocked(productsApi.fetchDistributorPriceOptions).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          name: "Arroz Diana",
+          brand: "Diana",
+          purchasePrice: 1000,
+          salePrice: null,
+          marginPct: null,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(productsApi.setDistributorPricesBulk).mockResolvedValue({ error: null });
+
+    render(
+      <StoreCatalogPanel
+        kind="distribuidor"
+        storeId={0}
+        storeName="mi distribuidora"
+        canSetPrice
+        marginPct={50}
+      />,
+    );
+    const user = userEvent.setup();
+
+    await screen.findByText("Arroz Diana");
+    await user.click(screen.getByRole("button", { name: "Carga masiva" }));
+    const dialog = await screen.findByRole("dialog", { name: "Carga masiva de precios" });
+    const sale = await within(dialog).findByLabelText("Precio de venta de Arroz Diana");
+    await user.clear(sale);
+    await user.type(sale, "1500");
+    await user.click(within(dialog).getByRole("button", { name: /guardar cambios \(1\)/i }));
+
+    await waitFor(() =>
+      expect(productsApi.setDistributorPricesBulk).toHaveBeenCalledWith([
+        {
+          productId: 1,
+          purchasePrice: null,
+          salePrice: 1500,
+          writePurchase: false,
+          writeSale: true,
+        },
+      ]),
     );
   });
 

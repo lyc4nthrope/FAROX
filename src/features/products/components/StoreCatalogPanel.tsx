@@ -1,20 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
 import { formatQty } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { DataTable, QuantityStepper, type DataTableColumn } from "../../../shared/ui";
-import { Badge, Status, buttonClass, inputClass, runAction, secondaryButtonClass } from "../../../shared/ui/Box";
+import {
+  Badge,
+  Status,
+  buttonClass,
+  inputClass,
+  runAction,
+  secondaryButtonClass,
+} from "../../../shared/ui/Box";
 import { Modal } from "../../../shared/ui/Modal";
 import { Pager } from "../../../shared/ui/Pager";
+import { BulkPriceEditor, type BulkPriceLine } from "../../inventory/components/BulkPriceEditor";
 import {
   fetchDistributorCatalog,
+  fetchDistributorPriceOptions,
   fetchProductCategories,
   fetchStoreCatalog,
   fetchStoreRelationPrices,
   removeDistributorCatalogProduct,
   removeStoreProduct,
+  setDistributorPricesBulk,
+  setDistributorProductMargin,
+  setStoreProductMargin,
   setStoreProductShortage,
   updateDistributorProductRelation,
   updateStoreProductFull,
@@ -37,7 +49,14 @@ const INITIAL_QUERY: CatalogQuery = {
   onlyShortage: false,
 };
 
-const EMPTY_EDIT = { quantity: "", threshold: "", expiry: "", purchasePrice: "", salePrice: "" };
+const EMPTY_EDIT = {
+  quantity: "",
+  threshold: "",
+  expiry: "",
+  purchasePrice: "",
+  salePrice: "",
+  margin: "",
+};
 
 type EditDraft = typeof EMPTY_EDIT;
 
@@ -99,6 +118,7 @@ export function StoreCatalogPanel({
   storeName,
   reloadToken = 0,
   canSetPrice = false,
+  marginPct = null,
   onChanged,
 }: {
   kind?: "store" | "distribuidor";
@@ -108,21 +128,24 @@ export function StoreCatalogPanel({
   reloadToken?: number;
   /** 0027/0030: Premium/admin puede editar los precios de la relación. */
   canSetPrice?: boolean;
+  /** 0047: margen general del usuario para la carga masiva del distribuidor. */
+  marginPct?: number | null;
   onChanged?: () => void;
 }) {
   const isStore = kind === "store";
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<CatalogEntry | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>(EMPTY_EDIT);
+  const [editingMargin, setEditingMargin] = useState<string>("");
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [busy, setBusy] = useState<{ id: number; action: RowAction } | null>(null);
   const [msg, setMsg] = useState<Msg>(NO_MSG);
 
   const list = useList<CatalogEntry, CatalogQuery>(
-    (query) =>
-      isStore ? fetchStoreCatalog(storeId, query) : fetchDistributorCatalog(query),
+    (query) => (isStore ? fetchStoreCatalog(storeId, query) : fetchDistributorCatalog(query)),
     INITIAL_QUERY,
   );
 
@@ -130,11 +153,49 @@ export function StoreCatalogPanel({
   // activo). Se carga aparte para el modal; el distribuidor lo trae en la fila.
   const relationPrices = useLoad(
     () =>
-      isStore
-        ? fetchStoreRelationPrices(storeId)
-        : Promise.resolve({ data: [], error: null }),
+      isStore ? fetchStoreRelationPrices(storeId) : Promise.resolve({ data: [], error: null }),
     [isStore, storeId],
   );
+
+  // 0047: catálogo completo del distribuidor para la carga masiva. Se pide solo
+  // con el diálogo abierto para no sumar egress a la pantalla.
+  const bulkOptions = useLoad(
+    () =>
+      bulkOpen && !isStore
+        ? fetchDistributorPriceOptions()
+        : Promise.resolve({ data: null, error: null }),
+    [bulkOpen, isStore],
+  );
+  const bulkProducts = useMemo(
+    () =>
+      (bulkOptions.data ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        brand: row.brand,
+      })),
+    [bulkOptions.data],
+  );
+  const bulkPurchasePrices = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of bulkOptions.data ?? []) {
+      if (row.purchasePrice !== null) map.set(row.id, row.purchasePrice);
+    }
+    return map;
+  }, [bulkOptions.data]);
+  const bulkSalePrices = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of bulkOptions.data ?? []) {
+      if (row.salePrice !== null) map.set(row.id, row.salePrice);
+    }
+    return map;
+  }, [bulkOptions.data]);
+  const bulkMarginOverrides = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of bulkOptions.data ?? []) {
+      if (row.marginPct !== null) map.set(row.id, row.marginPct);
+    }
+    return map;
+  }, [bulkOptions.data]);
 
   const categories = useLoad<CatalogRef[]>(async () => {
     const result = await fetchProductCategories();
@@ -220,20 +281,21 @@ export function StoreCatalogPanel({
 
   function openEdit(row: CatalogEntry): void {
     const relation = relationPrices.data?.find((price) => price.product_id === row.id);
-    const activeSalePrice = isStore
-      ? (relation?.sale_price ?? null)
-      : (row.sale_price ?? null);
+    const activeSalePrice = isStore ? (relation?.sale_price ?? null) : (row.sale_price ?? null);
     const purchasePrice = isStore
       ? (relation?.purchase_price ?? null)
       : (row.purchase_price ?? null);
+    const margin = isStore ? (relation?.margin_pct ?? null) : (row.margin_pct ?? null);
     setEditing(row);
     setEditError(null);
+    setEditingMargin(margin == null ? "" : String(margin));
     setEditDraft({
       quantity: String(row.quantity ?? 0),
       threshold: row.threshold == null ? "" : String(row.threshold),
       expiry: row.expiry_date ?? "",
       purchasePrice: purchasePrice == null ? "" : String(purchasePrice),
       salePrice: activeSalePrice == null ? "" : String(activeSalePrice),
+      margin: margin == null ? "" : String(margin),
     });
   }
 
@@ -242,6 +304,24 @@ export function StoreCatalogPanel({
     if (trimmed === "") return null;
     const value = Number(trimmed);
     return Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  /** 0046: null = usar el general; 0 = no sugerir; "invalid" = fuera de rango. */
+  function parseMargin(raw: string): number | null | "invalid" {
+    const trimmed = raw.trim();
+    if (trimmed === "") return null;
+    const value = Number(trimmed);
+    if (!Number.isFinite(value) || value < 0 || value > 1000) return "invalid";
+    return Math.round(value * 100) / 100;
+  }
+
+  async function saveBulkPrices(lines: readonly BulkPriceLine[]): Promise<string | null> {
+    const error = await runAction(() => setDistributorPricesBulk(lines));
+    if (error === null) {
+      refetch();
+      onChanged?.();
+    }
+    return error;
   }
 
   async function saveEdit(): Promise<void> {
@@ -263,6 +343,7 @@ export function StoreCatalogPanel({
     }
     const purchasePrice = canSetPrice ? parsePrice(editDraft.purchasePrice) : null;
     const salePrice = canSetPrice ? parsePrice(editDraft.salePrice) : null;
+    const margin = canSetPrice ? parseMargin(editDraft.margin) : null;
     if (canSetPrice && editDraft.purchasePrice.trim() !== "" && purchasePrice === null) {
       setEditError("El precio de compra debe ser mayor a 0.");
       return;
@@ -271,8 +352,27 @@ export function StoreCatalogPanel({
       setEditError("El precio de venta debe ser mayor a 0.");
       return;
     }
+    if (margin === "invalid") {
+      setEditError("El margen debe estar entre 0 y 1000.");
+      return;
+    }
     const expiryDate = editDraft.expiry === "" ? null : editDraft.expiry;
     setSavingEdit(true);
+    // 0046: el margen propio se guarda aparte y primero; si falla, no se toca
+    // el resto de la relación.
+    if (canSetPrice && editDraft.margin.trim() !== editingMargin.trim()) {
+      const marginError = await runAction(() =>
+        isStore
+          ? setStoreProductMargin(storeId, row.id, margin)
+          : setDistributorProductMargin(row.id, margin),
+      );
+      if (marginError !== null) {
+        setSavingEdit(false);
+        setEditError(marginError);
+        return;
+      }
+      setEditingMargin(editDraft.margin.trim());
+    }
     const error = await runAction(() =>
       isStore
         ? updateStoreProductFull(
@@ -306,8 +406,7 @@ export function StoreCatalogPanel({
     onChanged?.();
   }
 
-  const filtered =
-    list.query.q !== "" || list.query.categoryId !== null || list.query.onlyShortage;
+  const filtered = list.query.q !== "" || list.query.categoryId !== null || list.query.onlyShortage;
 
   const columns: DataTableColumn<CatalogEntry>[] = [
     {
@@ -342,9 +441,7 @@ export function StoreCatalogPanel({
           {
             key: "expiry",
             header: "Vence",
-            render: (row) => (
-              <span className="whitespace-nowrap">{row.expiry_date ?? "—"}</span>
-            ),
+            render: (row) => <span className="whitespace-nowrap">{row.expiry_date ?? "—"}</span>,
           },
         ] satisfies DataTableColumn<CatalogEntry>[])
       : ([
@@ -458,6 +555,15 @@ export function StoreCatalogPanel({
           >
             Agregar productos
           </button>
+          {!isStore && canSetPrice && (
+            <button
+              className={`${secondaryButtonClass} whitespace-normal text-center leading-tight`}
+              type="button"
+              onClick={() => setBulkOpen(true)}
+            >
+              Carga masiva
+            </button>
+          )}
         </div>
       </div>
 
@@ -559,53 +665,46 @@ export function StoreCatalogPanel({
       {editing !== null && (
         <Modal title={`Editar ${editing.name}`} onClose={() => setEditing(null)}>
           <Status error={editError} />
-          {isStore && (
-            <Status loading={relationPrices.loading} error={relationPrices.error} />
-          )}
-          <div className="space-y-4">
-            <div>
-              <span className="block text-sm font-medium text-gray-700">
-                {isStore ? "Cantidad en stock" : "Cantidad que poseo"}
-              </span>
-              <div className="mt-1.5">
-                <QuantityStepper
-                  label={editing.name}
-                  value={editDraft.quantity}
-                  min={0}
-                  onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
-                />
+          {isStore && <Status loading={relationPrices.loading} error={relationPrices.error} />}
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <span className="block text-xs font-semibold tracking-wide text-gray-600">
+                  {isStore ? "Cantidad en stock" : "Cantidad que poseo"}
+                </span>
+                <div className="mt-1">
+                  <QuantityStepper
+                    label={editing.name}
+                    value={editDraft.quantity}
+                    min={0}
+                    onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
+                  />
+                </div>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {isStore
-                  ? "Se ajusta sin registrar un movimiento."
-                  : "Es la existencia propia de tu distribuidora, no la de la tienda."}
-              </p>
+              <label className="block text-sm">
+                <span className="text-xs font-semibold tracking-wide text-gray-600">
+                  {isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"}
+                </span>
+                <input
+                  className={`mt-1 ${inputClass}`}
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  placeholder="Sin umbral"
+                  aria-label={
+                    isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"
+                  }
+                  value={editDraft.threshold}
+                  onChange={(event) =>
+                    setEditDraft({ ...editDraft, threshold: event.target.value })
+                  }
+                />
+                <span className="mt-1 block text-xs text-gray-500">
+                  Vacío: avisa al llegar a 0.
+                </span>
+              </label>
             </div>
-            <label className="block text-sm">
-              <span className="text-xs font-semibold tracking-wide text-gray-600">
-                {isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"}
-              </span>
-              <input
-                className={`mt-1 ${inputClass}`}
-                type="number"
-                min="0"
-                step="0.001"
-                placeholder="Sin umbral"
-                aria-label={
-                  isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"
-                }
-                value={editDraft.threshold}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, threshold: event.target.value })
-                }
-              />
-              <span className="mt-1 block text-xs text-gray-500">
-                {isStore
-                  ? "Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0. Con umbral, se activa cuando la cantidad es igual o menor."
-                  : "Con umbral, se genera una alerta de stock (y el aviso «Bajo» en tu catálogo) cuando la cantidad es igual o menor."}
-              </span>
-            </label>
-            <label className="block text-sm">
+            <label className="block text-sm sm:max-w-xs">
               <span className="text-xs font-semibold tracking-wide text-gray-600">
                 Vencimiento (opcional)
               </span>
@@ -614,76 +713,115 @@ export function StoreCatalogPanel({
                 type="date"
                 aria-label="Vencimiento (opcional)"
                 value={editDraft.expiry}
-                onChange={(event) =>
-                  setEditDraft({ ...editDraft, expiry: event.target.value })
-                }
+                onChange={(event) => setEditDraft({ ...editDraft, expiry: event.target.value })}
               />
-              <span className="mt-1 block text-xs text-gray-500">
-                {isStore
-                  ? "Alimenta la alerta de caducidad de la tienda."
-                  : "Genera una alerta de caducidad si tenés cantidad y vence en 15 días o menos; también muestra «Vence»."}
-              </span>
             </label>
             {canSetPrice ? (
-              <div className="grid gap-3 border-t border-gray-100 pt-4 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-xs font-semibold tracking-wide text-gray-600">
-                    Precio de compra (COP)
-                  </span>
-                  <input
-                    className={`mt-1 ${inputClass}`}
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="Opcional"
-                    aria-label="Precio de compra (COP)"
-                    value={editDraft.purchasePrice}
-                    onChange={(event) =>
-                      setEditDraft({ ...editDraft, purchasePrice: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-xs font-semibold tracking-wide text-gray-600">
-                    Precio de venta (COP)
-                  </span>
-                  <input
-                    className={`mt-1 ${inputClass}`}
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    placeholder="Opcional"
-                    aria-label="Precio de venta (COP)"
-                    value={editDraft.salePrice}
-                    onChange={(event) =>
-                      setEditDraft({ ...editDraft, salePrice: event.target.value })
-                    }
-                  />
-                </label>
-                <p className="text-xs text-gray-500 sm:col-span-2">
-                  Se usan para estimar el precio al registrar movimientos o pedidos; siempre podés
-                  cambiarlo en esa operación.
+              <div className="border-t border-gray-100 pt-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="block text-sm">
+                    <span className="text-xs font-semibold tracking-wide text-gray-600">
+                      Precio de compra (COP)
+                    </span>
+                    <input
+                      className={`mt-1 ${inputClass}`}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Opcional"
+                      aria-label="Precio de compra (COP)"
+                      value={editDraft.purchasePrice}
+                      onChange={(event) =>
+                        setEditDraft({ ...editDraft, purchasePrice: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-xs font-semibold tracking-wide text-gray-600">
+                      Precio de venta (COP)
+                    </span>
+                    <input
+                      className={`mt-1 ${inputClass}`}
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="Opcional"
+                      aria-label="Precio de venta (COP)"
+                      value={editDraft.salePrice}
+                      onChange={(event) =>
+                        setEditDraft({ ...editDraft, salePrice: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-xs font-semibold tracking-wide text-gray-600">
+                      Margen propio (%)
+                    </span>
+                    <input
+                      className={`mt-1 ${inputClass}`}
+                      type="number"
+                      min="0"
+                      max="1000"
+                      step="0.01"
+                      placeholder="Opcional"
+                      aria-label="Margen propio (%)"
+                      value={editDraft.margin}
+                      onChange={(event) =>
+                        setEditDraft({ ...editDraft, margin: event.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Opcionales. Margen vacío = general; 0 = no sugerir.
                 </p>
               </div>
             ) : (
-              <p className="border-t border-gray-100 pt-4 text-xs text-gray-500">
-                Los precios de compra y venta son una función Premium.
+              <p className="border-t border-gray-100 pt-3 text-xs text-gray-500">
+                Los precios son una función Premium.
               </p>
             )}
-            <div className="flex flex-wrap gap-2">
-              <button className={buttonClass} type="button" disabled={savingEdit || relationPrices.error !== null || (isStore && relationPrices.loading)} onClick={() => void saveEdit()}>
-                {savingEdit ? "Guardando…" : "Guardar cambios"}
-              </button>
+            <div className="flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
               <button
-                className={secondaryButtonClass}
+                className={`${secondaryButtonClass} w-full sm:w-auto`}
                 type="button"
                 disabled={savingEdit}
                 onClick={() => setEditing(null)}
               >
                 Cancelar
               </button>
+              <button
+                className={`${buttonClass} w-full sm:w-auto`}
+                type="button"
+                disabled={
+                  savingEdit || relationPrices.error !== null || (isStore && relationPrices.loading)
+                }
+                onClick={() => void saveEdit()}
+              >
+                {savingEdit ? "Guardando…" : "Guardar cambios"}
+              </button>
             </div>
           </div>
+        </Modal>
+      )}
+
+      {bulkOpen && !isStore && (
+        <Modal title="Carga masiva de precios" size="lg" onClose={() => setBulkOpen(false)}>
+          {bulkOptions.data === null ? (
+            <Status
+              loading={bulkOptions.loading}
+              error={bulkOptions.error ?? "No se pudo cargar tu catálogo."}
+            />
+          ) : (
+            <BulkPriceEditor
+              products={bulkProducts}
+              purchasePrices={bulkPurchasePrices}
+              salePrices={bulkSalePrices}
+              marginPct={marginPct}
+              marginOverrides={bulkMarginOverrides}
+              onSave={saveBulkPrices}
+            />
+          )}
         </Modal>
       )}
     </div>

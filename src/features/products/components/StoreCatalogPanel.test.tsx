@@ -15,6 +15,10 @@ vi.mock("../api", () => ({
   updateStoreProduct: vi.fn(),
   updateStoreProductFull: vi.fn(),
   updateDistributorProductRelation: vi.fn(),
+  setStoreProductMargin: vi.fn(),
+  setDistributorProductMargin: vi.fn(),
+  fetchDistributorPriceOptions: vi.fn(),
+  setDistributorPricesBulk: vi.fn(),
   // AddProductsPanel (montado dentro del modal) usa estas.
   fetchActiveProductsForCatalog: vi.fn(),
   addStoreProduct: vi.fn(),
@@ -112,9 +116,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     );
     const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
     expect(
-      within(dialog).getByText(
-        /Sin umbral, la alerta de stock se activa cuando la cantidad llega a 0/,
-      ),
+      within(dialog).getByText(/Vacío: avisa al llegar a 0\./),
     ).toBeInTheDocument();
     await user.clear(umbral);
     await user.type(umbral, "8");
@@ -138,7 +140,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
 
   it("Premium edita los precios de compra y venta de la relación de la tienda (0030)", async () => {
     vi.mocked(productsApi.fetchStoreRelationPrices).mockResolvedValue({
-      data: [{ product_id: 1, sale_price: 2500, purchase_price: 1800 }],
+      data: [{ product_id: 1, sale_price: 2500, purchase_price: 1800, margin_pct: null }],
       error: null,
     });
     renderPanel(true);
@@ -166,6 +168,29 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
         2500,
       ),
     );
+  });
+
+  it("guarda el margen propio del producto por RPC (0046)", async () => {
+    vi.mocked(productsApi.fetchStoreRelationPrices).mockResolvedValue({
+      data: [{ product_id: 1, sale_price: 2500, purchase_price: 1800, margin_pct: 40 }],
+      error: null,
+    });
+    vi.mocked(productsApi.setStoreProductMargin).mockResolvedValue({ error: null });
+
+    renderPanel(true);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: "Editar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
+    const margin = within(dialog).getByLabelText("Margen propio (%)");
+    expect(margin).toHaveValue(40);
+
+    await user.clear(margin);
+    await user.type(margin, "60");
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(productsApi.setStoreProductMargin).toHaveBeenCalledWith(10, 1, 60));
+    expect(await screen.findByText('"Arroz Diana" actualizado.')).toBeInTheDocument();
   });
 
   it("cancelar la edición no guarda nada", async () => {

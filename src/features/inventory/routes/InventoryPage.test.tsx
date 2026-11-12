@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as productsApi from "../../products/api";
+import * as profileApi from "../../profile/api";
 import * as inventoryApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { InventoryPage } from "./InventoryPage";
@@ -24,6 +25,7 @@ vi.mock("../api", () => ({
   deleteMovementTemplate: vi.fn(),
   reverseMovement: vi.fn(),
   setPrice: vi.fn(),
+  setStorePricesBulk: vi.fn(),
 }));
 // El catálogo/asignación se prueba en StoreCatalogPanel.test: acá solo importa
 // que Inventario componga la pestaña «Productos».
@@ -32,6 +34,10 @@ vi.mock("../../products/components/StoreCatalogPanel", () => ({
 }));
 vi.mock("../../products/api", () => ({
   fetchStorePurchasePrices: vi.fn(),
+  fetchStoreProductMargins: vi.fn(),
+}));
+vi.mock("../../profile/api", () => ({
+  fetchMyMargin: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -86,6 +92,11 @@ beforeEach(() => {
   vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({ data: [], error: null });
   vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({ data: [], error: null });
   vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
+    data: new Map<number, number>(),
+    error: null,
+  });
+  vi.mocked(profileApi.fetchMyMargin).mockResolvedValue({ data: null, error: null });
+  vi.mocked(productsApi.fetchStoreProductMargins).mockResolvedValue({
     data: new Map<number, number>(),
     error: null,
   });
@@ -157,6 +168,94 @@ describe("InventoryPage · pestañas", () => {
     await user.click(screen.getByRole("button", { name: "Publicar precio" }));
 
     expect(await screen.findByRole("dialog", { name: "Publicar precio" })).toBeInTheDocument();
+  });
+
+  it("la carga masiva abre la tabla editable de precios de la tienda", async () => {
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /precios/i }));
+    await user.click(await screen.findByRole("button", { name: "Carga masiva" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Carga masiva de precios" });
+    expect(
+      await within(dialog).findByText("La tienda no tiene productos asignados."),
+    ).toBeInTheDocument();
+  });
+
+  it("la carga masiva ofrece aplicar el margen del usuario (0045)", async () => {
+    vi.mocked(profileApi.fetchMyMargin).mockResolvedValue({ data: 50, error: null });
+    vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
+      data: [{ product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 10 }],
+      error: null,
+    });
+    vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
+      data: new Map([[1, 1000]]),
+      error: null,
+    });
+
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /precios/i }));
+    await user.click(await screen.findByRole("button", { name: "Carga masiva" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Carga masiva de precios" });
+    expect(
+      await within(dialog).findByRole("button", { name: "Aplicar margen (50%)" }),
+    ).toBeInTheDocument();
+  });
+
+  it("un operador free no ve ni la carga masiva ni publicar precio", async () => {
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "operador", premium: false });
+
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /precios/i }));
+
+    expect(screen.queryByRole("button", { name: "Carga masiva" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Publicar precio" })).not.toBeInTheDocument();
+  });
+
+  it("guarda la carga masiva con solo la fila y la columna tocadas", async () => {
+    vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
+      data: [{ product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 10 }],
+      error: null,
+    });
+    vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({
+      data: [{ product_id: 1, product_name: "Arroz Diana", price: 2000, currency: "COP" }],
+      error: null,
+    });
+    vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
+      data: new Map([[1, 1200]]),
+      error: null,
+    });
+    vi.mocked(inventoryApi.setStorePricesBulk).mockResolvedValue({ error: null });
+
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /precios/i }));
+    await user.click(await screen.findByRole("button", { name: "Carga masiva" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Carga masiva de precios" });
+    const sale = await within(dialog).findByLabelText("Precio de venta de Arroz Diana");
+    await user.clear(sale);
+    await user.type(sale, "2500");
+    await user.click(within(dialog).getByRole("button", { name: /guardar cambios \(1\)/i }));
+
+    await waitFor(() =>
+      expect(inventoryApi.setStorePricesBulk).toHaveBeenCalledWith(10, [
+        {
+          productId: 1,
+          purchasePrice: null,
+          salePrice: 2500,
+          writePurchase: false,
+          writeSale: true,
+        },
+      ]),
+    );
   });
 });
 

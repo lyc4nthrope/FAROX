@@ -6,6 +6,7 @@ import {
   registerMovement,
   reverseMovement,
   setPrice,
+  setStorePricesBulk,
 } from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
@@ -128,6 +129,64 @@ describe("inventory api — contrato exacto de las RPC", () => {
       motiveId: 1,
       expiryDate: null,
     });
+    expect(result.error).toBe(error);
+  });
+});
+
+describe("inventory api — carga masiva de precios (0043)", () => {
+  it("envía solo las filas indicadas y las columnas tocadas", async () => {
+    await setStorePricesBulk(3, [
+      {
+        productId: 10,
+        purchasePrice: 1200,
+        salePrice: 2500,
+        writePurchase: true,
+        writeSale: true,
+      },
+      {
+        productId: 11,
+        purchasePrice: null,
+        salePrice: 3000,
+        writePurchase: false,
+        writeSale: true,
+      },
+    ]);
+
+    expect(rpc).toHaveBeenCalledWith("set_store_prices_bulk", {
+      p_store: 3,
+      p_lines: [
+        {
+          product_id: 10,
+          purchase_price: 1200,
+          sale_price: 2500,
+          set_purchase: true,
+          set_sale: true,
+        },
+        {
+          product_id: 11,
+          purchase_price: null,
+          sale_price: 3000,
+          set_purchase: false,
+          set_sale: true,
+        },
+      ],
+    });
+  });
+
+  it("devuelve el error crudo si el guardado falla", async () => {
+    const error = { message: "set_store_prices_bulk: publicar precios requiere Premium (D7)" };
+    rpc.mockResolvedValue({ data: null, error });
+
+    const result = await setStorePricesBulk(3, [
+      {
+        productId: 10,
+        purchasePrice: null,
+        salePrice: 2500,
+        writePurchase: false,
+        writeSale: true,
+      },
+    ]);
+
     expect(result.error).toBe(error);
   });
 });

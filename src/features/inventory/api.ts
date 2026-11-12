@@ -437,6 +437,7 @@ export async function fetchPrices(storeId: number): Promise<LoadResult<PriceRow[
     .select("product_id,price,currency,product:products(name)")
     .eq("store_id", storeId)
     .eq("is_active", true)
+    .order("product_id")
     .limit(500);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     product_id: Number(r.product_id),
@@ -500,6 +501,39 @@ export async function setPrice(
     p_store: storeId,
     p_price: price,
     p_currency: "COP",
+  });
+  return { error };
+}
+
+/** 0043: fila de la carga masiva. `null` + el flag en true = borrar ese precio. */
+export interface StorePriceLineInput {
+  productId: number;
+  purchasePrice: number | null;
+  salePrice: number | null;
+  /** Solo se escribe la columna que el usuario tocó. */
+  writePurchase: boolean;
+  writeSale: boolean;
+}
+
+/**
+ * 0043: guarda los precios de compra y venta de varios productos en UNA
+ * transacción. Solo se envían las filas que el usuario cambió, y de cada fila
+ * solo la columna marcada: una celda que el usuario no tocó nunca borra el
+ * precio guardado.
+ */
+export async function setStorePricesBulk(
+  storeId: number,
+  lines: readonly StorePriceLineInput[],
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("set_store_prices_bulk", {
+    p_store: storeId,
+    p_lines: lines.map((line) => ({
+      product_id: line.productId,
+      purchase_price: line.purchasePrice,
+      sale_price: line.salePrice,
+      set_purchase: line.writePurchase,
+      set_sale: line.writeSale,
+    })),
   });
   return { error };
 }
