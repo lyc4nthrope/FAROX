@@ -82,6 +82,10 @@ jobs:
         run: |
           set -euo pipefail
           supabase db start 2>&1 | tee db-start.log
+          # CLI v3 ya no imprime los NOTICE/WARNING de las migraciones. 0012 es
+          # verify-only e idempotente: se re-ejecuta para capturar su salida.
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -f supabase/migrations/20261016000012_verify_hardening.sql 2>&1 | tee -a db-start.log
 
       - name: "Presencia — las 12 aplicaciones deben evidenciarse (protección de DEV-08, D7)"
         run: |
