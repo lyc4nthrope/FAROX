@@ -22,7 +22,7 @@
 | B7 | Precios | 6 | B4 | ✅ Incluye carga masiva, autollenado, margen y costo manual |
 | B8 | Fiado (créditos y pagos) | 7 | C4 | ✅ Bajo `src/features/orders` (`CreditsPage`) |
 | B9 | Despliegue del front (Azure SWA) | 7–8 | B0.4 | ✅ `deploy-front.yml` + `public/staticwebapp.config.json` |
-| B10 | Baseline + aplicar todo al remoto + verificación final | 9–10 | A0.1, A1, A5, todas | ✅ Historial remoto baselineado hasta 0051 (0001-0048 marcadas, 0049-0051 aplicadas) |
+| B10 | Baseline + aplicar todo al remoto + verificación final | 9–10 | A0.1, A1, A5, todas | ✅ Historial remoto baselineado hasta 0051 (0001-0048 marcadas, 0049-0051 aplicadas); 0052 queda pendiente |
 
 **Notas de actualización (2026-11-12):**
 

@@ -23,7 +23,7 @@
 
 > El plan original es del 23-24 oct. Desde entonces el trabajo se ejecutó integrado y la arquitectura del asistente cambió: **n8n fue reemplazado por Edge Functions** (`agent` + `whatsapp-webhook`). Las secciones §3.2, §3.3, §6 y §7 se conservan como registro histórico; lo que sigue describe lo que existe hoy y lo que falta.
 
-**Producto:** MVP funcional desplegado en Azure Static Web Apps, con Supabase como backend. Las 51 migraciones llegan hasta `20261112205203_agent_whatsapp_fix.sql`; el historial remoto quedó baselineado hasta esa versión.
+**Producto:** MVP funcional desplegado en Azure Static Web Apps, con Supabase como backend. Los 52 archivos de migración llegan hasta `20261113021000_agent_wrappers_volatile.sql`; el historial remoto está baselineado hasta 0051 y 0052 queda pendiente de aplicar.
 
 | Área | Estado | Qué existe |
 |---|---|---|

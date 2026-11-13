@@ -1,6 +1,6 @@
 # FAROX — Migraciones Supabase (Sprint 1)
 
-> **Estado al 2026-11-12:** este README describe el Sprint 1 (0001-0012) y se conserva como registro. El esquema vigente llega a **0051**; la lista completa y el orden real viven en `supabase/migrations/`. Ver "Migraciones 0013-0051" abajo.
+> **Estado al 2026-11-12:** este README describe el Sprint 1 (0001-0012) y se conserva como registro. El esquema vigente llega a **0052**; la lista completa y el orden real viven en `supabase/migrations/`. Ver "Migraciones 0013-0052" abajo.
 
 Materialización del esquema según `Base de datos FAROX.md` (documento **autoridad**).
 12 migraciones numeradas que se ejecutan **en orden estricto** — el orden numérico
@@ -26,7 +26,7 @@ son el hardening de `sprint1-hardening` y comparten UNA ventana de mantenimiento
 
 ---
 
-## Migraciones 0013-0051 (estado 2026-11-12)
+## Migraciones 0013-0052 (estado 2026-11-12)
 
 El esquema creció bastante más allá del Sprint 1. Estas son las migraciones posteriores, en orden de filename. El orden real es el timestamp completo; los prefijos cortos se conservan solo como referencia.
 
@@ -43,13 +43,13 @@ El esquema creció bastante más allá del Sprint 1. Estas son las migraciones p
 | 0042 | Teléfono | `phone_verifications`, normalización E.164, unicidad del teléfono verificado |
 | 0043-0047 | Precios | Carga masiva tienda/distribuidor, autollenado, margen global y por producto, costo manual |
 | 0048 | Pulido | Normalización de teléfono, rate limit por hora, batching del dashboard, egreso de chat |
-| 0049-0051 | Asistente fase 2 | `agent_actions`, ejecución única, WhatsApp (`*_for_user`, `whatsapp_inbound`), fix de conversaciones por usuario |
+| 0049-0052 | Asistente fase 2 | `agent_actions`, ejecución única, WhatsApp (`*_for_user`, `whatsapp_inbound`), fix de conversaciones por usuario; 0052 marca los wrappers como VOLATILE |
 
 **Notas:**
 
 - **Dos "0040":** `20261103000040_ranking_productos.sql` y `20261104000040_limites_texto.sql`. No colisionan porque el timestamp completo es distinto, pero el número corto se repite.
 - **0016 no existe:** el `append_chat_reply` planificado nunca se creó. El asistente escribe `assistant`/`tool` desde la Edge Function con `service_role`, después de validar el JWT.
-- **Baseline remoto:** el historial de `supabase_migrations.schema_migrations` se marcó hasta 0048 y luego se aplicaron 0049-0051. `supabase migration list` no debe mostrar diferencias.
+- **Baseline remoto:** el historial de `supabase_migrations.schema_migrations` se marcó hasta 0048 y luego se aplicaron 0049-0051; **0052 queda pendiente**. `supabase migration list` mostrará esa pendiente.
 - **Edge Functions:** `agent` (verify_jwt), `whatsapp-webhook` (verify_jwt=false, valida firma de Meta), `agent-health` (verify_jwt=false, `x-cron-secret`). Deploy: `supabase functions deploy agent`, `supabase functions deploy whatsapp-webhook --no-verify-jwt`.
 
 ---

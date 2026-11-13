@@ -7,7 +7,7 @@
 
 ---
 
-> **Estado al 2026-11-12:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0051**; el índice de cambios y los pendientes vigentes están en §10.
+> **Estado al 2026-11-12:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0052**; el índice de cambios y los pendientes vigentes están en §10.
 
 ## 0. Contexto y origen
 
@@ -998,7 +998,7 @@ END $$;
 | 0042 | Teléfono | `users.phone_verified_at`, `phone_verifications`, `normalize_phone_e164`, `phone_verification_start`, `phone_verification_confirm_whatsapp` |
 | 0043-0047 | Precios | `set_store_prices_bulk`, `set_distributor_prices_bulk`, autollenado desde movimientos, `set_my_margin`, `store_product_margins`, `set_store_product_margin`, costo manual |
 | 0048 | Pulido | Normalización de teléfono, rate limit por hora, `internal_dashboard_upsert`, batching de movimientos |
-| 0049-0051 | Asistente fase 2 | `agent_actions`, `agent_prepare_action`, `agent_execute_action`, `agent_cancel_action`, `internal_set_actor`, `internal_assert_wa_identity`, wrappers `*_for_user`, `whatsapp_inbound` |
+| 0049-0052 | Asistente fase 2 | `agent_actions`, `agent_prepare_action`, `agent_execute_action`, `agent_cancel_action`, `internal_set_actor`, `internal_assert_wa_identity`, wrappers `*_for_user`, `whatsapp_inbound`; 0052 marca los wrappers como VOLATILE |
 
 ### 10.2 Asistente: contrato de seguridad
 
@@ -1018,6 +1018,7 @@ END $$;
 - [ ] **Playwright H1-H4**: no hay `playwright.config.ts`, ni `e2e/`, ni dependencia.
 - [ ] **Tests de `api.ts`**: faltan `stores`, `catalogs` y `profile`; `products` solo tiene paginación.
 - [ ] **Manual e informe**: `docs/manual/USO-POR-ROL.md` es una guía rápida; el informe tiene corte al 26 oct.
+- [ ] **0052 pendiente en el remoto**: los wrappers VOLATILE están en el repo, pero el proyecto sigue en 0051.
 
 ### 10.4 Convenciones que cambiaron
 
