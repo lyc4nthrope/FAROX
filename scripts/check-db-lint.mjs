@@ -27,11 +27,17 @@ const ACCEPTED_APP_ISSUES = new Map([
     'public.set_order_prices|never read variable "v_price"',
     "0029: variable muerta, sin efecto en ejecución",
   ],
+]);
+
+// Prefijos aceptados: plpgsql_check agrega contexto variable al mensaje
+// ("… on line 5", guiones distintos según versión), así que el match exacto
+// no es estable. Solo se acepta el inicio documentado; otra función no pasa.
+const ACCEPTED_APP_PREFIXES = [
   [
-    'public.register_movements_bulk|target type is different type than source type — during statement block local variable "v_ids" initialization on line 5',
+    'public.register_movements_bulk|target type is different type than source type',
     "0048: inicializador '{}' para bigint[]; falso positivo de plpgsql_check, sin efecto en ejecución",
   ],
-]);
+];
 
 const esc = (s) => String(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
 const die = (msg) => {
@@ -106,7 +112,10 @@ for (const entry of entries) {
       extensionIssues += 1;
       continue;
     }
-    const reason = ACCEPTED_APP_ISSUES.get(`${fn}|${message}`);
+    const key = `${fn}|${message}`;
+    const reason =
+      ACCEPTED_APP_ISSUES.get(key) ??
+      ACCEPTED_APP_PREFIXES.find(([prefix]) => key.startsWith(prefix))?.[1];
     if (reason !== undefined) {
       accepted.push(`[${level}] ${fn}: ${message} — ${reason}`);
       continue;
