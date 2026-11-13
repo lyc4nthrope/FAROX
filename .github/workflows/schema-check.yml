@@ -33,8 +33,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: supabase/setup-cli@v1
-        # U5 (design #507 §1): sin input de versión — el nombre del input de versión de
-        # setup-cli es UNVERIFIED ("default latest first"). Confirmar antes de fijar versión.
+        with:
+          # El config.toml usa claves de CLI v3 (local_smtp, oauth_server, orioledb_version);
+          # "latest" resolvía a una v2 que las rechaza. Fijar la misma versión que el repo.
+          version: 3.1.0
 
       - name: "Self-test del parser — prove-by-break con fixtures (DEV-09 · design §2.6/§9)"
         run: |
