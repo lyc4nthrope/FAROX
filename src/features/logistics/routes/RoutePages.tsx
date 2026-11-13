@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { EmptyState } from "../../../shared/ui";
+import { EmptyState, ExampleDashboard, type ExampleDashboardStat } from "../../../shared/ui";
 import {
   Badge,
   Box,
@@ -14,6 +14,8 @@ import {
   runAction,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
+import { StoreRouteMap } from "../components/StoreRouteMap";
+import { ContactButton } from "../../store-links";
 import {
   ROUTE_LABELS,
   STOP_LABELS,
@@ -21,6 +23,8 @@ import {
   fetchGeoStores,
   fetchRouteDetail,
   fetchRoutes,
+  fetchMyDistributorId,
+  fetchStoresWithRequests,
   googleMapsUrl,
   markStop,
   saveRoute,
@@ -40,6 +44,13 @@ function formatRouteDate(value: string): string {
     day: "numeric",
     month: "short",
   });
+}
+
+function formatExpectedDate(value: string | null): string {
+  if (value === null) return "sin fecha";
+  const date = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
 /** Vista de una ruta: paradas en orden, enlace a Google Maps y acciones. */
@@ -202,32 +213,339 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
   );
 }
 
-/** /mi-ruta — ruta de hoy del distribuidor. */
+/** /mi-ruta — mapa + selector de tiendas con solicitudes y ruta asignada. */
 export function MyRoutePage() {
   const today = todayIso();
   const route = useLoad(() => fetchRouteDetail(null, today), [today]);
+  const requests = useLoad(fetchStoresWithRequests, []);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [routeMsg, setRouteMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
+  const initialized = useRef(false);
+
+  // Arrancan todas marcadas: el mapa se ve poblado y desmarcar es un clic.
+  useEffect(() => {
+    if (initialized.current || requests.data === null) return;
+    initialized.current = true;
+    setSelectedIds(new Set(requests.data.map((store) => store.id)));
+  }, [requests.data]);
+
+  const stores = useMemo(() => requests.data ?? [], [requests.data]);
+  const selectedStores = useMemo(
+    () => stores.filter((store) => selectedIds.has(store.id)),
+    [stores, selectedIds],
+  );
+  const selectedOrders = selectedStores.reduce((total, store) => total + store.orderCount, 0);
+  const mapsUrl = googleMapsUrl(selectedStores);
+  const orderIndex = new Map(selectedStores.map((store, index) => [store.id, index + 1]));
+
+  function toggle(storeId: number): void {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(storeId)) next.delete(storeId);
+      else next.add(storeId);
+      return next;
+    });
+  }
+
+  function selectAll(): void {
+    setSelectedIds(new Set(stores.map((store) => store.id)));
+  }
+
+  function clearAll(): void {
+    setSelectedIds(new Set());
+  }
+
+  async function saveTodayRoute(): Promise<void> {
+    if (selectedStores.length === 0) {
+      setRouteMsg({ error: "Marcá al menos una tienda para guardar la ruta.", ok: null });
+      return;
+    }
+    setSavingRoute(true);
+    if (
+      route.data !== null &&
+      (route.data.status === "completed" || route.data.status === "cancelled")
+    ) {
+      setRouteMsg({ error: "La ruta de hoy ya está cerrada; no se puede reemplazar.", ok: null });
+      setSavingRoute(false);
+      return;
+    }
+    if (
+      route.data?.status === "active" &&
+      !window.confirm(
+        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
+      )
+    ) {
+      setSavingRoute(false);
+      return;
+    }
+    const distributor = await fetchMyDistributorId();
+    if (distributor.error !== null || distributor.data === null) {
+      setRouteMsg({ error: "No pudimos identificar tu distribuidora.", ok: null });
+      setSavingRoute(false);
+      return;
+    }
+    const distributorId = distributor.data;
+    const stops = selectedStores.map((store, index) => ({
+      store_id: store.id,
+      stop_order: index + 1,
+      estimated_time: null,
+    }));
+    const error = await runAction(() => saveRoute(distributorId, today, stops));
+    setRouteMsg({ error, ok: error === null ? "Ruta de hoy guardada." : null });
+    if (error === null) {
+      route.reload();
+      requests.reload();
+    }
+    setSavingRoute(false);
+  }
+
+  const routeStops = route.data?.stops.length ?? 0;
+  const routeStopsList = route.data?.stops ?? [];
+  const pendingStops = routeStopsList.filter((stop) => stop.status === "pending").length;
+  const totalRequests = stores.reduce((total, store) => total + store.orderCount, 0);
+  // Mismo panel que la “Vista de ejemplo” del inicio, pero con datos reales:
+  // los pedidos abiertos y las paradas de la ruta de hoy.
+  const summaryStats: readonly [ExampleDashboardStat, ExampleDashboardStat] = [
+    {
+      label: "Pedidos",
+      value: requests.loading ? "—" : String(totalRequests),
+      hint: `${stores.length} ${stores.length === 1 ? "tienda" : "tiendas"} con solicitudes`,
+    },
+    {
+      label: "Paradas",
+      value: route.loading ? "—" : String(routeStops),
+      hint:
+        route.data === null
+          ? "sin ruta guardada"
+          : `${pendingStops} ${pendingStops === 1 ? "pendiente" : "pendientes"}`,
+    },
+  ];
+
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-        Logística
-      </p>
-      <div className="mt-1 flex flex-wrap items-center gap-2.5">
-        <h1 className="text-2xl font-semibold tracking-tight">Mi ruta de hoy</h1>
-        <span className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-500">
-          {formatRouteDate(today)}
-        </span>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Logística</p>
+      <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Ruta del día</h1>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+            Marcá las tiendas con solicitudes, ubicalas en el mapa y abrí el recorrido en Google
+            Maps. «Guardar ruta» registra esas paradas para hoy; el recorrido lo calcula Google
+            Maps.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+            {formatRouteDate(today)}
+          </span>
+          <span className="border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+            {selectedStores.length} de {stores.length} tiendas
+          </span>
+        </div>
       </div>
-      <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Tus paradas en orden, con la hora estimada y el recorrido completo en el mapa.
-      </p>
-      <Status loading={route.loading} error={route.error} />
-      {!route.loading && route.data === null && !route.error && (
-        <EmptyState
-          title="No tenés ruta para hoy"
-          hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
+
+      <div className="mt-5">
+        <ExampleDashboard
+          eyebrow="Tu día"
+          layout="wide"
+          stats={summaryStats}
+          stops={routeStopsList.map((stop) => stop.store_name)}
+          emptyStopsText="Todavía no guardaste paradas para hoy."
         />
-      )}
-      {route.data && <RouteView route={route.data} onChanged={route.reload} />}
+      </div>
+
+      <Status loading={requests.loading} error={requests.error} />
+
+      <div className="mt-5">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Tu ruta de hoy
+        </h2>
+        <div className="mt-2">
+          <Status loading={route.loading} error={route.error} />
+          {!route.loading && route.data === null && !route.error && (
+            <EmptyState
+              title="No tenés ruta asignada para hoy"
+              hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
+            />
+          )}
+          {route.data && <RouteView route={route.data} onChanged={route.reload} />}
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Planificar el recorrido
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          Marcá las tiendas con solicitudes y guardá las paradas de hoy.
+        </p>
+        <div className="mt-2 grid border border-gray-300 bg-white lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
+          <section
+            aria-label="Mapa de tiendas"
+            className="min-w-0 border-b border-gray-300 lg:border-b-0 lg:border-r"
+          >
+            <header className="flex items-center justify-between border-b border-gray-300 px-4 py-2.5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
+                Mapa
+              </h2>
+              <span className="text-[11px] text-gray-500">Solo tiendas marcadas</span>
+            </header>
+            <div className="h-[24rem] lg:h-[34rem]">
+              <StoreRouteMap stores={selectedStores} />
+            </div>
+          </section>
+
+          <section className="min-w-0" aria-label="Tiendas con solicitudes">
+            <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 px-4 py-2.5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
+                Tiendas con solicitudes
+              </h2>
+              <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                <button
+                  type="button"
+                  className="underline underline-offset-4 hover:text-gray-900"
+                  onClick={selectAll}
+                >
+                  Marcar todas
+                </button>
+                <button
+                  type="button"
+                  className="underline underline-offset-4 hover:text-gray-900"
+                  onClick={clearAll}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </header>
+
+            {stores.length === 0 && !requests.loading ? (
+              <div className="px-4 py-10">
+                <EmptyState
+                  title="No hay tiendas con solicitudes abiertas"
+                  hint="Cuando tengas pedidos pendientes o en ruta, sus tiendas van a aparecer acá."
+                />
+                <p className="mt-3 text-center text-sm text-gray-600">
+                  ¿No ves tus tiendas?{" "}
+                  <Link className="font-medium underline underline-offset-4" to="/vincular">
+                    Vinculá una tienda
+                  </Link>
+                </p>
+              </div>
+            ) : (
+              <ul className="max-h-[24rem] divide-y divide-gray-200 overflow-y-auto lg:max-h-[34rem]">
+                {stores.map((store) => {
+                  const selected = selectedIds.has(store.id);
+                  const index = orderIndex.get(store.id);
+                  return (
+                    <li
+                      key={store.id}
+                      className={`flex items-start border-l-4 transition-colors ${
+                        selected ? "border-gray-900 bg-gray-50" : "border-transparent"
+                      }`}
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 shrink-0 accent-gray-900"
+                          checked={selected}
+                          onChange={() => toggle(store.id)}
+                          aria-label={`Incluir ${store.name}`}
+                        />
+                        <span
+                          aria-hidden="true"
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center border text-xs font-semibold tabular-nums ${
+                            selected
+                              ? "border-gray-900 bg-gray-900 text-white"
+                              : "border-gray-300 text-gray-400"
+                          }`}
+                        >
+                          {selected ? index : "—"}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                            <span className="break-words text-sm font-medium text-gray-900">
+                              {store.name}
+                            </span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                              {store.orderCount}{" "}
+                              {store.orderCount === 1 ? "solicitud" : "solicitudes"}
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block break-words text-xs text-gray-500">
+                            {[store.address, store.city].filter(Boolean).join(" · ") ||
+                              "Sin dirección"}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-gray-500">
+                            Próxima entrega: {formatExpectedDate(store.nextExpectedAt)}
+                          </span>
+                        </span>
+                      </label>
+                      <div className="shrink-0 px-3 py-3">
+                        <ContactButton kind="store" id={store.id} name={store.name} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-x border-b border-gray-300 bg-white px-4 py-3">
+          <p className="text-sm text-gray-600">
+            <span className="font-semibold text-gray-900">{selectedStores.length}</span>{" "}
+            {selectedStores.length === 1 ? "tienda" : "tiendas"} ·{" "}
+            <span className="font-semibold text-gray-900">{selectedOrders}</span>{" "}
+            {selectedOrders === 1 ? "solicitud" : "solicitudes"}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 border border-gray-900 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              disabled={savingRoute}
+              onClick={() => void saveTodayRoute()}
+            >
+              {savingRoute ? "Guardando…" : "Guardar ruta"}
+            </button>
+            {mapsUrl !== null ? (
+              <a
+                className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 21s6-4.6 6-10a6 6 0 1 0-12 0c0 5.4 6 10 6 10Z" />
+                  <circle cx="12" cy="11" r="2" />
+                </svg>
+                Abrir en Google Maps
+              </a>
+            ) : (
+              <span className="border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400">
+                Marcá al menos una tienda
+              </span>
+            )}
+          </div>
+        </div>
+
+        {(routeMsg.error !== null || routeMsg.ok !== null) && (
+          <div className="border-x border-b border-gray-300 bg-white px-4 py-2">
+            <Status error={routeMsg.error} ok={routeMsg.ok} />
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -256,7 +574,7 @@ export function RouteDetailPage() {
         </svg>
         Rutas
       </Link>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Logística
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Detalle de ruta</h1>
@@ -312,9 +630,7 @@ export function RoutesPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
-        Logística
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Logística</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Rutas</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Planificá el recorrido de cada distribuidor, ordená las paradas y seguí su avance.

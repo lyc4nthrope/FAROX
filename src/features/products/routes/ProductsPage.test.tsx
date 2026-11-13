@@ -8,6 +8,7 @@ import * as authApi from "../../auth/api";
 import * as productsApi from "../api";
 import type { CatalogEntry, ProductListRow } from "../types";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
+import { MyCatalogPage } from "./MyCatalogPage";
 import { ProductsPage } from "./ProductsPage";
 
 // D7 (componente, api de la feature mockeada COMPLETA): /products ya no es la
@@ -27,8 +28,10 @@ vi.mock("../api", () => ({
   fetchStoreCatalog: vi.fn(),
   fetchDistributorCatalog: vi.fn(),
   fetchActiveProductsForCatalog: vi.fn(),
-  addStoreCatalogProduct: vi.fn(),
+  addStoreProduct: vi.fn(),
   removeStoreCatalogProduct: vi.fn(),
+  fetchStoreStock: vi.fn(),
+  fetchDistributorProductIds: vi.fn(),
   addDistributorCatalogProduct: vi.fn(),
   removeDistributorCatalogProduct: vi.fn(),
   setStoreProductQuantity: vi.fn(),
@@ -53,7 +56,13 @@ const FILA: ProductListRow = {
   category: { id: 1, name: "Bebidas" },
 };
 
-const ENTRADA_TIENDA: CatalogEntry = { ...FILA, quantity: 0, is_shortage: false };
+const ENTRADA_TIENDA: CatalogEntry = {
+  ...FILA,
+  quantity: 0,
+  threshold: null,
+  expiry_date: null,
+  is_shortage: false,
+};
 
 const OTRO_PRODUCTO: ProductListRow = {
   id: 2,
@@ -71,11 +80,16 @@ const SIN_FILTROS = { q: "", categoryId: null, onlyShortage: false };
 function renderPagina(role: RoleName) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  // 0024: el operador ya no llega a /products (redirige a /inventario), pero el
+  // catálogo por entidad sigue usándose para el distribuidor y el rol nulo. Los
+  // casos de tienda se montan sobre MyCatalogPage directamente.
+  const element = role === "operador" ? <MyCatalogPage /> : <ProductsPage />;
   return render(
     <MemoryRouter initialEntries={["/products"]}>
       <AuthProvider>
         <Routes>
-          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products" element={element} />
+          <Route path="/inventario" element={<p>Inventario destino</p>} />
         </Routes>
       </AuthProvider>
     </MemoryRouter>,
@@ -115,7 +129,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       error: null,
     });
     vi.mocked(productsApi.fetchDistributorCatalog).mockResolvedValue({
-      rows: [{ ...FILA, quantity: null, is_shortage: false }],
+      rows: [{ ...FILA, quantity: null, threshold: null, expiry_date: null, is_shortage: false }],
       count: 1,
       error: null,
     });
@@ -124,7 +138,9 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
       count: 1,
       error: null,
     });
-    vi.mocked(productsApi.addStoreCatalogProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.addStoreProduct).mockResolvedValue({ error: null });
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({ data: [], error: null });
+    vi.mocked(productsApi.fetchDistributorProductIds).mockResolvedValue({ data: [], error: null });
     vi.mocked(productsApi.removeStoreCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.addDistributorCatalogProduct).mockResolvedValue({ error: null });
     vi.mocked(productsApi.removeDistributorCatalogProduct).mockResolvedValue({ error: null });
@@ -137,6 +153,25 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("operador: /products redirige a /inventario (0024)", async () => {
+    vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "operador", premium: false });
+
+    render(
+      <MemoryRouter initialEntries={["/products"]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/inventario" element={<p>Inventario destino</p>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Inventario destino")).toBeInTheDocument();
+    expect(productsApi.fetchCatalogContext).not.toHaveBeenCalled();
   });
 
   it("admin: vista GENERAL con todos los productos + alta del catálogo global", async () => {
@@ -169,7 +204,7 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     renderPagina("distribuidor");
 
     expect(await screen.findByText("Catálogo de mi distribuidora")).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Café molido" })).toBeInTheDocument();
+    expect(await screen.findByText("Café molido")).toBeInTheDocument();
     expect(productsApi.fetchDistributorCatalog).toHaveBeenCalledWith({
       page: 0,
       pageSize: 25,
@@ -201,10 +236,71 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
     await user.click(await within(dialog).findByRole("button", { name: "Agregar" }));
 
-    await waitFor(() => expect(productsApi.addStoreCatalogProduct).toHaveBeenCalledWith(7, 2));
+    await waitFor(() =>
+      expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 0, null, null),
+    );
     expect(await screen.findByText("Producto agregado al catálogo.")).toBeInTheDocument();
     // El catálogo se vuelve a pedir tras el alta (sin realtime).
     expect(productsApi.fetchStoreCatalog).toHaveBeenCalledTimes(2);
+  });
+
+  it("S2/0026: la fila del registro agrega y el stepper define la cantidad inicial", async () => {
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+
+    await user.click(
+      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz blanco" }),
+    );
+    // La fila entera agrega; el botón sigue existiendo como referencia.
+    await user.click(within(dialog).getByText("Arroz blanco"));
+
+    await waitFor(() =>
+      expect(productsApi.addStoreProduct).toHaveBeenCalledWith(7, 2, 1, null, null),
+    );
+    expect(within(dialog).getByRole("button", { name: "Agregar" })).toBeInTheDocument();
+  });
+
+  it("S11/0026: un producto ya asignado muestra su stock y no se agrega otra vez", async () => {
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({
+      data: [{ product_id: 2, quantity: 7 }],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+
+    expect(await within(dialog).findByText("En tienda · 7")).toBeInTheDocument();
+    const yaEsta = within(dialog).getByRole("button", { name: "Ya está" });
+    expect(yaEsta).toBeDisabled();
+    await user.click(within(dialog).getByText("Arroz blanco"));
+    expect(productsApi.addStoreProduct).not.toHaveBeenCalled();
+  });
+
+  it("0027: el filtro «Solo no añadidos» excluye los ya asignados en el servidor", async () => {
+    vi.mocked(productsApi.fetchStoreStock).mockResolvedValue({
+      data: [{ product_id: 2, quantity: 7 }],
+      error: null,
+    });
+    const user = userEvent.setup();
+    renderPagina("operador");
+
+    await user.click(await screen.findByRole("button", { name: "Agregar producto" }));
+    const dialog = await screen.findByRole("dialog", { name: "Agregar productos a mi catálogo" });
+    await within(dialog).findByText("En tienda · 7");
+
+    await user.click(within(dialog).getByLabelText("Solo no añadidos"));
+
+    await waitFor(() =>
+      expect(productsApi.fetchActiveProductsForCatalog).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 0, pageSize: 25 }),
+        [2],
+      ),
+    );
   });
 
   it("S2: el alta es una ventana emergente y Escape la cierra", async () => {
@@ -334,7 +430,9 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const section = await cajaCatalogo();
     await user.click(await within(section).findByRole("button", { name: "Marcar faltante" }));
 
-    await waitFor(() => expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, true));
+    await waitFor(() =>
+      expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, true),
+    );
     expect(await screen.findByText('"Café molido" marcado como faltante.')).toBeInTheDocument();
   });
 

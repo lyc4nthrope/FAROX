@@ -5,11 +5,7 @@
 // RPC: DML directo por tabla (design #599 §2.3).
 
 /** Las 4 tablas de catálogo del motor (design key-decision #1). */
-export type CatalogKey =
-  | "unit_types"
-  | "store_types"
-  | "brands"
-  | "product_categories";
+export type CatalogKey = "unit_types" | "store_types" | "brands" | "product_categories";
 
 /** Fila uniforme del motor: cada definition pide SOLO sus columnas al server
  * (select explícito, D4) y normalize llena el resto con defaults. */

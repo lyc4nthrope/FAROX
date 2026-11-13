@@ -167,7 +167,9 @@ export function DistributorFormPage() {
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (
         <div className="mt-6">
-          {typeof distributorId === "number" && <ReactivateBanner table="distributors" id={distributorId} />}
+          {typeof distributorId === "number" && (
+            <ReactivateBanner table="distributors" id={distributorId} />
+          )}
           <DistributorForm
             values={values}
             errors={errors}

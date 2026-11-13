@@ -74,7 +74,12 @@ export function QrScanner({
           Detener cámara
         </button>
       ) : (
-        <button className={buttonClass} type="button" disabled={disabled || starting} onClick={() => void start()}>
+        <button
+          className={buttonClass}
+          type="button"
+          disabled={disabled || starting}
+          onClick={() => void start()}
+        >
           Escanear QR
         </button>
       )}

@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check-scope": "node scripts/check-scope.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run check-scope"
+    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run check-scope"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
@@ -45,6 +45,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "jsdom": "^26.1.0",
     "prettier": "^3.5.1",
+    "supabase": "^3.1.0",
     "tailwindcss": "^4.1.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.30.1",

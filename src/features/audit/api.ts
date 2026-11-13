@@ -64,9 +64,7 @@ export async function fetchAuditPage(
   if (filtro.data.table_name !== undefined) {
     query = query.eq("table_name", filtro.data.table_name);
   }
-  const { data, error } = await query
-    .order("id", { ascending: false })
-    .limit(AUDIT_PAGE_SIZE + 1);
+  const { data, error } = await query.order("id", { ascending: false }).limit(AUDIT_PAGE_SIZE + 1);
   if (error !== null) {
     return { rows: [], hasMore: false, error };
   }

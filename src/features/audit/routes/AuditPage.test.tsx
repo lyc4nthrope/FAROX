@@ -5,11 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as auditApi from "../api";
-import {
-  diffCambios,
-  diffResumen,
-  formatDiffValue,
-} from "../components/AuditTable";
+import { diffCambios, diffResumen, formatDiffValue } from "../components/AuditTable";
 import type { AuditRow } from "../types";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { RequireRole } from "../../../app/guards/RequireRole";
@@ -112,9 +108,7 @@ describe("AuditPage · ADM-10.1 (lista de eventos)", () => {
   it("lista vacía ⇒ EmptyState amigable (vacío ≠ error, D4) sin crash", async () => {
     renderPagina();
 
-    expect(
-      await screen.findByText("Todavía no hay eventos registrados."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no hay eventos registrados.")).toBeInTheDocument();
   });
 
   it("error del server (42501) ⇒ ErrorBanner amigable vía mapError, nunca texto crudo", async () => {
@@ -125,9 +119,7 @@ describe("AuditPage · ADM-10.1 (lista de eventos)", () => {
     });
     renderPagina();
 
-    expect(
-      await screen.findByText("No tenés permisos para esta operación."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No tenés permisos para esta operación.")).toBeInTheDocument();
     expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
   });
 });

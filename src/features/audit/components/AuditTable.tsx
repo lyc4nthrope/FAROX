@@ -40,9 +40,7 @@ export function formatDiffValue(value: unknown): string {
   if (value === null || value === undefined) return "vacío";
   if (typeof value === "string") {
     if (value === "") return "(vacío)";
-    return value.length > MAX_VALUE_CHARS
-      ? `${value.slice(0, MAX_VALUE_CHARS)}…`
-      : value;
+    return value.length > MAX_VALUE_CHARS ? `${value.slice(0, MAX_VALUE_CHARS)}…` : value;
   }
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return "[valor complejo]";
@@ -112,9 +110,7 @@ const COLUMNAS: DataTableColumn<AuditRow>[] = [
     key: "accion",
     header: "Acción",
     render: (row) => (
-      <span
-        className={`rounded px-2 py-0.5 text-xs font-medium ${ACCION_CLASE[row.action]}`}
-      >
+      <span className={`rounded px-2 py-0.5 text-xs font-medium ${ACCION_CLASE[row.action]}`}>
         {ACCION_LABEL[row.action]}
       </span>
     ),
@@ -141,9 +137,7 @@ const COLUMNAS: DataTableColumn<AuditRow>[] = [
       }
       return (
         <details>
-          <summary className="cursor-pointer text-gray-700">
-            {diffResumen(row.diff)}
-          </summary>
+          <summary className="cursor-pointer text-gray-700">{diffResumen(row.diff)}</summary>
           <ul className="mt-1 list-inside list-disc text-xs text-gray-600">
             {cambios.map((cambio) => (
               <CambioDetalle key={cambio.columna} cambio={cambio} />

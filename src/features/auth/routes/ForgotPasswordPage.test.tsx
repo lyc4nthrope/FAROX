@@ -97,9 +97,6 @@ describe("ForgotPasswordPage · pedir el link por email", () => {
 
   it("tiene salida al login", () => {
     renderForgot();
-    expect(screen.getByRole("link", { name: "Volver al login" })).toHaveAttribute(
-      "href",
-      "/login",
-    );
+    expect(screen.getByRole("link", { name: "Volver al login" })).toHaveAttribute("href", "/login");
   });
 });

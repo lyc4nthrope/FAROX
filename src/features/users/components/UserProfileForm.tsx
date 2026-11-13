@@ -1,4 +1,5 @@
 import type { UserProfileFormValues } from "../schemas";
+import { LIMITS } from "../../../shared/lib/limits";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../../profile/types";
 
 export interface ProfileFormErrors {
@@ -62,10 +63,7 @@ export function UserProfileForm({
         </p>
       )}
       <div>
-        <label
-          htmlFor="user-profile-full-name"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="user-profile-full-name" className="block text-sm font-medium text-gray-700">
           Nombre completo
         </label>
         <input
@@ -74,6 +72,7 @@ export function UserProfileForm({
           autoComplete="name"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.full_name}
+          maxLength={LIMITS.userName}
           aria-invalid={errors.full_name !== undefined}
           aria-describedby={
             errors.full_name === undefined ? undefined : "user-profile-full-name-error"
@@ -87,10 +86,7 @@ export function UserProfileForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="user-profile-phone"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="user-profile-phone" className="block text-sm font-medium text-gray-700">
           Teléfono
         </label>
         <input
@@ -99,6 +95,7 @@ export function UserProfileForm({
           autoComplete="tel"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.phone_number}
+          maxLength={LIMITS.userPhone}
           aria-invalid={errors.phone_number !== undefined}
           aria-describedby={
             errors.phone_number === undefined ? undefined : "user-profile-phone-error"

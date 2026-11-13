@@ -15,10 +15,18 @@ export interface UseLoadState<T> {
   reload: () => void;
 }
 
+export const REFRESH_EVENT = "farox:refresh";
+
 /**
  * Carga simple (no paginada) para pantallas de detalle o listas cortas.
  * Descarta respuestas viejas si `deps` cambian antes de que termine la anterior.
  */
+export function notifyDataChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(REFRESH_EVENT));
+  }
+}
+
 export function useLoad<T>(
   loader: () => Promise<LoadResult<T>>,
   deps: readonly unknown[],
@@ -29,6 +37,16 @@ export function useLoad<T>(
   const [reloadKey, setReloadKey] = useState(0);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
+
+  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
+
+  useEffect(() => {
+    function onRefresh(): void {
+      reload();
+    }
+    window.addEventListener(REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(REFRESH_EVENT, onRefresh);
+  }, [reload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,8 +70,6 @@ export function useLoad<T>(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps los define el caller
   }, [...deps, reloadKey]);
-
-  const reload = useCallback(() => setReloadKey((key) => key + 1), []);
 
   return { data, error, loading, reload };
 }

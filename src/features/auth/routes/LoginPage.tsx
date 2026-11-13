@@ -3,6 +3,7 @@ import { Link, Navigate } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { signInWithPassword } from "../api";
+import { BackToHomeLink } from "../components/BackToHomeLink";
 import { LoginForm, type LoginFormErrors } from "../components/LoginForm";
 import { loginSchema, type LoginInput } from "../schemas";
 
@@ -71,7 +72,8 @@ export function LoginPage() {
 
   return (
     <div className="mx-auto max-w-sm px-4 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Iniciar sesión</h1>
+      <BackToHomeLink />
+      <h1 className="mt-6 text-2xl font-semibold tracking-tight">Iniciar sesión</h1>
       <p className="mt-1 text-sm text-gray-600">
         Ingresá con tu email y contraseña para usar FAROX.
       </p>

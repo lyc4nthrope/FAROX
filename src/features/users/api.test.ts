@@ -112,10 +112,9 @@ describe("users api · fetchUsers (lista /users, policy users_select 0006:202-20
     const result = await fetchUsers({ page: 0, pageSize: 25 });
 
     expect(fromMock).toHaveBeenCalledWith("users");
-    expect(users.stub.select).toHaveBeenCalledWith(
-      `${FORM_SELECT}, role:roles(name)`,
-      { count: "planned" },
-    );
+    expect(users.stub.select).toHaveBeenCalledWith(`${FORM_SELECT}, role:roles(name)`, {
+      count: "planned",
+    });
     expect(users.stub.order).toHaveBeenCalledWith("full_name");
     expect(users.stub.range).toHaveBeenCalledWith(0, 24);
     expect(result.count).toBe(1);
@@ -185,9 +184,7 @@ describe("users api · fetchUser (detalle /users/:id)", () => {
 
     const { row, error } = await fetchUser("u1");
 
-    expect(users.stub.select).toHaveBeenCalledWith(
-      `${FORM_SELECT}, role:roles(id,name)`,
-    );
+    expect(users.stub.select).toHaveBeenCalledWith(`${FORM_SELECT}, role:roles(id,name)`);
     expect(users.stub.eq).toHaveBeenCalledWith("id", "u1");
     expect(users.stub.single).toHaveBeenCalled();
     expect(error).toBeNull();
@@ -352,9 +349,7 @@ describe("users api · fetchUserStores (ADM-7 — SOLO lectura, scope SOLO por u
     const { rows, error } = await fetchUserStores("u1");
 
     expect(fromMock).toHaveBeenCalledWith("user_stores");
-    expect(userStores.stub.select).toHaveBeenCalledWith(
-      "store_id, created_at, stores(name,city)",
-    );
+    expect(userStores.stub.select).toHaveBeenCalledWith("store_id, created_at, stores(name,city)");
     // Único filtro de la cadena: el scope lo decide la RLS, no el front.
     expect(userStores.stub.eq).toHaveBeenCalledTimes(1);
     expect(userStores.stub.eq).toHaveBeenCalledWith("user_id", "u1");

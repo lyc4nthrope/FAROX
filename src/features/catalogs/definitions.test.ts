@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CATALOG_DEFINITIONS,
-  getCatalogDefinition,
-  type CatalogDefinition,
-} from "./definitions";
+import { CATALOG_DEFINITIONS, getCatalogDefinition, type CatalogDefinition } from "./definitions";
 import { productCategorySchema } from "./schemas";
 import type { CatalogKey } from "./types";
 
@@ -14,12 +10,7 @@ import type { CatalogKey } from "./types";
 // cada tabla debe reflejar SU policy (0006:66-120), nunca una decisión de
 // código.
 
-const KEYS: CatalogKey[] = [
-  "unit_types",
-  "store_types",
-  "brands",
-  "product_categories",
-];
+const KEYS: CatalogKey[] = ["unit_types", "store_types", "brands", "product_categories"];
 
 function definitionDe(key: CatalogKey): CatalogDefinition {
   const found = CATALOG_DEFINITIONS.find((definition) => definition.key === key);
@@ -43,7 +34,9 @@ describe("CATALOG_DEFINITIONS — configs completas ×4 (T-C4)", () => {
       expect(definition.columns.length).toBeGreaterThan(0);
       expect(definition.columns[0].key).toBe("name"); // la primera col SIEMPRE es el nombre
       expect(definition.fields.length).toBeGreaterThan(0);
-      expect(definition.deleteMode === "hard" || definition.deleteMode === "soft-two-step").toBe(true);
+      expect(definition.deleteMode === "hard" || definition.deleteMode === "soft-two-step").toBe(
+        true,
+      );
       expect(definition.select.length).toBeGreaterThan(0);
       expect(definition.emptyTitle.length).toBeGreaterThan(0);
       expect(typeof definition.toDbRow).toBe("function");
@@ -88,9 +81,11 @@ describe("getCatalogDefinition — resolución de :catalogKey (design key-decisi
 describe("toDbRow — conversión de vacío a NULL en columnas nullable (0002:63-64)", () => {
   it("product_categories: description y parent_id vacíos viajan NULL", () => {
     const definition = definitionDe("product_categories");
-    expect(
-      definition.toDbRow({ name: "Snacks", description: "", parent_id: "" }),
-    ).toEqual({ name: "Snacks", description: null, parent_id: null });
+    expect(definition.toDbRow({ name: "Snacks", description: "", parent_id: "" })).toEqual({
+      name: "Snacks",
+      description: null,
+      parent_id: null,
+    });
   });
 
   it("product_categories: parent_id elegido viaja numérico", () => {
@@ -102,9 +97,9 @@ describe("toDbRow — conversión de vacío a NULL en columnas nullable (0002:63
 
   it("unit_types: payload exacto de las 3 columnas NOT NULL (0002:31-33)", () => {
     const definition = definitionDe("unit_types");
-    expect(
-      definition.toDbRow({ name: "Galón", abbreviation: "gal", category: "volumen" }),
-    ).toEqual({ name: "Galón", abbreviation: "gal", category: "volumen" });
+    expect(definition.toDbRow({ name: "Galón", abbreviation: "gal", category: "volumen" })).toEqual(
+      { name: "Galón", abbreviation: "gal", category: "volumen" },
+    );
   });
 });
 

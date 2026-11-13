@@ -39,11 +39,7 @@ vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: { from: vi.fn(() => h.makeQuery()), rpc: vi.fn() },
 }));
 
-import {
-  fetchActiveProductsForCatalog,
-  fetchDistributorCatalog,
-  fetchStoreCatalog,
-} from "./api";
+import { fetchActiveProductsForCatalog, fetchDistributorCatalog, fetchStoreCatalog } from "./api";
 
 const NO_FILTERS = { q: "", categoryId: null, onlyShortage: false };
 const SECOND_PAGE = { page: 1, pageSize: 25 };
@@ -69,7 +65,7 @@ describe("catálogo: los tres fetchers paginan (S4)", () => {
   });
 
   it("fetchDistributorCatalog: pide el rango de la página", async () => {
-    expect(await fetchDistributorCatalog(SECOND_PAGE)).toEqual({
+    expect(await fetchDistributorCatalog({ ...SECOND_PAGE, ...NO_FILTERS })).toEqual({
       rows: [],
       count: 0,
       error: null,

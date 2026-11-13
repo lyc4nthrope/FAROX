@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { EmptyState } from "../../../shared/ui";
+import { EmptyState, ResponsiveTable } from "../../../shared/ui";
+import { Modal } from "../../../shared/ui/Modal";
 import {
   Badge,
   Box,
@@ -13,6 +14,7 @@ import {
   inputClass,
   runAction,
   secondaryButtonClass,
+  type BadgeTone,
 } from "../../../shared/ui/Box";
 import { formatCOP } from "../../../shared/lib/format";
 import {
@@ -40,7 +42,16 @@ function formatDate(value: string): string {
   return date.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () => void }) {
+function creditTone(credit: CreditRow): BadgeTone {
+  const overdue =
+    credit.status === "pending" && credit.due_date !== null && credit.due_date < todayIso();
+  if (credit.status === "paid") return "green";
+  if (credit.status === "cancelled") return "gray";
+  return overdue ? "red" : "amber";
+}
+
+/** Detalle de un crédito: saldo, pagos y acciones. Vive dentro de un Modal. */
+function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () => void }) {
   const { role } = useAuth();
   const payments = useLoad(() => fetchPayments(credit.id), [credit.id]);
   const [amount, setAmount] = useState("");
@@ -63,20 +74,12 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
   const paidPct = credit.total_amount > 0 ? Math.min(100, (paid / credit.total_amount) * 100) : 0;
   const overdue =
     credit.status === "pending" && credit.due_date !== null && credit.due_date < todayIso();
-  const tone =
-    credit.status === "paid"
-      ? "green"
-      : credit.status === "cancelled"
-        ? "gray"
-        : overdue
-          ? "red"
-          : "amber";
 
   return (
-    <Box title={`Crédito #${credit.id} · ${credit.store_name}`}>
+    <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
             Saldo pendiente
           </p>
           <p className="mt-1 text-3xl font-semibold tracking-tight text-gray-900">
@@ -87,7 +90,7 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          <Badge tone={tone}>{CREDIT_LABELS[credit.status] ?? credit.status}</Badge>
+          <Badge tone={creditTone(credit)}>{CREDIT_LABELS[credit.status] ?? credit.status}</Badge>
           {credit.due_date !== null && (
             <span className={`text-xs font-medium ${overdue ? "text-red-700" : "text-gray-500"}`}>
               {overdue ? "Vencido" : "Vence"} {formatDate(credit.due_date)}
@@ -199,7 +202,7 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
           </ul>
         </div>
       )}
-    </Box>
+    </div>
   );
 }
 
@@ -207,6 +210,9 @@ function CreditCard({ credit, onChanged }: { credit: CreditRow; onChanged: () =>
 export function CreditsPage() {
   const credits = useLoad(() => fetchCredits(), []);
   const rows = credits.data ?? [];
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = rows.find((credit) => credit.id === selectedId) ?? null;
+
   const pending = rows.filter((c) => c.status === "pending");
   const balance = pending.reduce((sum, c) => sum + c.balance, 0);
   const overdue = pending.filter((c) => c.due_date !== null && c.due_date < todayIso()).length;
@@ -214,7 +220,7 @@ export function CreditsPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Cartera</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Cartera</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Fiado</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Los créditos se crean desde el detalle de un pedido entregado. Acá ves el saldo, los pagos y
@@ -266,9 +272,76 @@ export function CreditsPage() {
         </div>
       )}
 
-      {rows.map((c) => (
-        <CreditCard key={c.id} credit={c} onChanged={credits.reload} />
-      ))}
+      {rows.length > 0 && (
+        <Box title="Créditos">
+          <ResponsiveTable
+            caption="Cartera de créditos"
+            columns={[
+              {
+                key: "store",
+                header: "Tienda",
+                primary: true,
+                render: (credit) => (
+                  <span className="font-medium text-gray-900">{credit.store_name}</span>
+                ),
+              },
+              {
+                key: "id",
+                header: "Crédito",
+                render: (credit) => `#${credit.id}`,
+              },
+              {
+                key: "balance",
+                header: "Saldo",
+                className: "tabular-nums",
+                render: (credit) => formatCOP(credit.balance),
+              },
+              {
+                key: "total",
+                header: "Total",
+                className: "tabular-nums",
+                render: (credit) => formatCOP(credit.total_amount),
+              },
+              {
+                key: "due",
+                header: "Vence",
+                className: "whitespace-nowrap",
+                render: (credit) => (credit.due_date === null ? "—" : formatDate(credit.due_date)),
+              },
+              {
+                key: "status",
+                header: "Estado",
+                render: (credit) => (
+                  <Badge tone={creditTone(credit)}>
+                    {CREDIT_LABELS[credit.status] ?? credit.status}
+                  </Badge>
+                ),
+              },
+            ]}
+            rows={rows}
+            rowKey={(credit) => String(credit.id)}
+            actions={(credit) => (
+              <button
+                className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                type="button"
+                onClick={() => setSelectedId(credit.id)}
+              >
+                Ver detalle
+              </button>
+            )}
+          />
+        </Box>
+      )}
+
+      {selected !== null && (
+        <Modal
+          title={`Crédito #${selected.id} · ${selected.store_name}`}
+          size="lg"
+          onClose={() => setSelectedId(null)}
+        >
+          <CreditDetail key={selected.id} credit={selected} onChanged={credits.reload} />
+        </Modal>
+      )}
     </section>
   );
 }

@@ -136,9 +136,7 @@ describe("RoleFormPage · alta /roles/new (ADM-8.1/8.2 · mitigación R3)", () =
     expect(rolesApi.createRole).not.toHaveBeenCalled();
     expect(rolesApi.updateRole).not.toHaveBeenCalled();
     expect(rolesApi.deleteRole).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/Elegí un nombre de rol del catálogo de la app/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Elegí un nombre de rol del catálogo de la app/)).toBeInTheDocument();
   });
 
   it("nombre vacío ⇒ error inline y CERO requests (zero-request convención)", async () => {
@@ -150,9 +148,7 @@ describe("RoleFormPage · alta /roles/new (ADM-8.1/8.2 · mitigación R3)", () =
 
     expect(rolesApi.createRole).not.toHaveBeenCalled();
     expect(rolesApi.updateRole).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/Elegí un nombre de rol del catálogo de la app/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Elegí un nombre de rol del catálogo de la app/)).toBeInTheDocument();
   });
 
   it("23505 del server (nombre ya existente) ⇒ mensaje amigable, jamás texto crudo", async () => {
@@ -209,9 +205,7 @@ describe("RoleFormPage · edición /roles/:id (ADM-8.4/8.5)", () => {
     const input = await screen.findByLabelText("Nombre del rol");
     expect(input).toBeDisabled();
     expect(input).toHaveValue("supervisor");
-    expect(
-      screen.getByRole("button", { name: "Eliminar rol" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Eliminar rol" })).toBeInTheDocument();
   });
 
   it("ADM-8.4: borrar rol en uso (23503) ⇒ mensaje amigable y el formulario permanece", async () => {
@@ -268,9 +262,7 @@ describe("RoleFormPage · edición /roles/:id (ADM-8.4/8.5)", () => {
     vi.mocked(rolesApi.fetchRole).mockResolvedValue({ row: null, error: sinFila });
     renderPagina("/roles/999");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "No se encontró el registro.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se encontró el registro.");
     // La página no crashea: el banner convive con el form (patrón
     // DistributorFormPage), pero el submit está blindado por el guard de id.
     expect(rolesApi.updateRole).not.toHaveBeenCalled();
@@ -280,9 +272,7 @@ describe("RoleFormPage · edición /roles/:id (ADM-8.4/8.5)", () => {
   it("URL de edición inválida (/roles/abc) ⇒ sin fetch y estado amigable", async () => {
     renderPagina("/roles/abc");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "No se encontró el registro.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se encontró el registro.");
     expect(rolesApi.fetchRole).not.toHaveBeenCalled();
   });
 });

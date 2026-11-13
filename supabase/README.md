@@ -1,26 +1,57 @@
 # FAROX — Migraciones Supabase (Sprint 1)
 
+> **Estado al 2026-11-13:** este README describe el Sprint 1 (0001-0012) y se conserva como registro. El esquema vigente llega a **0053**; la lista completa y el orden real viven en `supabase/migrations/`. Ver "Migraciones 0013-0053" abajo.
+
 Materialización del esquema según `Base de datos FAROX.md` (documento **autoridad**).
 12 migraciones numeradas que se ejecutan **en orden estricto** — el orden numérico
 del filename ES el orden de materialización del §7. Las 4 últimas (0009→0012)
 son el hardening de `sprint1-hardening` y comparten UNA ventana de mantenimiento
 (ver "Hardening 0009→0012" abajo).
 
-| # | Archivo | Qué hace |
-|---|---------|----------|
-| 1 | `20261015000001_extensions_enums.sql` | Extensiones (postgis, pg_cron) + los 11 enums (§1) |
-| 2 | `20261015000002_tables_reused.sql` | 11 tablas reutilizadas de NØSEE en su estado final (§2) |
-| 3 | `20261015000003_tables_farox.sql` | 14 tablas nuevas FAROX + 3 FKs diferidas (§3) |
-| 4 | `20261015000004_functions_triggers.sql` | Helpers, triggers y TODAS las RPC (§4) |
-| 5 | `20261015000005_seeds.sql` | Semilla mínima de catálogos (§7.6, D19) |
-| — | ⚠️ **PASO MANUAL — ver abajo** ⚠️ | Signup del primer admin + promoción |
-| 6 | `20261015000006_rls_grants.sql` | ENABLE RLS en las 25 tablas + policies + REVOKE/GRANT (§8/§4) |
-| 7 | `20261015000007_realtime_jobs.sql` | Publicación realtime podada + 3 jobs pg_cron diarios (§5/§7.10) |
-| 8 | `20261015000008_verify.sql` | Diagnóstico completo — no modifica nada (§7.11) |
-| 9 | `20261016000009_negocio.sql` | Hardening de negocio: helpers con `is_active`, guards de `confirm_delivery`/`register_entry`/`exit`, `create_order` con `is_active`, `create_credit` sólo sobre pedidos `delivered`, policies scoped de créditos/rutas (§4/§8) |
-| 10 | `20261016000010_perf.sql` | Performance: `confirm_delivery` con dedup y UN solo upsert de dashboard (1 evento realtime por entrega), índices parciales (`stock.expiry_date`, `orders.expected_at`, `alerts.store_id`), `audit_diff` precalculado, `get_dashboard` ≤366 días, `create_order` set-based |
-| 11 | `20261016000011_seguridad.sql` | Seguridad: `assert_admin()` (guard admin NULL-safe) + lockdown de grants deny-by-default (REVOKE de PUBLIC — bug PG #8685 —, whitelist de 31 firmas, PostGIS re-grant, `anon` sin DML) |
-| 12 | `20261016000012_verify_hardening.sql` | Verificación del hardening — no modifica nada (checks H1-H4) |
+| #   | Archivo                                 | Qué hace                                                                                                                                                                                                                                                                  |
+| --- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `20261015000001_extensions_enums.sql`   | Extensiones (postgis, pg_cron) + los 11 enums (§1)                                                                                                                                                                                                                        |
+| 2   | `20261015000002_tables_reused.sql`      | 11 tablas reutilizadas de NØSEE en su estado final (§2)                                                                                                                                                                                                                   |
+| 3   | `20261015000003_tables_farox.sql`       | 14 tablas nuevas FAROX + 3 FKs diferidas (§3)                                                                                                                                                                                                                             |
+| 4   | `20261015000004_functions_triggers.sql` | Helpers, triggers y TODAS las RPC (§4)                                                                                                                                                                                                                                    |
+| 5   | `20261015000005_seeds.sql`              | Semilla mínima de catálogos (§7.6, D19)                                                                                                                                                                                                                                   |
+| —   | ⚠️ **PASO MANUAL — ver abajo** ⚠️       | Signup del primer admin + promoción                                                                                                                                                                                                                                       |
+| 6   | `20261015000006_rls_grants.sql`         | ENABLE RLS en las 25 tablas + policies + REVOKE/GRANT (§8/§4)                                                                                                                                                                                                             |
+| 7   | `20261015000007_realtime_jobs.sql`      | Publicación realtime podada + 3 jobs pg_cron diarios (§5/§7.10)                                                                                                                                                                                                           |
+| 8   | `20261015000008_verify.sql`             | Diagnóstico completo — no modifica nada (§7.11)                                                                                                                                                                                                                           |
+| 9   | `20261016000009_negocio.sql`            | Hardening de negocio: helpers con `is_active`, guards de `confirm_delivery`/`register_entry`/`exit`, `create_order` con `is_active`, `create_credit` sólo sobre pedidos `delivered`, policies scoped de créditos/rutas (§4/§8)                                            |
+| 10  | `20261016000010_perf.sql`               | Performance: `confirm_delivery` con dedup y UN solo upsert de dashboard (1 evento realtime por entrega), índices parciales (`stock.expiry_date`, `orders.expected_at`, `alerts.store_id`), `audit_diff` precalculado, `get_dashboard` ≤366 días, `create_order` set-based |
+| 11  | `20261016000011_seguridad.sql`          | Seguridad: `assert_admin()` (guard admin NULL-safe) + lockdown de grants deny-by-default (REVOKE de PUBLIC — bug PG #8685 —, whitelist de 31 firmas, PostGIS re-grant, `anon` sin DML)                                                                                    |
+| 12  | `20261016000012_verify_hardening.sql`   | Verificación del hardening — no modifica nada (checks H1-H4)                                                                                                                                                                                                              |
+
+---
+
+## Migraciones 0013-0053 (estado 2026-11-13)
+
+El esquema creció bastante más allá del Sprint 1. Estas son las migraciones posteriores, en orden de filename. El orden real es el timestamp completo; los prefijos cortos se conservan solo como referencia.
+
+| Rango     | Área                          | Hitos                                                                                                                                                                                                                                        |
+| --------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0013-0015 | Registro y alcance            | `create_store` con ubicación, `register_distributor`, `user_stores` SELECT, guards del último admin                                                                                                                                          |
+| 0017-0018 | QR y RLS                      | `store_distributors`, `link_code`, RPC de vínculo; fix de recursión de policies en rutas/stock                                                                                                                                               |
+| 0019-0022 | Catálogo por rol              | Catálogo de tienda/distribuidor/admin, vínculo para operadores, solicitudes a distribuidores                                                                                                                                                 |
+| 0023-0030 | Pedidos, inventario y precios | Faltantes y fiado del operador, cotización, ciclo del pedido, alta/edición de inventario, precios Premium, entregas y ventas, relaciones producto↔tienda/distribuidor                                                                        |
+| 0031-0036 | Alertas y Premium             | Alertas del distribuidor, vencimiento/planes, downgrade de tiendas, gestión de tiendas, Mercado Pago, avisos admin                                                                                                                           |
+| 0037-0038 | Tickets                       | Ventas/compras multi-producto, descuentos y tickets recurrentes                                                                                                                                                                              |
+| 0039      | Asistente fase 1              | `create_chat(p_title, p_store)` con tienda, tools `agent_search_products`, `agent_stock`, `agent_last_order`                                                                                                                                 |
+| 0040-0041 | Límites                       | Topes de texto/jsonb, rate limit de chat en la BD; ranking de productos (`20261103000040`)                                                                                                                                                   |
+| 0042      | Teléfono                      | `phone_verifications`, normalización E.164, unicidad del teléfono verificado                                                                                                                                                                 |
+| 0043-0047 | Precios                       | Carga masiva tienda/distribuidor, autollenado, margen global y por producto, costo manual                                                                                                                                                    |
+| 0048      | Pulido                        | Normalización de teléfono, rate limit por hora, batching del dashboard, egreso de chat                                                                                                                                                       |
+| 0049-0053 | Asistente fase 2              | `agent_actions`, ejecución única, WhatsApp (`*_for_user`, `whatsapp_inbound`), fix de conversaciones por usuario; 0052 marca los wrappers como VOLATILE; 0053 serializa `send_message`, normaliza `wa_id` con `+` y purga `whatsapp_inbound` |
+
+**Notas:**
+
+- **Dos "0040":** `20261103000040_ranking_productos.sql` y `20261104000040_limites_texto.sql`. No colisionan porque el timestamp completo es distinto, pero el número corto se repite.
+- **0016 no existe:** el `append_chat_reply` planificado nunca se creó. El asistente escribe `assistant`/`tool` desde la Edge Function con `service_role`, después de validar el JWT.
+- **Convención de nombres:** 0019-0048 usan `YYYYMMDD0000NN` (el número corto va en los segundos); desde 0049 usan `YYYYMMDDHHMMSS` real, el default de `supabase migration new`. El orden siempre lo decide el prefijo completo.
+- **Baseline remoto:** el historial de `supabase_migrations.schema_migrations` se marcó hasta 0048 y luego se aplicaron 0049-0051; **0052 y 0053 quedan pendientes**. `supabase migration list` mostrará esas pendientes.
+- **Edge Functions:** `agent` (verify_jwt), `whatsapp-webhook` (verify_jwt=false, valida firma de Meta), `agent-health` (verify_jwt=false, `x-cron-secret`). Deploy: `supabase functions deploy agent`, `supabase functions deploy whatsapp-webhook --no-verify-jwt`.
 
 ---
 
@@ -51,7 +82,7 @@ Cualquier medio de signup de Supabase Auth (la app, el dashboard en
 Authentication → Users → "Add user", o el SDK). El trigger
 `on_auth_user_created` inserta la fila en `public.users` con rol `operador`.
 
-> Si el trigger fallara con *"roles sin sembrar"* es que 0005 no corrió —
+> Si el trigger fallara con _"roles sin sembrar"_ es que 0005 no corrió —
 > corré 0005 y repetí el signup (borrá el usuario huérfano de Authentication
 > primero si quedó).
 
@@ -89,11 +120,11 @@ WHERE u.id = '<UUID>'::uuid AND r.name = 'admin';
 > editor — `session_user() = 'postgres' AND auth.uid() IS NULL`
 > (bootstrap C2). En PostgREST `session_user` es `authenticator`, así que
 > ninguna app, CLI o caller con anon key toma ese bypass: un cliente con
-> `auth.uid()` NULL recibe `'solo admin'`. *(El bypass implícito del
+> `auth.uid()` NULL recibe `'solo admin'`. _(El bypass implícito del
 > guard original `my_role() <> 'admin'` — sin JWT, `my_role()` es NULL y
 > la comparación no aplicaba — ya no existe en la secuencia actual: 0004
 > lo cerró con `IS DISTINCT FROM` (B3) y 0011 lo re-abre **sólo**,
-> explícito, para la sesión del SQL editor.)*
+> explícito, para la sesión del SQL editor.)_
 >
 > Cambio de roles vía API (sólo **después** del bootstrap, no lo reemplaza):
 > con un admin activo ya promovido, logueate como ese admin en la app, copiá
@@ -120,7 +151,7 @@ WHERE u.id = '<UUID>'::uuid AND r.name = 'admin';
 > (B3) y 0006 suma `REVOKE EXECUTE ... FROM PUBLIC/anon`, así que con el
 > anon key la llamada ya revienta con `permission denied` ANTES de correr
 > el body; 0011 refuerza esa capa para el futuro — `ALTER DEFAULT
-> PRIVILEGES` (sin `IN SCHEMA` para PUBLIC, que con la bug PG #8685 sería
+PRIVILEGES` (sin `IN SCHEMA` para PUBLIC, que con la bug PG #8685 sería
 > no-op) + sweep + whitelist explícita de 31 firmas (26 RPC + 5 helpers)
 > que sólo devuelve `EXECUTE` a `authenticated`/`service_role`, de modo que
 > toda función que agregue una migración futura nace sin EXECUTE para

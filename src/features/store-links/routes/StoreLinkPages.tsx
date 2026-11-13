@@ -22,6 +22,7 @@ import {
   unlinkDistributor,
 } from "../api";
 import { QrScanner } from "../components/QrScanner";
+import { ContactButton } from "../components/ContactButton";
 import { parseLinkCode } from "../scan";
 
 /** Código + QR + distribuidores vinculados de UNA tienda. */
@@ -92,6 +93,7 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
                     desde {new Date(l.created_at).toLocaleDateString("es-CO")}
                   </span>
                 </span>
+                <ContactButton kind="distribuidor" id={l.distributor_id} name={l.name} />
                 <Link
                   className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
                   to={`/pedidos/nuevo?storeId=${storeId}&distributorId=${l.distributor_id}`}
@@ -241,7 +243,7 @@ export function StoreQrPage() {
         </svg>
         Inventario de la tienda
       </Link>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Vínculos
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -299,7 +301,7 @@ export function LinkStorePage() {
 
   return (
     <section className="mx-auto max-w-xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Vínculos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Vínculos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Vincular tienda</h1>
       <p className="mt-1 text-sm text-gray-500">
         Escaneá el QR que te compartió la tienda o escribí el código para quedar vinculado.

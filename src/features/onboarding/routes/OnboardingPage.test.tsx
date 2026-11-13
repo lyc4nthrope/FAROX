@@ -329,7 +329,9 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
 
     expect(await screen.findByText("Ingresá el NIT")).toBeInTheDocument();
     expect(onboardingApi.registerDistributor).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Registrarme como distribuidor" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrarme como distribuidor" }),
+    ).toBeInTheDocument();
   });
 
   it("cap-1 (ya tenés un distribuidor): mensaje MAPEADO, jamás el crudo, sin navegación", async () => {
@@ -350,7 +352,9 @@ describe("OnboardingPage · terminal [Distribuidor] → register_distributor (T2
     );
     expect(screen.queryByText(/ya tenés un distribuidor asociado/)).not.toBeInTheDocument();
     // Sigo en el form (retry) y sin refetch de señales.
-    expect(screen.getByRole("button", { name: "Registrarme como distribuidor" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Registrarme como distribuidor" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("llegaste al inicio")).not.toBeInTheDocument();
     expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(1);
   });
@@ -423,7 +427,9 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
     await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
 
-    expect(await screen.findByText("Ingresá una latitud válida entre -90 y 90")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Ingresá una latitud válida entre -90 y 90"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Ingresá una longitud válida entre -180 y 180")).toBeInTheDocument();
     expect(onboardingApi.createStore).not.toHaveBeenCalled();
   });
@@ -475,7 +481,9 @@ describe("OnboardingPage · terminal [Mi tienda] → create_store (T2.5, S-D3.B)
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
     await user.click(screen.getByRole("button", { name: "Poner pin" }));
 
-    expect(await screen.findByText("Dirección resuelta: Carrera 7 #1-1, Bogotá")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Dirección resuelta: Carrera 7 #1-1, Bogotá"),
+    ).toBeInTheDocument();
     expect(nominatim.reverseGeocode).toHaveBeenCalledWith(4.6097, -74.0631);
     await user.click(screen.getByRole("button", { name: "Crear mi tienda" }));
 
@@ -553,9 +561,7 @@ describe("OnboardingPage · terminal [Trabajo en tienda] → pasiva (T2.6, S-D3.
     await elegir(user, "Tienda");
     await elegir(user, "Trabajo en tienda");
 
-    expect(
-      await screen.findByText(/no vas a ver pedidos ni stock/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no vas a ver pedidos ni stock/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Entendido" }));
 
     expect(await screen.findByText("llegaste al inicio")).toBeInTheDocument();

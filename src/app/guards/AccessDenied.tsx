@@ -10,8 +10,8 @@ export function AccessDenied() {
         Acceso denegado
       </h1>
       <p className="mt-2 text-sm">
-        No tenés permisos para ver esta sección. Si creés que es un error,
-        contactá a un administrador.
+        No tenés permisos para ver esta sección. Si creés que es un error, contactá a un
+        administrador.
       </p>
     </section>
   );

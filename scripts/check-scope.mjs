@@ -9,19 +9,12 @@ import { join, relative } from "node:path";
 const SRC = join(process.cwd(), "src");
 
 // §S8-1 · 21 RPCs diferidos (whitelist Base:642-659; 10 en alcance + 21 = 31).
-const DEFERRED_RPCS = [
-  "get_stock",
-  "create_chat",
-  "send_message",
-];
+// 0039: create_chat / send_message / chat_* ya son parte del alcance real
+// (asistente de consultas), asi que salen de las listas diferidas.
+const DEFERRED_RPCS = ["get_stock"];
 
 // Tablas todavía no habilitadas en el front (el resto ya tiene slice).
-const DEFERRED_TABLES = [
-  "order_items",
-  "dashboard_daily",
-  "chat_conversations",
-  "chat_messages",
-];
+const DEFERRED_TABLES = ["order_items", "dashboard_daily"];
 
 const QUOTE = "['\"`]";
 
@@ -41,9 +34,20 @@ const RULES = [
     // STORE-1 negative: INSERT directo en stores está REVOKE-ado (0006:360) —
     // la creación pasa SOLO por rpc create_store. upsert incluido: también inserta.
     name: "INSERT/UPSERT directo en stores (STORE-1)",
-    regex: new RegExp(`\\.from\\(\\s*${QUOTE}stores${QUOTE}\\s*\\)\\s*\\.\\s*(insert|upsert)\\b`, "s"),
+    regex: new RegExp(
+      `\\.from\\(\\s*${QUOTE}stores${QUOTE}\\s*\\)\\s*\\.\\s*(insert|upsert)\\b`,
+      "s",
+    ),
   },
 ];
+
+// C5 (dashboard INT-01): Base D32 eligió realtime sobre polling por costo, así
+// que el canal se permite SOLO en los archivos del dashboard. El resto del
+// front sigue sin realtime (§S8-4).
+const REALTIME_ALLOWED = new Set([
+  "src/features/logistics/routes/DashboardPage.tsx",
+  "src/features/logistics/routes/DashboardPage.test.tsx",
+]);
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -63,9 +67,12 @@ for await (const file of walk(SRC)) {
   if (!/\.(ts|tsx)$/.test(file)) continue;
   scanned += 1;
   const content = await readFile(file, "utf8");
+  const rel = relative(process.cwd(), file).split("\\").join("/");
+  const realtimeAllowed = REALTIME_ALLOWED.has(rel);
   for (const rule of RULES) {
+    if (realtimeAllowed && rule.name.startsWith("canal de realtime")) continue;
     if (rule.regex.test(content)) {
-      violations.push(`${relative(process.cwd(), file)} → ${rule.name}`);
+      violations.push(`${rel} → ${rule.name}`);
     }
   }
 }

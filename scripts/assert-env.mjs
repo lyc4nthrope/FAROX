@@ -25,9 +25,15 @@ const missing = names.filter((name) => {
 
 if (missing.length > 0) {
   for (const name of missing) {
-    console.log(esc(`::error:: falta '${name}' (vacía o no definida) — configurala en GitHub Actions (Variables de repo o secrets del Environment; gates G2/T4.1). Este job falla a propósito acá: nunca corre sin ella.`));
+    console.log(
+      esc(
+        `::error:: falta '${name}' (vacía o no definida) — configurala en GitHub Actions (Variables de repo o secrets del Environment; gates G2/T4.1). Este job falla a propósito acá: nunca corre sin ella.`,
+      ),
+    );
   }
-  console.error(`assert-env FALLÓ — ${missing.length} de ${names.length} valor(es) ausente(s): ${missing.join(", ")}`);
+  console.error(
+    `assert-env FALLÓ — ${missing.length} de ${names.length} valor(es) ausente(s): ${missing.join(", ")}`,
+  );
   process.exit(1);
 }
 

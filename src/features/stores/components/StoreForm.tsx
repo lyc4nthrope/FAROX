@@ -1,3 +1,4 @@
+import { LIMITS } from "../../../shared/lib/limits";
 import { MapLocationField } from "../../../shared/ui/LocationPicker/MapLocationField";
 import type { StoreFormValues } from "../schemas";
 import type { StoreTypeRef } from "../types";
@@ -20,8 +21,8 @@ export interface StoreFormProps {
   // por si el guard de la ruta cambia (idea:134: ocultar es UX, la DB manda).
   readOnly: boolean;
   // admin en modo edición (el borrado en dos pasos vive en el contenedor):
-  // SEC-01 idea:114 — operador crea/edita pero NO borra (idea:130 "sin
-  // destruir"); el DELETE es admin-only (0006:172-174).
+  // SEC-01 idea:114 - operador crea/edita. 0034 le permite desactivar su
+  // propia tienda (soft-delete); el DELETE duro sigue admin-only (0006:172-174).
   canDelete: boolean;
   submitLabel: string;
   storeTypes: StoreTypeRef[];
@@ -96,6 +97,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.name}
+          maxLength={LIMITS.storeName}
           aria-invalid={errors.name !== undefined}
           aria-describedby={errors.name === undefined ? undefined : "store-name-error"}
           onChange={(event) => onChange({ ...values, name: event.target.value })}
@@ -142,6 +144,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.address}
+          maxLength={LIMITS.storeAddress}
           onChange={(event) => onChange({ ...values, address: event.target.value })}
         />
       </div>
@@ -155,6 +158,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.city}
+          maxLength={LIMITS.storeCity}
           onChange={(event) => onChange({ ...values, city: event.target.value })}
         />
       </div>
@@ -168,6 +172,7 @@ export function StoreForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.phone}
+          maxLength={LIMITS.storePhone}
           onChange={(event) => onChange({ ...values, phone: event.target.value })}
         />
       </div>

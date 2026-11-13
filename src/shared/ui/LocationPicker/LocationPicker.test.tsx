@@ -181,9 +181,7 @@ describe("LocationPicker (mapa imperativo Leaflet)", () => {
     expect(L.tileLayer).toHaveBeenCalledWith(TILE_PROVIDERS[0].url, TILE_PROVIDERS[0].options);
     // En el env de test no hay VITE_CARTO_KEY ⇒ el primario resuelto es OSM
     // (sin host cartocdn): el watermark "API key required" es imposible.
-    expect(TILE_PROVIDERS[0].url).toBe(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    );
+    expect(TILE_PROVIDERS[0].url).toBe("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png");
   });
 
   it("la vista inicial usa las coordenadas existentes (edición) y pinta el marker", () => {

@@ -68,6 +68,19 @@ export const PRIVACY_THIRD_PARTIES: readonly ThirdParty[] = [
       "COORDENADAS —o el texto de la dirección— para traducirlas a una dirección legible (geocodificación " +
       "inversa y directa). Nominatim recibe las coordenadas exactas de la tienda que estás creando o editando.",
   },
+  {
+    name: "Mercado Pago (https://www.mercadopago.com.co)",
+    receives:
+      "si contratás Premium, Mercado Pago recibe tu email, el plan, el monto y la referencia de la suscripción " +
+      "para procesar el cobro recurrente. Los datos de tarjeta los maneja Mercado Pago; FAROX no los almacena. " +
+      "Mercado Pago devuelve el estado del pago y de la suscripción para activar o cancelar Premium.",
+  },
+  {
+    name: "Resend (https://resend.com)",
+    receives:
+      "si tenés Premium o una suscripción, Resend recibe tu email y nombre para enviarte avisos de renovación, " +
+      "vencimiento, gracia, pago rechazado o cancelación. No recibe datos de tarjeta ni el detalle de tus tiendas.",
+  },
 ];
 
 export const PRIVACY_SECTIONS: readonly PrivacySection[] = [

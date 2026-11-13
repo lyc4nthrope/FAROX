@@ -94,9 +94,7 @@ describe("RolesPage (ADM-8 · lista /roles)", () => {
 
     expect(await screen.findByText("admin")).toBeInTheDocument();
     expect(screen.getByText("operador")).toBeInTheDocument();
-    expect(
-      screen.getByText("Rol viejo de otra época"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Rol viejo de otra época")).toBeInTheDocument();
     expect(rolesApi.fetchRoles).toHaveBeenCalledTimes(1);
   });
 
@@ -106,9 +104,7 @@ describe("RolesPage (ADM-8 · lista /roles)", () => {
     const supervisor = await screen.findByRole("link", { name: "supervisor" });
     const fila = supervisor.closest("tr");
     expect(fila).not.toBeNull();
-    expect(
-      screen.getByText("Rol no reconocido: degrada a «sin rol»"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Rol no reconocido: degrada a «sin rol»")).toBeInTheDocument();
   });
 
   it("C0.4: toda fila enlaza a su edición y no hay botones de borrar en la lista", async () => {
@@ -130,9 +126,7 @@ describe("RolesPage (ADM-8 · lista /roles)", () => {
     vi.mocked(rolesApi.fetchRoles).mockResolvedValue({ rows: [], error: null });
     renderPagina();
 
-    expect(
-      await screen.findByText("Todavía no hay roles cargados."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no hay roles cargados.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 

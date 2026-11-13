@@ -13,10 +13,7 @@ export interface CurrentSession {
   email: string | null;
 }
 
-export type AuthSessionListener = (
-  event: AuthChangeEvent,
-  session: CurrentSession | null,
-) => void;
+export type AuthSessionListener = (event: AuthChangeEvent, session: CurrentSession | null) => void;
 
 // Devolvemos solo { message } en errores: el texto crudo NUNCA se renderiza
 // (la taxonomía completa mapError() es B3/T3.1 — D5).
@@ -120,9 +117,7 @@ export async function resendConfirmationEmail(
 // código es de UN solo uso: sin canjearlo, confirmar NO otorga sesión.
 
 export type ConfirmEmailOutcome =
-  | { status: "ok" }
-  | { status: "missing-code" }
-  | { status: "error"; error: AuthOperationError };
+  { status: "ok" } | { status: "missing-code" } | { status: "error"; error: AuthOperationError };
 
 // Método VERIFICADO contra las types instaladas (@supabase/supabase-js
 // 2.118.0 → auth-js GoTrueClient.d.ts:856-858):
@@ -178,9 +173,7 @@ export async function updatePassword(
 }
 
 export type RecoverySessionOutcome =
-  | { status: "ready" }
-  | { status: "missing" }
-  | { status: "error"; error: AuthOperationError };
+  { status: "ready" } | { status: "missing" } | { status: "error"; error: AuthOperationError };
 
 // El link de recuperación llega con el mismo contrato que el de confirmación:
 // ?code= (PKCE) o #access_token (implícito, ya canjeado por el SDK). Se
@@ -210,10 +203,7 @@ export async function fetchPrivileges(): Promise<Privileges> {
       supabase.rpc("is_premium"),
     ]);
     if (roleResult.error !== null || premiumResult.error !== null) {
-      console.error(
-        "[FAROX] Privilegios no disponibles:",
-        roleResult.error ?? premiumResult.error,
-      );
+      console.error("[FAROX] Privilegios no disponibles:", roleResult.error ?? premiumResult.error);
       return { role: null, premium: false, transient: true };
     }
     return { role: normalizeRole(roleResult.data), premium: premiumResult.data === true };

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  deriveNeedsOnboarding,
-  hasDistributorId,
-  hasOwnedStores,
-  hasStoreIds,
-} from "./detection";
+import { deriveNeedsOnboarding, hasDistributorId, hasOwnedStores, hasStoreIds } from "./detection";
 
 // Predicado puro de la pregunta (T2.1 · R-D3.2/R-D3.3 · design #538 §5.1):
 // 4 combinaciones de señales + el ack de sesión de [Trabajo en tienda].

@@ -24,9 +24,7 @@ describe("CatalogsPage — índice /catalogs con las 4 pantallas del motor", () 
   it("pinta el título y los 4 links hacia /catalogs/:catalogKey", async () => {
     renderPagina();
 
-    expect(
-      await screen.findByRole("heading", { name: "Catálogos" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Catálogos" })).toBeInTheDocument();
     const esperados: Array<[string, string]> = [
       ["Tipos de unidad", "/catalogs/unit_types"],
       ["Tipos de tienda", "/catalogs/store_types"],
@@ -34,9 +32,7 @@ describe("CatalogsPage — índice /catalogs con las 4 pantallas del motor", () 
       ["Categorías de producto", "/catalogs/product_categories"],
     ];
     for (const [nombre, href] of esperados) {
-      expect(
-        screen.getByRole("link", { name: nombre }),
-      ).toHaveAttribute("href", href);
+      expect(screen.getByRole("link", { name: nombre })).toHaveAttribute("href", href);
     }
   });
 

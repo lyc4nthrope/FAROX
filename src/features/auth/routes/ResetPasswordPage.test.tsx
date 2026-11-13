@@ -99,10 +99,7 @@ describe("ResetPasswordPage · elegir la nueva contraseña", () => {
 
     expect(await screen.findByText("Contraseña actualizada")).toBeInTheDocument();
     expect(authApi.updatePassword).toHaveBeenCalledWith("nueva123");
-    expect(screen.getByRole("link", { name: "Ir al inicio" })).toHaveAttribute(
-      "href",
-      "/inicio",
-    );
+    expect(screen.getByRole("link", { name: "Ir al inicio" })).toHaveAttribute("href", "/inicio");
   });
 
   it("weak_password: mensaje propio, sin texto crudo", async () => {

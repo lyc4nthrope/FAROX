@@ -59,11 +59,7 @@ export function MyCatalogPage() {
           </p>
         </div>
         {target !== null && (
-          <button
-            className={buttonClass}
-            type="button"
-            onClick={() => setAdding(true)}
-          >
+          <button className={buttonClass} type="button" onClick={() => setAdding(true)}>
             Agregar producto
           </button>
         )}
@@ -97,11 +93,7 @@ export function MyCatalogPage() {
       {target !== null && (
         <>
           <div className="mt-4">
-            <CatalogBox
-              target={target}
-              categories={categories.data ?? []}
-              reloadToken={version}
-            />
+            <CatalogBox target={target} categories={categories.data ?? []} reloadToken={version} />
           </div>
           {adding && (
             <Modal title="Agregar productos a mi catálogo" onClose={() => setAdding(false)}>

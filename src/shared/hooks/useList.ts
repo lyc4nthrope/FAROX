@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { mapError } from "../lib/errors/mapError";
 import { initialListQuery, type ListQuery, type ListResult } from "../lib/list";
+import { REFRESH_EVENT } from "./useLoad";
 
 // D4 · useList (T3.2 — diseño #486): contenedor genérico de listados, a mano
 // (TanStack Query rechazado: dependencia extra para 3 CRUDs — D4).
@@ -9,9 +10,7 @@ import { initialListQuery, type ListQuery, type ListResult } from "../lib/list";
 // CERO realtime (§S8-4): el refresco es por refetch, jamás por suscripción.
 // El hook NO importa supabase: el fetcher es la capa api de la feature (D1).
 
-export type ListFetcher<T, Q extends ListQuery = ListQuery> = (
-  query: Q,
-) => Promise<ListResult<T>>;
+export type ListFetcher<T, Q extends ListQuery = ListQuery> = (query: Q) => Promise<ListResult<T>>;
 
 /**
  * Estado del listado. `error` ya viene MAPEADO por mapError(): el texto
@@ -101,6 +100,14 @@ export function useList<T, Q extends ListQuery = ListQuery>(
   const refetch = useCallback(() => {
     setReloadKey((key) => key + 1);
   }, []);
+
+  useEffect(() => {
+    function onRefresh(): void {
+      refetch();
+    }
+    window.addEventListener(REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(REFRESH_EVENT, onRefresh);
+  }, [refetch]);
 
   const setPage = useCallback((page: number) => {
     setQueryState((current) => (current.page === page ? current : { ...current, page }));

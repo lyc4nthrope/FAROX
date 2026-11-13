@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../auth/types";
 import * as authApi from "../../auth/api";
+import * as productsApi from "../../products/api";
 import * as storeLinksApi from "../../store-links/api";
 import * as ordersApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
@@ -19,6 +20,9 @@ vi.mock("../api", () => ({
 vi.mock("../../store-links/api", () => ({
   fetchLinkedDistributorOptions: vi.fn(),
   fetchStoreDistributorProducts: vi.fn(),
+}));
+vi.mock("../../products/api", () => ({
+  fetchShortageProducts: vi.fn(),
 }));
 vi.mock("../../auth/api", () => ({
   getSession: vi.fn(),
@@ -42,6 +46,14 @@ function renderPage(role: RoleName, path = "/pedidos/nuevo") {
   );
 }
 
+/** Un solo buscador: escribe el término y agrega el resultado por su nombre. */
+async function addProduct(user: ReturnType<typeof userEvent.setup>, name: string): Promise<void> {
+  const search = await screen.findByLabelText("Buscar producto");
+  await user.clear(search);
+  await user.type(search, name);
+  await user.click(await screen.findByRole("button", { name: `Agregar ${name}` }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
@@ -58,7 +70,7 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(ordersApi.fetchStoreProducts).mockResolvedValue({
-    data: [{ id: 10, name: "Arroz" }],
+    data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12 }],
     error: null,
   });
   vi.mocked(storeLinksApi.fetchLinkedDistributorOptions).mockResolvedValue({
@@ -67,11 +79,12 @@ beforeEach(() => {
   });
   vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
     data: [
-      { id: 10, name: "Arroz", price: 4500 },
-      { id: 11, name: "Aceite", price: null },
+      { id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 },
+      { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
     ],
     error: null,
   });
+  vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({ data: [], error: null });
 });
 
 afterEach(() => {
@@ -79,8 +92,9 @@ afterEach(() => {
 });
 
 describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", () => {
-  it("operador: solo distribuidores vinculados y productos de la intersección con precio", async () => {
+  it("operador: un solo buscador con la intersección y el precio informativo", async () => {
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
 
     expect(await screen.findByLabelText("Tienda")).toHaveValue("3");
     expect(await screen.findByLabelText("Distribuidor")).toHaveValue("7");
@@ -91,11 +105,46 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(ordersApi.fetchDistributorOptions).not.toHaveBeenCalled();
     expect(ordersApi.fetchStoreProducts).not.toHaveBeenCalled();
 
-    const product = screen.getByLabelText("Producto 1");
-    const arroz = await screen.findByRole("option", { name: /^Arroz/ });
-    expect(arroz).toHaveTextContent("4.500");
-    expect(screen.getByRole("option", { name: "Aceite (sin precio)" })).toBeDisabled();
-    expect(product).toHaveValue("");
+    const search = screen.getByLabelText("Buscar producto");
+    await user.type(search, "arroz");
+    expect(await screen.findByText("Arroz")).toBeInTheDocument();
+    expect(screen.getByText(/4\.500/)).toBeInTheDocument();
+    expect(screen.queryByText("Aceite")).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "aceite");
+    expect(await screen.findByText("Aceite")).toBeInTheDocument();
+    expect(screen.getByText(/sin precio/)).toBeInTheDocument();
+    // 0024: sin precio ya no bloquea la solicitud; el distribuidor la cotiza.
+    expect(screen.getByRole("button", { name: "Agregar Aceite" })).toBeEnabled();
+  });
+
+  it("busca por marca y el stock mínimo es un filtro que se muestra solo al abrirlo", async () => {
+    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
+      data: [
+        { id: 10, name: "Arroz", brand: "Diana", quantity: 12, price: 4500 },
+        { id: 11, name: "Aceite", brand: "Premier", quantity: 0, price: 3000 },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    const search = await screen.findByLabelText("Buscar producto");
+    await user.type(search, "premier");
+    expect(await screen.findByText("Aceite")).toBeInTheDocument();
+    expect(screen.queryByText("Arroz")).not.toBeInTheDocument();
+
+    // El campo de stock mínimo NO aparece por defecto.
+    expect(screen.queryByLabelText("Stock mínimo")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Filtros" }));
+    expect(screen.getByLabelText("Stock mínimo")).toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "a");
+    await user.type(screen.getByLabelText("Stock mínimo"), "5");
+    expect(await screen.findByText("Arroz")).toBeInTheDocument();
+    expect(screen.queryByText("Aceite")).not.toBeInTheDocument();
   });
 
   it("operador sin vínculos: explica que debe vincular un distribuidor", async () => {
@@ -112,60 +161,106 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     ).toBeInTheDocument();
   });
 
-  // create_order rechaza productos sin precio activo en la tienda (D40); sin
-  // este aviso el selector solo muestra opciones deshabilitadas y parece roto.
-  it("operador con productos sin precio: explica por qué y enlaza al inventario de la tienda", async () => {
+  // 0024: la solicitud nace sin precio y el distribuidor la cotiza después.
+  it("operador: puede pedir un producto sin precio y la cantidad usa − / +", async () => {
+    vi.mocked(ordersApi.createOrder).mockResolvedValue({ data: 42, error: null });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
 
-    const notice = await screen.findByText(
-      /1 producto no tiene precio en esta tienda y no se puede pedir\./,
-    );
-    expect(notice).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Publicá su precio en Inventario" })).toHaveAttribute(
-      "href",
-      "/inventario/3",
+    await addProduct(user, "Aceite");
+    const quantity = screen.getByLabelText("Cantidad de Aceite");
+    expect(quantity).toHaveValue(1);
+    expect(screen.queryByText(/no tiene precio en esta tienda/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Inventario/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sumar cantidad de Aceite" }));
+    await user.click(screen.getByRole("button", { name: "Sumar cantidad de Aceite" }));
+    expect(quantity).toHaveValue(3);
+
+    await user.click(screen.getByRole("button", { name: "Crear pedido" }));
+
+    await waitFor(() =>
+      expect(ordersApi.createOrder).toHaveBeenCalledWith({
+        storeId: 3,
+        distributorId: 7,
+        items: [{ product_id: 11, quantity: 3 }],
+        expectedAt: null,
+        notes: null,
+      }),
     );
   });
 
-  it("operador sin ningún producto con precio: lo dice en plural", async () => {
+  it("un solo buscador: los productos se acumulan abajo y no se duplican", async () => {
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    await addProduct(user, "Arroz");
+    await addProduct(user, "Aceite");
+
+    expect(screen.getAllByLabelText("Buscar producto")).toHaveLength(1);
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1);
+    expect(screen.getByLabelText("Cantidad de Aceite")).toHaveValue(1);
+    // El buscador quedó vacío tras agregar: no hay resultados abiertos.
+    expect(screen.getByLabelText("Buscar producto")).toHaveValue("");
+
+    // El restar nunca baja de 1.
+    expect(screen.getByRole("button", { name: "Restar cantidad de Arroz" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Sumar cantidad de Arroz" }));
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(2);
+    await user.click(screen.getByRole("button", { name: "Restar cantidad de Arroz" }));
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1);
+
+    // Buscar el mismo producto otra vez no crea una segunda línea.
+    const search = screen.getByLabelText("Buscar producto");
+    await user.type(search, "arroz");
+    expect(await screen.findByRole("button", { name: "Agregar Arroz" })).toBeDisabled();
+    expect(screen.getAllByLabelText("Cantidad de Arroz")).toHaveLength(1);
+  });
+
+  it("la fila del resultado también agrega el producto", async () => {
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByLabelText("Buscar producto"), "arroz");
+    await user.click(await screen.findByText("Arroz"));
+
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1);
+  });
+
+  it("operador con todos los productos sin precio: igual puede solicitar", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [
-        { id: 10, name: "Arroz", price: null },
-        { id: 11, name: "Aceite", price: null },
+        { id: 10, name: "Arroz", brand: null, quantity: null, price: null },
+        { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
       ],
       error: null,
     });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
 
-    expect(
-      await screen.findByText(/2 productos no tienen precio en esta tienda y no se pueden pedir\./),
-    ).toBeInTheDocument();
+    const search = await screen.findByLabelText("Buscar producto");
+    await user.type(search, "arroz");
+    expect(await screen.findByRole("button", { name: "Agregar Arroz" })).toBeEnabled();
+    expect(screen.queryByText(/no tienen precio en esta tienda/)).not.toBeInTheDocument();
+
+    await user.clear(search);
+    await user.type(search, "aceite");
+    expect(await screen.findByRole("button", { name: "Agregar Aceite" })).toBeEnabled();
   });
 
-  it("operador con todos los productos con precio: no muestra el aviso", async () => {
-    vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
-      data: [{ id: 10, name: "Arroz", price: 4500 }],
-      error: null,
-    });
-    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
-
-    await screen.findByRole("option", { name: /^Arroz/ });
-    expect(screen.queryByText(/no tiene precio en esta tienda/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Inventario/ })).not.toBeInTheDocument();
-  });
-
-  it("cambiar de tienda limpia distribuidor, líneas y vuelve a consultar", async () => {
+  it("cambiar de tienda limpia distribuidor y productos solicitados", async () => {
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
     const user = userEvent.setup();
 
     expect(await screen.findByLabelText("Distribuidor")).toHaveValue("7");
-    await user.selectOptions(await screen.findByLabelText("Producto 1"), "10");
-    await user.type(screen.getByLabelText("Cantidad 1"), "2");
+    await addProduct(user, "Arroz");
     await user.selectOptions(screen.getByLabelText("Tienda"), "4");
 
     expect(screen.getByLabelText("Distribuidor")).toHaveValue("");
-    expect(screen.getByLabelText("Producto 1")).toHaveValue("");
-    expect(screen.getByLabelText("Cantidad 1")).toHaveValue(null);
+    expect(screen.queryByLabelText("Cantidad de Arroz")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Buscá un producto arriba o agregá un faltante para empezar la solicitud."),
+    ).toBeInTheDocument();
     await waitFor(() =>
       expect(storeLinksApi.fetchLinkedDistributorOptions).toHaveBeenCalledWith(4),
     );
@@ -173,25 +268,134 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
 
   it("admin: conserva distribuidores globales y productos de la tienda", async () => {
     renderPage("admin", "/pedidos/nuevo?storeId=3");
+    const user = userEvent.setup();
 
     expect(await screen.findByRole("option", { name: "Distribuidora Global" })).toBeInTheDocument();
-    expect(await screen.findByRole("option", { name: "Arroz" })).toBeInTheDocument();
+    await addProduct(user, "Arroz");
+    expect(screen.getByLabelText("Cantidad de Arroz")).toBeInTheDocument();
     expect(ordersApi.fetchDistributorOptions).toHaveBeenCalledTimes(1);
     expect(ordersApi.fetchStoreProducts).toHaveBeenCalledWith(3);
     expect(storeLinksApi.fetchStoreDistributorProducts).not.toHaveBeenCalled();
   });
 
-  // S3: /faltantes llega con los productos elegidos; solo se precargan los
-  // pedibles (con precio) y con cantidad 1 para ajustar.
-  it("operador desde faltantes: precarga los productos pedibles y descarta los que no tienen precio", async () => {
+  // S3: /faltantes llega con los productos elegidos; 0024 ya no descarta los
+  // que no tienen precio: se precargan todos con cantidad 1 para ajustar.
+  it("operador desde faltantes: precarga todos los productos del filtro", async () => {
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7&faltantes=10,11");
 
-    await waitFor(() => expect(screen.getByLabelText("Producto 1")).toHaveValue("10"));
-    expect(screen.getByLabelText("Cantidad 1")).toHaveValue(1);
+    await waitFor(() => expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1));
+    expect(screen.getByLabelText("Cantidad de Aceite")).toHaveValue(1);
     expect(
-      screen.getByText("Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades."),
+      screen.getByText(
+        "Vienen preseleccionados los faltantes de la tienda: ajustá las cantidades.",
+      ),
     ).toBeInTheDocument();
-    // El 11 venía en la lista pero no tiene precio activo: no se precarga.
-    expect(screen.queryByLabelText("Producto 2")).not.toBeInTheDocument();
+  });
+
+  it("S9: muestra los faltantes de la tienda y los agrega rápido", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 11,
+          name: "Aceite",
+          brand: null,
+          unit: "L",
+          category: "Aceites",
+          quantity: 0,
+          base_quantity: 1,
+        },
+        {
+          store_id: 4,
+          store_name: "Tienda Norte",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+    const user = userEvent.setup();
+
+    expect(
+      await screen.findByRole("heading", { name: "Faltantes de la tienda" }),
+    ).toBeInTheDocument();
+    // Solo los faltantes de la tienda elegida (2, no 3).
+    expect(screen.getAllByRole("button", { name: /^Agregar faltante / })).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Agregar faltante Arroz" }));
+    expect(screen.getByLabelText("Cantidad de Arroz")).toHaveValue(1);
+    expect(screen.getByRole("button", { name: "Agregar faltante Arroz" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Agregar todos" }));
+    await user.click(screen.getByRole("button", { name: "Agregar todos" }));
+    expect(screen.getByLabelText("Cantidad de Aceite")).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/^Cantidad de /)).toHaveLength(2);
+  });
+
+  it("S9: no ofrece agregar un faltante que el distribuidor no maneja", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 99,
+          name: "Detergente",
+          brand: null,
+          unit: "L",
+          category: "Aseo",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
+
+    expect(await screen.findByText("No está en el catálogo del distribuidor")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar faltante Detergente" })).toBeDisabled();
+  });
+
+  it("S9: sin distribuidor elegido, los faltantes se ven pero no se pueden agregar", async () => {
+    vi.mocked(productsApi.fetchShortageProducts).mockResolvedValue({
+      data: [
+        {
+          store_id: 3,
+          store_name: "Tienda Centro",
+          product_id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          unit: "kg",
+          category: "Granos",
+          quantity: 0,
+          base_quantity: 1,
+        },
+      ],
+      error: null,
+    });
+    renderPage("operador", "/pedidos/nuevo?storeId=3");
+
+    expect(
+      await screen.findByText("Elegí un distribuidor para saber cuáles podés pedir."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agregar faltante Arroz" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Agregar todos" })).toBeDisabled();
   });
 });

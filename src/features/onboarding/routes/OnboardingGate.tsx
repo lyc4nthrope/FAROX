@@ -12,10 +12,7 @@ import {
   type OnboardingPhase,
 } from "../context";
 import { deriveNeedsOnboarding } from "../detection";
-import {
-  readCachedOnboardingSignals,
-  writeCachedOnboardingSignals,
-} from "../signalsCache";
+import { readCachedOnboardingSignals, writeCachedOnboardingSignals } from "../signalsCache";
 import type { OnboardingSignals } from "../types";
 
 // Guard DERIVADO post-RequireAuth (R-D3.1 · design #538 §5.2 y §8):

@@ -27,9 +27,7 @@ export function UserStoresPanel({ stores, loading, error }: UserStoresPanelProps
           <ErrorBanner message={error} />
         </div>
       )}
-      {error === null && loading && (
-        <p className="mt-2 text-sm text-gray-600">Cargando…</p>
-      )}
+      {error === null && loading && <p className="mt-2 text-sm text-gray-600">Cargando…</p>}
       {error === null && !loading && stores.length === 0 && (
         <div className="mt-2">
           <EmptyState title="Sin tiendas asignadas" />
@@ -39,10 +37,7 @@ export function UserStoresPanel({ stores, loading, error }: UserStoresPanelProps
         <ul className="mt-2 list-disc pl-5 text-sm text-gray-700">
           {stores.map((store) => (
             <li key={store.store_id}>
-              <Link
-                to={`/stores/${store.store_id}`}
-                className="text-gray-900 underline"
-              >
+              <Link to={`/stores/${store.store_id}`} className="text-gray-900 underline">
                 {store.store_name ?? `Tienda #${store.store_id}`}
               </Link>
               {store.store_city !== null && (

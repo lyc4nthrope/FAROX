@@ -276,9 +276,7 @@ describe("UserDetailPage · ADM-5 (rol SOLO vía update_user_role)", () => {
 
     await user.click(screen.getByRole("button", { name: "Guardar rol" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "El rol seleccionado no existe.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("El rol seleccionado no existe.");
     expect(screen.queryByText(/rol inexistente/)).toBeNull();
   });
 });
@@ -300,9 +298,7 @@ describe("UserDetailPage · ADM-6 (toggles premium y activo + guarda propia)", (
     expect(usersApi.setUserPremium).toHaveBeenCalledWith("u2", true);
     expect(await screen.findByText("Ahora es premium.")).toBeInTheDocument();
     expect(usersApi.fetchUser).toHaveBeenCalledTimes(2);
-    await waitFor(() =>
-      expect(screen.getByRole("switch", { name: "Premium" })).toBeChecked(),
-    );
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Premium" })).toBeChecked());
   });
 
   it("ADM-6.2: en la fila PROPIA el toggle de activo está deshabilitado con copy voseo y CERO requests", async () => {
@@ -312,9 +308,7 @@ describe("UserDetailPage · ADM-6 (toggles premium y activo + guarda propia)", (
 
     const activo = await screen.findByRole("switch", { name: "Activo" });
     expect(activo).toBeDisabled();
-    expect(
-      await screen.findByText("No te podés desactivar a vos mismo."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No te podés desactivar a vos mismo.")).toBeInTheDocument();
 
     await user.click(activo);
 
@@ -352,9 +346,7 @@ describe("UserDetailPage · ADM-6 (toggles premium y activo + guarda propia)", (
     // Fila visible con su estado nuevo (la página NO navega ni se borra).
     expect(screen.getByRole("heading", { name: "Omar Prueba" })).toBeInTheDocument();
     expect(await screen.findByText("Inactivo")).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole("switch", { name: "Activo" })).not.toBeChecked(),
-    );
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Activo" })).not.toBeChecked());
   });
 
   it("ADM-6.4: admin degradado (rpc «solo admin») ⇒ «Solo un administrador puede hacer esto.»", async () => {
@@ -447,9 +439,7 @@ describe("UserDetailPage · ADM-7 (tiendas asignadas en SOLO LECTURA)", () => {
 
 describe("UserDetailPage · T-B10 (degradación elegante R4/B0 — sin admin real)", () => {
   it("error de red al cargar ⇒ mensaje amigable, la pantalla nunca crashea", async () => {
-    vi.mocked(usersApi.fetchUser).mockRejectedValue(
-      new TypeError("Failed to fetch"),
-    );
+    vi.mocked(usersApi.fetchUser).mockRejectedValue(new TypeError("Failed to fetch"));
     renderPagina();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -462,9 +452,7 @@ describe("UserDetailPage · T-B10 (degradación elegante R4/B0 — sin admin rea
     vi.mocked(usersApi.fetchUser).mockResolvedValue({ row: null, error: SIN_FILA });
     renderPagina();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "No se encontró el registro.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("No se encontró el registro.");
     expect(screen.queryByRole("switch")).toBeNull();
   });
 });
@@ -492,9 +480,7 @@ describe("UserDetailPage · T-E3 (cross-links a entidades existentes)", () => {
 
     const centro = await screen.findByRole("link", { name: "Tienda Centro" });
     expect(centro).toHaveAttribute("href", "/stores/1");
-    expect(
-      screen.getByRole("link", { name: "Tienda Norte" }),
-    ).toHaveAttribute("href", "/stores/2");
+    expect(screen.getByRole("link", { name: "Tienda Norte" })).toHaveAttribute("href", "/stores/2");
   });
 
   it("sin tiendas asignadas ⇒ EmptyState y CERO links a /stores", async () => {

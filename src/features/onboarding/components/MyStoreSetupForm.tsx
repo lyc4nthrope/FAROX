@@ -74,10 +74,7 @@ export function MyStoreSetupForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="onboarding-store-type"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="onboarding-store-type" className="block text-sm font-medium text-gray-700">
           Tipo de tienda
         </label>
         <select
@@ -111,7 +108,9 @@ export function MyStoreSetupForm({
           latitudeError={errors.lat}
           longitudeError={errors.lng}
           onLocationChange={onLocationChange}
-          onCoordinateTextChange={(next) => onChange({ ...values, lat: next.latitude, lng: next.longitude })}
+          onCoordinateTextChange={(next) =>
+            onChange({ ...values, lat: next.latitude, lng: next.longitude })
+          }
           label="Ubicación de la tienda"
           idPrefix="onboarding-store"
         />

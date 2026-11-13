@@ -13,6 +13,7 @@ import {
   runAction,
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
+import { ResponsiveTable, type ResponsiveTableColumn } from "../../../shared/ui";
 import { formatCOP } from "../../../shared/lib/format";
 import {
   ORDER_STATUS_LABELS,
@@ -20,7 +21,12 @@ import {
   createCredit,
   fetchOrder,
   fetchOrderItems,
+  fetchOrderQuotes,
+  fetchDistributorSalePrices,
+  setOrderExpectedAt,
+  setOrderPrices,
   updateOrderStatus,
+  type OrderItemRow,
 } from "../api";
 
 const LINE_LABELS: Record<string, string> = {
@@ -32,22 +38,48 @@ const LINE_LABELS: Record<string, string> = {
 /** /pedidos/:orderId — detalle, cambio de estado, confirmar entrega y fiado. */
 export function OrderDetailPage() {
   const orderId = Number(useParams().orderId);
-  const { role } = useAuth();
+  const { role, premium } = useAuth();
   const order = useLoad(() => fetchOrder(orderId), [orderId]);
   const items = useLoad(() => fetchOrderItems(orderId), [orderId]);
+  // 0024: la cotización viaja por su propia RPC; get_order_items sigue sin
+  // exponer el precio privado de la tienda (D40/D41).
+  const quoteRows = useLoad(() => fetchOrderQuotes(orderId), [orderId]);
+  // 0030: el Premium estima la cotización con SU precio de venta configurado
+  // en el catálogo; luego puede ajustarlo en cada línea.
+  const distributorSalePrices = useLoad(
+    () =>
+      role === "distribuidor" && premium
+        ? fetchDistributorSalePrices((items.data ?? []).map((item) => item.product_id))
+        : Promise.resolve({ data: new Map<number, number>(), error: null }),
+    [role, premium, items.data],
+  );
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
   });
   const [received, setReceived] = useState<Record<number, string>>({});
+  const [quoteDrafts, setQuoteDrafts] = useState<Record<number, string>>({});
+  const [expectedAtDraft, setExpectedAtDraft] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  // Por defecto, recibido = pedido.
+  // Por defecto, recibido = pedido; la cotización arranca con lo ya guardado.
   useEffect(() => {
     if (items.data) {
       setReceived(Object.fromEntries(items.data.map((i) => [i.product_id, String(i.quantity)])));
     }
   }, [items.data]);
+
+  // 0025: la fecha prometida es comunicación distribuidor ↔ operador.
+  useEffect(() => {
+    if (order.data) {
+      setExpectedAtDraft(order.data.expected_at ? order.data.expected_at.slice(0, 10) : "");
+    }
+  }, [order.data]);
+
+  // Al cambiar de pedido se descartan los borradores del anterior.
+  useEffect(() => {
+    setQuoteDrafts({});
+  }, [orderId]);
 
   async function act(action: () => Promise<{ error: { message: string } | null }>, ok: string) {
     const error = await runAction(action);
@@ -55,6 +87,7 @@ export function OrderDetailPage() {
     if (error === null) {
       order.reload();
       items.reload();
+      quoteRows.reload();
     }
   }
 
@@ -62,7 +95,7 @@ export function OrderDetailPage() {
   const open = o !== null && (o.status === "pending" || o.status === "in_route");
   const showPrice = items.data?.some((i) => i.unit_price !== null) ?? false;
 
-  function onConfirm() {
+  async function onConfirm() {
     const payload = (items.data ?? []).map((i) => ({
       product_id: i.product_id,
       received_quantity: Number(received[i.product_id] ?? 0),
@@ -75,6 +108,35 @@ export function OrderDetailPage() {
     ) {
       setMsg({ error: "Cada cantidad recibida debe estar entre 0 y la pedida.", ok: null });
       return;
+    }
+    // 0029: si el distribuidor ajustó la cotización, se persiste antes de
+    // entregar para que el movimiento de salida registre ese precio de venta.
+    if (canQuote) {
+      const priced = (items.data ?? [])
+        .map((item) => ({
+          productId: item.product_id,
+          raw: quoteValue(item.product_id).trim(),
+        }))
+        .filter((entry) => entry.raw !== "");
+      if (priced.some((entry) => !Number.isFinite(Number(entry.raw)) || Number(entry.raw) <= 0)) {
+        setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
+        return;
+      }
+      if (priced.length > 0) {
+        const priceError = await runAction(() =>
+          setOrderPrices(
+            orderId,
+            priced.map((entry) => ({
+              product_id: entry.productId,
+              distributor_price: Number(entry.raw),
+            })),
+          ),
+        );
+        if (priceError !== null) {
+          setMsg({ error: priceError, ok: null });
+          return;
+        }
+      }
     }
     void act(
       () => confirmDelivery(orderId, payload),
@@ -90,6 +152,120 @@ export function OrderDetailPage() {
         : o?.status === "in_route"
           ? "blue"
           : "amber";
+
+  // 0025: el ciclo operativo (ruta/entrega/fecha) es del distribuidor; el
+  // admin conserva el override.
+  const canDispatch = o !== null && (role === "admin" || role === "distribuidor");
+
+  function onSaveExpectedAt() {
+    // Mediodía UTC: la fecha se ve igual en la zona horaria de Colombia
+    // (UTC-5); a medianoche UTC el resumen mostraba el día anterior.
+    const value = expectedAtDraft === "" ? null : `${expectedAtDraft}T12:00:00Z`;
+    void act(() => setOrderExpectedAt(orderId, value), "Fecha prometida actualizada.");
+  }
+
+  // 0024: el distribuidor cotiza lo que le cobra a la tienda mientras el
+  // pedido sigue pendiente. El admin puede corregir la cotización.
+  const canQuote =
+    o !== null &&
+    (o.status === "pending" || o.status === "in_route") &&
+    (role === "admin" || role === "distribuidor");
+
+  // La cotización guardada es el valor por defecto; el borrador local gana
+  // mientras el usuario edita (no hay carrera con el fetch).
+  const savedQuotes = new Map(
+    (quoteRows.data ?? []).map((row) => [row.product_id, row.distributor_price]),
+  );
+  const quoteValue = (productId: number): string => {
+    const draft = quoteDrafts[productId];
+    if (draft !== undefined) return draft;
+    const saved = savedQuotes.get(productId);
+    if (saved !== null && saved !== undefined) return String(saved);
+    // 0030: primero el precio de venta propio del distribuidor (su catálogo).
+    if (premium) {
+      const own = distributorSalePrices.data?.get(productId);
+      if (own !== undefined) return String(own);
+    }
+    // 0028: si no configuró precio, el precio registrado de la tienda sigue
+    // siendo una sugerencia editable para Premium.
+    const registered = premium
+      ? ((items.data ?? []).find((item) => item.product_id === productId)?.unit_price ?? null)
+      : null;
+    return registered === null ? "" : String(registered);
+  };
+
+  function onQuote() {
+    const priced = (items.data ?? [])
+      .map((item) => ({ productId: item.product_id, value: quoteValue(item.product_id) }))
+      .filter((entry) => entry.value.trim() !== "");
+    if (priced.length === 0) {
+      setMsg({ error: "Ingresá al menos un precio para cotizar.", ok: null });
+      return;
+    }
+    const payload = priced.map((entry) => ({
+      product_id: entry.productId,
+      distributor_price: Number(entry.value),
+    }));
+    if (payload.some((p) => !Number.isFinite(p.distributor_price) || p.distributor_price <= 0)) {
+      setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
+      return;
+    }
+    void act(() => setOrderPrices(orderId, payload), "Cotización guardada.");
+  }
+
+  const quotedTotal = (items.data ?? []).reduce((total, item) => {
+    const value = Number(quoteValue(item.product_id));
+    return Number.isFinite(value) && value > 0 ? total + value * item.quantity : total;
+  }, 0);
+
+  // Lectura para quien no cotiza (operador Premium): muestra lo ya cotizado
+  // sin ofrecer el formulario. get_order_quotes devuelve cero filas si no
+  // tiene permiso (no-premium).
+  const savedQuoteTotal = (items.data ?? []).reduce((total, item) => {
+    const saved = savedQuotes.get(item.product_id);
+    return saved == null ? total : total + saved * item.quantity;
+  }, 0);
+  const showQuoteReadOnly =
+    !canQuote && (quoteRows.data ?? []).some((row) => row.distributor_price !== null);
+
+  const itemColumns: ResponsiveTableColumn<OrderItemRow>[] = [
+    {
+      key: "product",
+      header: "Producto",
+      primary: true,
+      render: (item) => <span className="font-medium text-gray-900">{item.product_name}</span>,
+    },
+    { key: "quantity", header: "Pedido", render: (item) => item.quantity },
+    { key: "received", header: "Recibido", render: (item) => item.received_quantity ?? "—" },
+    {
+      key: "lineStatus",
+      header: "Estado línea",
+      render: (item) => (
+        <Badge
+          tone={item.status === "received" ? "green" : item.status === "partial" ? "amber" : "gray"}
+        >
+          {LINE_LABELS[item.status] ?? item.status}
+        </Badge>
+      ),
+    },
+  ];
+  if (showPrice) {
+    itemColumns.push({
+      key: "price",
+      header: "Precio unitario",
+      render: (item) => (item.unit_price === null ? "—" : formatCOP(item.unit_price)),
+    });
+  }
+  if (showQuoteReadOnly) {
+    itemColumns.push({
+      key: "quote",
+      header: "Cotización",
+      render: (item) => {
+        const saved = savedQuotes.get(item.product_id);
+        return saved == null ? "—" : formatCOP(saved);
+      },
+    });
+  }
 
   return (
     <section>
@@ -119,6 +295,59 @@ export function OrderDetailPage() {
         Seguimiento de la entrega, cantidades recibidas y su impacto en el stock de la tienda.
       </p>
       <Status loading={order.loading} error={order.error ?? msg.error} ok={msg.ok} />
+
+      {o && open && canDispatch && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+            Acciones
+          </span>
+          {o.status === "pending" && (
+            <button
+              className={buttonClass}
+              type="button"
+              onClick={() =>
+                void act(() => updateOrderStatus(orderId, "in_route", null), "Pedido en ruta.")
+              }
+            >
+              Marcar en ruta
+            </button>
+          )}
+          {o.status === "in_route" && canDispatch && (
+            <button
+              className={secondaryButtonClass}
+              type="button"
+              onClick={() =>
+                void act(
+                  () => updateOrderStatus(orderId, "pending", null),
+                  "Pedido devuelto a pendiente.",
+                )
+              }
+            >
+              Volver a pendiente
+            </button>
+          )}
+          <button className={buttonClass} type="button" onClick={onConfirm}>
+            Confirmar entrega
+          </button>
+          {role === "admin" && (
+            <button
+              className={`${secondaryButtonClass} border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800`}
+              type="button"
+              onClick={() => {
+                const reason = window.prompt("Motivo de la cancelación");
+                if (reason) {
+                  void act(
+                    () => updateOrderStatus(orderId, "cancelled", reason),
+                    "Pedido cancelado.",
+                  );
+                }
+              }}
+            >
+              Cancelar pedido
+            </button>
+          )}
+        </div>
+      )}
 
       {o && (
         <Box title="Resumen">
@@ -171,98 +400,130 @@ export function OrderDetailPage() {
 
       <Box title="Productos">
         <Status loading={items.loading} error={items.error} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Pedido</th>
-                <th>Recibido</th>
-                <th>Estado línea</th>
-                {showPrice && <th>Precio unitario</th>}
-                {open && role !== "admin" && <th>Recibir</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {items.data?.map((i) => (
-                <tr key={i.id}>
-                  <td className="font-medium text-gray-900">{i.product_name}</td>
-                  <td>{i.quantity}</td>
-                  <td>{i.received_quantity ?? "—"}</td>
-                  <td>
-                    <Badge
-                      tone={
-                        i.status === "received"
-                          ? "green"
-                          : i.status === "partial"
-                            ? "amber"
-                            : "gray"
+        {items.data !== null && items.data.length > 0 && (
+          <ResponsiveTable
+            caption="Productos del pedido"
+            columns={itemColumns}
+            rows={items.data}
+            rowKey={(item) => String(item.id)}
+            actions={
+              open && canDispatch
+                ? (item) => (
+                    <input
+                      aria-label={`Recibido de ${item.product_name}`}
+                      className={`${inputClass} max-w-28`}
+                      type="number"
+                      min="0"
+                      max={item.quantity}
+                      step="0.001"
+                      value={received[item.product_id] ?? ""}
+                      onChange={(e) =>
+                        setReceived({ ...received, [item.product_id]: e.target.value })
                       }
-                    >
-                      {LINE_LABELS[i.status] ?? i.status}
-                    </Badge>
-                  </td>
-                  {showPrice && <td>{i.unit_price === null ? "—" : formatCOP(i.unit_price)}</td>}
-                  {open && role !== "admin" && (
-                    <td>
-                      <input
-                        aria-label={`Recibido de ${i.product_name}`}
-                        className={`${inputClass} max-w-28`}
-                        type="number"
-                        min="0"
-                        max={i.quantity}
-                        step="0.001"
-                        value={received[i.product_id] ?? ""}
-                        onChange={(e) =>
-                          setReceived({ ...received, [i.product_id]: e.target.value })
-                        }
-                      />
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    />
+                  )
+                : undefined
+            }
+            actionsHeader="Recibir"
+          />
+        )}
         {items.data?.length === 0 && !items.loading && (
           <p className="mt-3 text-sm text-gray-500">Este pedido no tiene líneas.</p>
         )}
+        {showQuoteReadOnly && (
+          <p className="mt-3 text-sm text-gray-600">
+            Total cotizado por el distribuidor:{" "}
+            <span className="font-semibold tabular-nums text-gray-900">
+              {formatCOP(savedQuoteTotal)}
+            </span>
+          </p>
+        )}
       </Box>
 
-      {o && open && (
-        <Box title="Acciones">
-          <div className="flex flex-wrap gap-2">
-            {o.status === "pending" && (role === "admin" || role === "operador") && (
-              <button
-                className={buttonClass}
-                type="button"
-                onClick={() =>
-                  void act(() => updateOrderStatus(orderId, "in_route", null), "Pedido en ruta.")
-                }
+      {o && open && role === "operador" && (
+        <p className="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+          El distribuidor marca el pedido en ruta y confirma la entrega. Vos seguís el estado acá.
+        </p>
+      )}
+
+      {canQuote && (
+        <Box title="Cotización del distribuidor">
+          <p className="text-sm text-gray-600">
+            Definí cuánto le cobrás a la tienda por cada producto. Podés ajustarlo mientras el
+            pedido siga abierto (pendiente o en ruta); el precio queda congelado en el movimiento de
+            la entrega.
+          </p>
+          <div className="mt-3 space-y-2">
+            {items.data?.map((item) => (
+              <div
+                key={item.product_id}
+                className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-end"
               >
-                Marcar en ruta
-              </button>
-            )}
-            {(role === "operador" || role === "distribuidor") && (
-              <button className={buttonClass} type="button" onClick={onConfirm}>
-                Confirmar entrega
-              </button>
-            )}
-            {role === "admin" && (
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-900">{item.product_name}</p>
+                  <p className="text-xs text-gray-500">
+                    Cantidad pedida: <span className="tabular-nums">{item.quantity}</span>
+                  </p>
+                </div>
+                <Field label={`Precio de ${item.product_name}`}>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Sin precio"
+                    value={quoteValue(item.product_id)}
+                    onChange={(event) =>
+                      setQuoteDrafts({ ...quoteDrafts, [item.product_id]: event.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-600">
+              Total cotizado:{" "}
+              <span className="font-semibold tabular-nums text-gray-900">
+                {formatCOP(quotedTotal)}
+              </span>
+            </p>
+            <button className={buttonClass} type="button" onClick={onQuote}>
+              Guardar cotización
+            </button>
+          </div>
+        </Box>
+      )}
+
+      {o && open && canDispatch && (
+        <Box title="Entrega y comunicación">
+          <p className="text-sm text-gray-600">
+            La fecha prometida es opcional y el operador la ve en el resumen. La alerta de pedido
+            atrasado se activa al pasar esta fecha: para plazos largos, elegí una fecha lejana; sin
+            fecha no se genera alerta.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <Field label="Fecha prometida (opcional)">
+              <input
+                className={inputClass}
+                type="date"
+                value={expectedAtDraft}
+                onChange={(event) => setExpectedAtDraft(event.target.value)}
+              />
+            </Field>
+            <button className={buttonClass} type="button" onClick={onSaveExpectedAt}>
+              Guardar fecha
+            </button>
+            {o.expected_at !== null && (
               <button
-                className={`${secondaryButtonClass} border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800`}
+                className={secondaryButtonClass}
                 type="button"
                 onClick={() => {
-                  const reason = window.prompt("Motivo de la cancelación");
-                  if (reason) {
-                    void act(
-                      () => updateOrderStatus(orderId, "cancelled", reason),
-                      "Pedido cancelado.",
-                    );
-                  }
+                  setExpectedAtDraft("");
+                  void act(() => setOrderExpectedAt(orderId, null), "Fecha prometida quitada.");
                 }}
               >
-                Cancelar pedido
+                Quitar fecha
               </button>
             )}
           </div>

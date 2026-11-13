@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReactivateBanner } from "./ReactivateBanner";
 
-const state = { role: "admin", isActive: false, updated: [] as unknown[] };
+const state = {
+  role: "admin",
+  isActive: false,
+  updated: [] as unknown[],
+  rpcCalls: [] as unknown[],
+};
 
 vi.mock("../../app/providers/AuthProvider", () => ({
   useAuth: () => ({ role: state.role }),
@@ -26,13 +31,23 @@ vi.mock("../lib/supabase/client", () => {
     };
   };
   chain.maybeSingle = () => Promise.resolve({ data: { is_active: state.isActive }, error: null });
-  return { supabase: { from: () => chain } };
+  return {
+    supabase: {
+      from: () => chain,
+      rpc: (name: string, args: unknown) => {
+        state.rpcCalls.push([name, args]);
+        state.isActive = true;
+        return Promise.resolve({ data: null, error: null });
+      },
+    },
+  };
 });
 
 beforeEach(() => {
   state.role = "admin";
   state.isActive = false;
   state.updated = [];
+  state.rpcCalls = [];
 });
 
 describe("ReactivateBanner (C0.2)", () => {
@@ -42,6 +57,14 @@ describe("ReactivateBanner (C0.2)", () => {
     await user.click(await screen.findByRole("button", { name: "Reactivar" }));
     expect(state.updated).toEqual([{ is_active: true }]);
     expect(await screen.findByText("Registro reactivado.")).toBeInTheDocument();
+  });
+
+  it("en tiendas reactiva por RPC (0034)", async () => {
+    const user = userEvent.setup();
+    render(<ReactivateBanner table="stores" id={2} />);
+    await user.click(await screen.findByRole("button", { name: "Reactivar" }));
+    expect(state.rpcCalls).toEqual([["reactivate_store", { p_store: 2 }]]);
+    expect(state.updated).toEqual([]);
   });
 
   it("un operador ve el aviso pero no el botón", async () => {

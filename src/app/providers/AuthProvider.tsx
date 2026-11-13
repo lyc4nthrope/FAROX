@@ -64,33 +64,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Aplica una sesión: deja el estado en "loading" y resuelve los privilegios
   // contra la DB. El ref protege contra respuestas viejas (cambio de sesión
   // mientras el rpc estaba en vuelo).
-  const applySession = useCallback(
-    async (session: CurrentSession | null): Promise<void> => {
-      if (session === null) {
-        currentUserIdRef.current = null;
-        setState(ANON_STATE);
-        return;
-      }
-      currentUserIdRef.current = session.userId;
-      setState({
-        status: "loading",
-        userId: session.userId,
-        email: session.email,
-        role: null,
-        premium: false,
-      });
-      const privileges = await fetchPrivileges();
-      if (currentUserIdRef.current !== session.userId) return;
-      setState({
-        status: "authenticated",
-        userId: session.userId,
-        email: session.email,
-        role: privileges.role,
-        premium: privileges.premium,
-      });
-    },
-    [],
-  );
+  const applySession = useCallback(async (session: CurrentSession | null): Promise<void> => {
+    if (session === null) {
+      currentUserIdRef.current = null;
+      setState(ANON_STATE);
+      return;
+    }
+    currentUserIdRef.current = session.userId;
+    setState({
+      status: "loading",
+      userId: session.userId,
+      email: session.email,
+      role: null,
+      premium: false,
+    });
+    const privileges = await fetchPrivileges();
+    if (currentUserIdRef.current !== session.userId) return;
+    setState({
+      status: "authenticated",
+      userId: session.userId,
+      email: session.email,
+      role: privileges.role,
+      premium: privileges.premium,
+    });
+  }, []);
 
   // Revalida privilegios de la sesión vigente SIN vaciar el estado (token
   // refresh, refocus de pestaña, auto-mutación de admin — D2).

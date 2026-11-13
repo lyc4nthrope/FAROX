@@ -122,8 +122,7 @@ export function ResetPasswordPage() {
       <div className="mx-auto max-w-sm px-4 py-12">
         <h1 className="text-2xl font-semibold tracking-tight">El link no es válido</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Puede haber expirado o ya haber sido usado. Pedí un link nuevo para elegir tu
-          contraseña.
+          Puede haber expirado o ya haber sido usado. Pedí un link nuevo para elegir tu contraseña.
         </p>
         <p className="mt-4 text-sm text-gray-600">
           <Link to="/recuperar" className="font-medium text-gray-900 underline">

@@ -1,8 +1,4 @@
-import {
-  DataTable,
-  type DataTableAction,
-  type DataTableColumn,
-} from "../../../shared/ui";
+import { DataTable, type DataTableAction, type DataTableColumn } from "../../../shared/ui";
 import type { CatalogDefinition } from "../definitions";
 import type { CatalogRow } from "../types";
 
@@ -40,16 +36,12 @@ export function CatalogTable({
   onDelete,
   onDeactivate,
 }: CatalogTableProps) {
-  const columns: DataTableColumn<CatalogRow>[] = definition.columns.map(
-    (column) => ({
-      key: column.key,
-      header: column.header,
-      render: (row) =>
-        column.display === undefined
-          ? valorPorDefecto(row, column.key)
-          : column.display(row),
-    }),
-  );
+  const columns: DataTableColumn<CatalogRow>[] = definition.columns.map((column) => ({
+    key: column.key,
+    header: column.header,
+    render: (row) =>
+      column.display === undefined ? valorPorDefecto(row, column.key) : column.display(row),
+  }));
 
   // Acciones por deleteMode (ADM-9.2): hard ⇒ «Eliminar» en toda fila;
   // soft-two-step (brands) ⇒ «Desactivar» SOLO sobre filas activas y
@@ -70,9 +62,7 @@ export function CatalogTable({
       key: "eliminar",
       label: "Eliminar",
       visible:
-        definition.deleteMode === "soft-two-step"
-          ? (row: CatalogRow) => !row.is_active
-          : undefined,
+        definition.deleteMode === "soft-two-step" ? (row: CatalogRow) => !row.is_active : undefined,
       onClick: onDelete,
     },
   ];

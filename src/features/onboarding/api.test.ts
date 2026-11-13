@@ -1,12 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import {
-  createStore,
-  fetchOnboardingSignals,
-  fetchStoreTypes,
-  registerDistributor,
-} from "./api";
+import { createStore, fetchOnboardingSignals, fetchStoreTypes, registerDistributor } from "./api";
 
 // Capa api contra el cliente supabase MOCKEADO (mismo aislamiento que el
 // resto de la suite: el cliente real valida el env al importar, V0-1).
