@@ -23,6 +23,14 @@ const ACCEPTED_APP_ISSUES = new Map([
     'public.create_order|never read variable "v_qty"',
     "0009: variable muerta, sin efecto en ejecución",
   ],
+  [
+    'public.set_order_prices|never read variable "v_price"',
+    "0029: variable muerta, sin efecto en ejecución",
+  ],
+  [
+    'public.register_movements_bulk|target type is different type than source type — during statement block local variable "v_ids" initialization on line 5',
+    "0048: inicializador '{}' para bigint[]; falso positivo de plpgsql_check, sin efecto en ejecución",
+  ],
 ]);
 
 const esc = (s) => String(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
