@@ -120,7 +120,10 @@ Deno.serve(async (request) => {
       .eq("wa_id", message.from)
       .gte("received_at", new Date(Date.now() - 3_600_000).toISOString());
     if ((count ?? 0) > MAX_INBOUND_PER_HOUR) {
-      const task = sendText(message.from, "Llegaste al límite de mensajes por hora. Probá más tarde.");
+      const task = sendText(
+        message.from,
+        "Llegaste al límite de mensajes por hora. Probá más tarde.",
+      );
       if (runtime.EdgeRuntime) runtime.EdgeRuntime.waitUntil(task);
       handled += 1;
       continue;
@@ -227,19 +230,25 @@ async function handleMessage(
   const action = findAction(toolLog);
 
   for (const entry of toolLog) {
-    await service.from("chat_messages").insert({
+    const { error: toolInsertError } = await service.from("chat_messages").insert({
       conversation_id: conversationId,
       role: "tool",
       content: entry.name,
       payload: { args: entry.args, result: entry.result },
     });
+    if (toolInsertError !== null) {
+      console.error("whatsapp-webhook TOOL_MESSAGE", toolInsertError.message);
+    }
   }
-  await service.from("chat_messages").insert({
+  const { error: assistantInsertError } = await service.from("chat_messages").insert({
     conversation_id: conversationId,
     role: "assistant",
     content: reply,
     payload: action === null ? null : { action_id: action.action_id },
   });
+  if (assistantInsertError !== null) {
+    console.error("whatsapp-webhook ASSISTANT_MESSAGE", assistantInsertError.message);
+  }
 
   if (action !== null) {
     await sendText(from, formatActionReply(action));
@@ -276,7 +285,10 @@ async function handleActionCommand(
     return;
   }
   if (pending === null) {
-    await sendText(from, "Ese código no existe o ya venció. Pedile al asistente que lo prepare de nuevo.");
+    await sendText(
+      from,
+      "Ese código no existe o ya venció. Pedile al asistente que lo prepare de nuevo.",
+    );
     return;
   }
 
@@ -315,7 +327,9 @@ async function handleActionCommand(
   const count = Number(result.count);
   await sendText(
     from,
-    Number.isFinite(count) && count > 0 ? `✅ Listo: ${count} línea(s) registrada(s).` : "✅ Listo.",
+    Number.isFinite(count) && count > 0
+      ? `✅ Listo: ${count} línea(s) registrada(s).`
+      : "✅ Listo.",
   );
 }
 
@@ -457,7 +471,9 @@ function formatActionReply(action: WhatsappAction): string {
     parts.push(`${String(line.name ?? "")} × ${String(line.qty ?? "")} — ${money(unit)}`);
   }
   if (kind === "shortage_toggle") {
-    parts.push(`${String(summary.product ?? "")}: ${summary.old === true ? "Sí" : "No"} → ${summary.new === true ? "Sí" : "No"}`);
+    parts.push(
+      `${String(summary.product ?? "")}: ${summary.old === true ? "Sí" : "No"} → ${summary.new === true ? "Sí" : "No"}`,
+    );
   }
   if (summary.total !== undefined && summary.total !== null) {
     parts.push(`Total: ${money(summary.total)}`);
@@ -494,22 +510,19 @@ async function sendText(to: string, body: string): Promise<void> {
   if (token === "" || phoneNumberId === "") return;
 
   const version = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? GRAPH_VERSION_DEFAULT;
-  const response = await fetch(
-    `https://graph.facebook.com/${version}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body },
-      }),
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body },
+    }),
+  });
 
   if (!response.ok) {
     console.error("whatsapp-webhook SEND_FAILED", response.status);

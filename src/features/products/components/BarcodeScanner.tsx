@@ -39,6 +39,8 @@ export function BarcodeScanner({
   const controls = useRef<IScannerControls | null>(null);
   const finished = useRef(false);
   const lastRead = useRef<{ code: string; at: number } | null>(null);
+  const onCodeRef = useRef(onCode);
+  onCodeRef.current = onCode;
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,14 +71,14 @@ export function BarcodeScanner({
               return;
             }
             lastRead.current = { code, at: now };
-            onCode(code);
+            onCodeRef.current(code);
             return;
           }
           finished.current = true;
           scannerControls.stop();
           controls.current = null;
           setActive(false);
-          onCode(code);
+          onCodeRef.current(code);
         },
       );
       if (finished.current) {
@@ -86,9 +88,7 @@ export function BarcodeScanner({
       controls.current = scanner;
       setActive(true);
     } catch {
-      setError(
-        "No pudimos abrir la cámara. Revisá los permisos o escribí el código a mano.",
-      );
+      setError("No pudimos abrir la cámara. Revisá los permisos o escribí el código a mano.");
     } finally {
       setStarting(false);
     }

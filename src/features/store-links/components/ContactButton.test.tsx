@@ -42,7 +42,15 @@ describe("contactHref (0029)", () => {
         email: "dist@farox.app",
         contact_preference: "email",
       }),
-    ).toBe("mailto:dist@farox.app");
+    ).toBe("mailto:dist%40farox.app");
+    expect(
+      contactHref({
+        full_name: "Distribuidora",
+        phone_number: null,
+        email: "ventas+norte@farox.app?subject=inyección",
+        contact_preference: "email",
+      }),
+    ).toBe("mailto:ventas%2Bnorte%40farox.app%3Fsubject%3Dinyecci%C3%B3n");
     expect(
       contactHref({
         full_name: "Distribuidora",

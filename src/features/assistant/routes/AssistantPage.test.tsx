@@ -8,7 +8,9 @@ import { AssistantPage } from "./AssistantPage";
 
 vi.mock("../api", () => ({
   askAgent: vi.fn(),
+  cancelAction: vi.fn(),
   createConversation: vi.fn(),
+  executeAction: vi.fn(),
   fetchMessages: vi.fn(),
   sendMessage: vi.fn(),
 }));
@@ -54,9 +56,7 @@ describe("AssistantPage · asistente de consultas (0039)", () => {
       }),
     );
     expect(assistantApi.sendMessage).toHaveBeenCalledWith(7, "¿Cuánto hay de arroz?");
-    expect(
-      await screen.findByText("Hay 12 unidades en Tienda Centro."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Hay 12 unidades en Tienda Centro.")).toBeInTheDocument();
   });
 
   it("muestra el error del asistente sin perder la conversación", async () => {
@@ -92,5 +92,39 @@ describe("AssistantPage · asistente de consultas (0039)", () => {
       expect.stringContaining("https://wa.me/573001234567?text="),
     );
     expect(link).toHaveAttribute("href", expect.stringContaining("FAR%C3%98X"));
+  });
+
+  it("refresca las pantallas abiertas (useLoad) después de confirmar un borrador", async () => {
+    vi.stubEnv("VITE_AGENT_WRITES_ENABLED", "true");
+    vi.mocked(assistantApi.askAgent).mockResolvedValue({
+      reply: "Preparé la salida.",
+      action: {
+        action_id: 15,
+        expires_at: new Date(Date.now() + 600_000).toISOString(),
+        summary: {
+          kind: "store_exit",
+          store: "Tienda Centro",
+          lines: [{ name: "Arroz", qty: 1, unit_price: 4500 }],
+          discount: 0,
+          total: 4500,
+        },
+      },
+      error: null,
+    });
+    vi.mocked(assistantApi.executeAction).mockResolvedValue({
+      data: { ok: true, count: 1 },
+      error: null,
+    });
+
+    render(<AssistantPage />);
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(inventoryApi.fetchMyStores).toHaveBeenCalledTimes(1));
+
+    await user.click(await screen.findByRole("button", { name: "¿Cuánto hay de arroz?" }));
+    const confirm = await screen.findByRole("button", { name: "Confirmar" });
+    await user.click(confirm);
+
+    await waitFor(() => expect(inventoryApi.fetchMyStores).toHaveBeenCalledTimes(2));
   });
 });

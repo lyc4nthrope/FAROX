@@ -37,7 +37,9 @@ describe("0048 · egreso, teléfono y privilegios", () => {
     expect(sql).toContain(
       "GRANT SELECT (id, conversation_id, role, content, created_at) ON public.chat_messages TO authenticated;",
     );
-    expect(sql).not.toContain("GRANT SELECT (id, conversation_id, role, content, created_at, payload)");
+    expect(sql).not.toContain(
+      "GRANT SELECT (id, conversation_id, role, content, created_at, payload)",
+    );
   });
 
   it("el rate limit cuenta por created_at y no por conversación", () => {
@@ -46,7 +48,9 @@ describe("0048 · egreso, teléfono y privilegios", () => {
     expect(sql).toContain(
       "CREATE INDEX IF NOT EXISTS idx_chat_messages_user_hour ON public.chat_messages (created_at) WHERE role = 'user';",
     );
-    expect(sql).toContain("AND cm.conversation_id IN ( SELECT cc.id FROM public.chat_conversations cc WHERE cc.user_id = auth.uid() )");
+    expect(sql).toContain(
+      "AND cm.conversation_id IN ( SELECT cc.id FROM public.chat_conversations cc WHERE cc.user_id = auth.uid() )",
+    );
   });
 
   it("un ticket hace UN upsert de dashboard_daily", () => {
@@ -67,10 +71,10 @@ describe("0048 · egreso, teléfono y privilegios", () => {
 
   it("un solo trigger normaliza y limpia la verificación", () => {
     const sql = read(M48);
-    expect(sql).toContain("DROP TRIGGER IF EXISTS trg_users_clear_phone_verification ON public.users;");
     expect(sql).toContain(
-      "BEFORE INSERT OR UPDATE OF phone_number ON public.users",
+      "DROP TRIGGER IF EXISTS trg_users_clear_phone_verification ON public.users;",
     );
+    expect(sql).toContain("BEFORE INSERT OR UPDATE OF phone_number ON public.users");
     expect(sql).toContain("DROP FUNCTION IF EXISTS public.clear_phone_verification_on_change();");
   });
 });
@@ -95,5 +99,25 @@ describe("0043-0047 · correcciones de lote y precios", () => {
     const sql = read("20261105000047_precios_masivos_distribuidor.sql");
     expect(sql).toContain("ORDER BY x.product_id");
     expect(sql).toContain("WHEN dp.purchase_price_source IS NULL THEN 'manual'");
+  });
+});
+
+describe("0053 · correcciones de PR review", () => {
+  const M53 = "20261113125000_review_fixes.sql";
+
+  it("serializa send_message por usuario con pg_advisory_xact_lock", () => {
+    const sql = read(M53);
+    expect(sql).toContain("pg_advisory_xact_lock(pg_catalog.hashtext(v_user::text))");
+  });
+
+  it("antepone '+' al wa_id en phone_verification_confirm_whatsapp", () => {
+    const sql = read(M53);
+    expect(sql).toContain("normalize_phone_e164('+' || ltrim(btrim(COALESCE(p_wa_id, '')), '+'))");
+  });
+
+  it("programa la purga diaria de whatsapp_inbound en pg_cron", () => {
+    const sql = read(M53);
+    expect(sql).toContain("farox_whatsapp_inbound_purge");
+    expect(sql).toContain("DELETE FROM public.whatsapp_inbound");
   });
 });

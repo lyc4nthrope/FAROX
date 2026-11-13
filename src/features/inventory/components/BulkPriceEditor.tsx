@@ -264,6 +264,10 @@ export function BulkPriceEditor({
       return;
     }
 
+    const sentById = new Map<
+      number,
+      { purchase: string; sale: string; writePurchase: boolean; writeSale: boolean }
+    >();
     const lines: BulkPriceLine[] = [];
     for (const row of changedRows) {
       const writePurchase = purchaseDirty(row);
@@ -277,6 +281,12 @@ export function BulkPriceEditor({
         setError(`Revisá «${row.name}»: ${INVALID_PRICE_HINT}`);
         return;
       }
+      sentById.set(row.id, {
+        purchase: row.purchase,
+        sale: row.sale,
+        writePurchase,
+        writeSale,
+      });
       lines.push({
         productId: row.id,
         purchasePrice: writePurchase ? purchasePrice : null,
@@ -295,11 +305,15 @@ export function BulkPriceEditor({
         return;
       }
       setRows((current) =>
-        current.map((row) => ({
-          ...row,
-          initialPurchase: row.purchase,
-          initialSale: row.sale,
-        })),
+        current.map((row) => {
+          const sent = sentById.get(row.id);
+          if (sent === undefined) return row;
+          return {
+            ...row,
+            initialPurchase: sent.writePurchase ? sent.purchase : row.initialPurchase,
+            initialSale: sent.writeSale ? sent.sale : row.initialSale,
+          };
+        }),
       );
       setNotice(
         `${lines.length} ${lines.length === 1 ? "producto guardado" : "productos guardados"}.`,
@@ -329,7 +343,12 @@ export function BulkPriceEditor({
             Solo sin precio
           </label>
           {(margin !== null || marginOverrides.size > 0) && (
-            <button type="button" className={secondaryButtonClass} onClick={applyMargin}>
+            <button
+              type="button"
+              className={secondaryButtonClass}
+              disabled={busy || saving}
+              onClick={applyMargin}
+            >
               Aplicar margen{margin !== null ? ` (${margin}%)` : ""}
             </button>
           )}
@@ -388,6 +407,7 @@ export function BulkPriceEditor({
                     placeholder="—"
                     aria-label={`Precio de compra de ${row.name}`}
                     value={row.purchase}
+                    disabled={busy || saving}
                     onChange={(event) => updateCell(row.id, "purchase", event.target.value)}
                     onPaste={(event) => onPasteColumn(event, row.id, "purchase")}
                   />
@@ -400,6 +420,7 @@ export function BulkPriceEditor({
                     placeholder="—"
                     aria-label={`Precio de venta de ${row.name}`}
                     value={row.sale}
+                    disabled={busy || saving}
                     onChange={(event) => updateCell(row.id, "sale", event.target.value)}
                     onPaste={(event) => onPasteColumn(event, row.id, "sale")}
                   />

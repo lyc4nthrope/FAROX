@@ -26,39 +26,41 @@ export function AssistantWidget() {
 
   return (
     <>
-      {open && (
-        <div
-          id="assistant-panel"
-          ref={panelRef}
-          role="dialog"
-          aria-label="Asistente"
-          tabIndex={-1}
-          className="fixed bottom-20 right-3 z-40 flex h-[70vh] max-h-[34rem] w-[min(24rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-900/20 outline-none sm:right-4"
-        >
-          <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
-            <p className="text-sm font-semibold tracking-tight text-gray-900">Asistente</p>
-            <button
-              type="button"
-              aria-label="Cerrar asistente"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
-              onClick={() => setOpen(false)}
+      <div
+        id="assistant-panel"
+        ref={panelRef}
+        role="dialog"
+        aria-label="Asistente"
+        aria-hidden={!open}
+        hidden={!open}
+        tabIndex={-1}
+        className={`fixed bottom-20 right-3 z-40 h-[70vh] max-h-[34rem] w-[min(24rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl shadow-gray-900/20 outline-none sm:right-4 ${
+          open ? "flex" : "hidden"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
+          <p className="text-sm font-semibold tracking-tight text-gray-900">Asistente</p>
+          <button
+            type="button"
+            aria-label="Cerrar asistente"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+            onClick={() => setOpen(false)}
+          >
+            <svg
+              aria-hidden="true"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              viewBox="0 0 24 24"
             >
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                viewBox="0 0 24 24"
-              >
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
-          </div>
-          <AssistantChat compact />
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
         </div>
-      )}
+        <AssistantChat compact />
+      </div>
 
       <button
         type="button"

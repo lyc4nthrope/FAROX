@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
-import { useLoad } from "../../../shared/hooks/useLoad";
+import { notifyDataChanged, useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { LIMITS } from "../../../shared/lib/limits";
 import { Status, buttonClass, inputClass } from "../../../shared/ui/Box";
@@ -26,7 +26,13 @@ const SUGGESTIONS: readonly string[] = [
  * La privacidad la resuelve la RLS: el mismo endpoint atiende a todos, pero
  * cada herramienta corre con el JWT del usuario.
  */
-export function AssistantChat({ compact = false }: { compact?: boolean }) {
+export function AssistantChat({
+  compact = false,
+  onDone,
+}: {
+  compact?: boolean;
+  onDone?: () => void;
+}) {
   const { role } = useAuth();
   const stores = useLoad(
     () => (role === "distribuidor" ? fetchDistributorStores() : fetchMyStores(role === "admin")),
@@ -202,7 +208,14 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
           </p>
         )}
         {actions.map((action) => (
-          <PendingActionCard key={action.action_id} action={action} />
+          <PendingActionCard
+            key={action.action_id}
+            action={action}
+            onDone={() => {
+              notifyDataChanged();
+              onDone?.();
+            }}
+          />
         ))}
       </div>
 
@@ -218,11 +231,7 @@ export function AssistantChat({ compact = false }: { compact?: boolean }) {
             disabled={sending}
             onChange={(event) => setInput(event.target.value)}
           />
-          <button
-            className={buttonClass}
-            type="submit"
-            disabled={sending || input.trim() === ""}
-          >
+          <button className={buttonClass} type="submit" disabled={sending || input.trim() === ""}>
             {sending ? "Enviando…" : "Enviar"}
           </button>
         </div>

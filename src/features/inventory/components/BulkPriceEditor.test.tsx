@@ -201,6 +201,34 @@ describe("BulkPriceEditor · guardado", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("No se pudo guardar.");
     expect(screen.getByRole("button", { name: /guardar cambios \(1\)/i })).toBeEnabled();
   });
+
+  it("deshabilita los inputs mientras guarda y solo marca como limpias las columnas enviadas", async () => {
+    const user = userEvent.setup();
+    let resolveSave: (value: string | null) => void = () => {};
+    const onSave = vi
+      .fn<(lines: readonly BulkPriceLine[]) => Promise<string | null>>()
+      .mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveSave = resolve;
+          }),
+      );
+    setup({ sale: new Map([[1, 2000]]), onSave });
+
+    await showAll(user);
+    const sale = screen.getByLabelText("Precio de venta de Arroz Diana");
+    await user.clear(sale);
+    await user.type(sale, "2200");
+    await user.click(screen.getByRole("button", { name: /guardar cambios \(1\)/i }));
+
+    expect(sale).toBeDisabled();
+    expect(screen.getByLabelText("Precio de compra de Arroz Diana")).toBeDisabled();
+
+    resolveSave(null);
+    expect(await screen.findByText("1 producto guardado.")).toBeInTheDocument();
+    expect(sale).toBeEnabled();
+    expect(screen.getByRole("button", { name: /guardar cambios \(0\)/i })).toBeDisabled();
+  });
 });
 
 describe("BulkPriceEditor · pegar desde Excel", () => {

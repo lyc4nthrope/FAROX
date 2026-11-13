@@ -1,10 +1,6 @@
 import { corsHeaders, errorJson, isPost, json } from "../_shared/http.ts";
 import { authHeader, serviceClient, userClient } from "../_shared/supabase.ts";
-import {
-  ModelUnavailableError,
-  runAgent,
-  type AgentHistoryItem,
-} from "../_shared/agent.ts";
+import { ModelUnavailableError, runAgent, type AgentHistoryItem } from "../_shared/agent.ts";
 
 // ============================================================================
 // Edge Function «agent»: un solo endpoint para todos los usuarios.
@@ -132,9 +128,7 @@ Deno.serve(async (request) => {
     .eq("id", activeId)
     .maybeSingle();
   let storeContext: { id: number; name: string } | null = null;
-  const conversationStoreId = Number(
-    (conversationRow as { store_id?: unknown } | null)?.store_id,
-  );
+  const conversationStoreId = Number((conversationRow as { store_id?: unknown } | null)?.store_id);
   if (Number.isFinite(conversationStoreId) && conversationStoreId > 0) {
     const { data: storeRow } = await client
       .from("stores")
@@ -157,18 +151,19 @@ Deno.serve(async (request) => {
     .in("role", ["user", "assistant"])
     .order("id", { ascending: false })
     .limit(MAX_HISTORY);
-  const history: AgentHistoryItem[] = (historyRows ?? [])
-    .reverse()
-    .flatMap((row) => {
-      if (row.role !== "user" && row.role !== "assistant") return [];
-      return [{ role: row.role, content: String(row.content) }];
-    });
+  const history: AgentHistoryItem[] = (historyRows ?? []).reverse().flatMap((row) => {
+    if (row.role !== "user" && row.role !== "assistant") return [];
+    return [{ role: row.role, content: String(row.content) }];
+  });
 
   const { error: sendError } = await client.rpc("send_message", {
     p_conversation: activeId,
     p_content: message,
   });
   if (sendError !== null) {
+    if (sendError.message.includes("límite de")) {
+      return errorJson("Llegaste al límite de consultas por hora. Probá más tarde.", 429, true);
+    }
     return errorJson("No pude guardar tu mensaje.", 500, true);
   }
 
@@ -204,14 +199,17 @@ Deno.serve(async (request) => {
     // guardan con service_role DESPUÉS de validar la conversación con el JWT.
     const admin = serviceClient();
     for (const entry of toolLog) {
-      await admin.from("chat_messages").insert({
+      const { error: toolInsertError } = await admin.from("chat_messages").insert({
         conversation_id: activeId,
         role: "tool",
         content: entry.name,
         payload: { args: entry.args, result: entry.result },
       });
+      if (toolInsertError !== null) {
+        console.error("agent TOOL_MESSAGE", toolInsertError.message);
+      }
     }
-    await admin.from("chat_messages").insert({
+    const { error: assistantInsertError } = await admin.from("chat_messages").insert({
       conversation_id: activeId,
       role: "assistant",
       content: reply,
@@ -220,6 +218,9 @@ Deno.serve(async (request) => {
           ? { action_id: (action as { action_id: number }).action_id }
           : null,
     });
+    if (assistantInsertError !== null) {
+      console.error("agent ASSISTANT_MESSAGE", assistantInsertError.message);
+    }
 
     return json({ conversation_id: activeId, reply, action }, 200, true);
   } catch (error) {

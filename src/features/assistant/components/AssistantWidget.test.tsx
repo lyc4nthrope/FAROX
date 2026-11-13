@@ -22,22 +22,23 @@ afterEach(() => {
 });
 
 describe("AssistantWidget · burbuja flotante (0040)", () => {
-  it("abre y cierra el chat desde la burbuja", async () => {
+  it("abre y cierra el chat desde la burbuja sin desmontar la conversación", async () => {
     renderWidget();
     const user = userEvent.setup();
 
+    expect(screen.queryByRole("dialog", { name: "Asistente" })).not.toBeInTheDocument();
+    expect(screen.getByText("chat del asistente")).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Abrir asistente" }));
     expect(await screen.findByRole("dialog", { name: "Asistente" })).toBeInTheDocument();
-    expect(screen.getByText("chat del asistente")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Cerrar asistente" }));
     expect(screen.queryByRole("dialog", { name: "Asistente" })).not.toBeInTheDocument();
+    expect(screen.getByText("chat del asistente")).toBeInTheDocument();
   });
 
   it("no aparece en /asistente, donde el chat ya es pantalla completa", () => {
     renderWidget("/asistente");
-    expect(
-      screen.queryByRole("button", { name: "Abrir asistente" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Abrir asistente" })).not.toBeInTheDocument();
   });
 });
