@@ -15,10 +15,17 @@ type ReactivatableTable = "products" | "stores" | "distributors";
 export function ReactivateBanner({ table, id }: { table: ReactivatableTable; id: number }) {
   const { role } = useAuth();
   const state = useLoad(async () => {
-    const { data, error } = await supabase.from(table).select("is_active").eq("id", id).maybeSingle();
+    const { data, error } = await supabase
+      .from(table)
+      .select("is_active")
+      .eq("id", id)
+      .maybeSingle();
     return { data: data === null ? null : (data as { is_active: boolean }).is_active, error };
   }, [table, id]);
-  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({ error: null, ok: null });
+  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
 
   if (state.data !== false) return msg.ok ? <Status ok={msg.ok} /> : null;
 

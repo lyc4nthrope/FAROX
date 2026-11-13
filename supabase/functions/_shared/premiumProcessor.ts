@@ -259,13 +259,8 @@ export async function processPreapproval(service: Service, dataId: string): Prom
   if (error !== null) throw new Error(error.message);
 }
 
-export async function processAuthorizedPayment(
-  service: Service,
-  dataId: string,
-): Promise<void> {
-  const result = await mpRequest<AuthorizedPaymentResponse>(
-    `/authorized_payments/${dataId}`,
-  );
+export async function processAuthorizedPayment(service: Service, dataId: string): Promise<void> {
+  const result = await mpRequest<AuthorizedPaymentResponse>(`/authorized_payments/${dataId}`);
   if (result.error !== null || result.data === null) {
     throw new Error(result.error ?? "No se pudo consultar la factura");
   }
@@ -359,11 +354,7 @@ export async function processPayment(service: Service, dataId: string): Promise<
   });
 }
 
-export async function processTopic(
-  service: Service,
-  topic: string,
-  dataId: string,
-): Promise<void> {
+export async function processTopic(service: Service, topic: string, dataId: string): Promise<void> {
   if (topic === "subscription_preapproval") {
     await processPreapproval(service, dataId);
     return;

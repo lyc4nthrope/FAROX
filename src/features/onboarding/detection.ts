@@ -35,9 +35,6 @@ export function hasOwnedStores(data: unknown): boolean {
 
 // Predicado puro de la pregunta (T2.1): se muestra MIENTRAS no exista
 // ninguna señal y nadie haya confirmado la terminal pasiva en esta sesión.
-export function deriveNeedsOnboarding(
-  signals: OnboardingSignals,
-  acknowledged: boolean,
-): boolean {
+export function deriveNeedsOnboarding(signals: OnboardingSignals, acknowledged: boolean): boolean {
   return !acknowledged && !signals.hasDistributor && !signals.hasStore;
 }

@@ -63,10 +63,7 @@ export function UserProfileForm({
         </p>
       )}
       <div>
-        <label
-          htmlFor="user-profile-full-name"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="user-profile-full-name" className="block text-sm font-medium text-gray-700">
           Nombre completo
         </label>
         <input
@@ -89,10 +86,7 @@ export function UserProfileForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="user-profile-phone"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="user-profile-phone" className="block text-sm font-medium text-gray-700">
           Teléfono
         </label>
         <input

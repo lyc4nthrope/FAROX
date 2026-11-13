@@ -13,7 +13,9 @@ const REPO_ROOT = decodeURIComponent(new URL("../../", import.meta.url).pathname
 const MIGRATION = "20261112160559_agent_actions.sql";
 
 function read(): string {
-  return fs.readFileSync(`${REPO_ROOT}/supabase/migrations/${MIGRATION}`, "utf8").replace(/\s+/g, " ");
+  return fs
+    .readFileSync(`${REPO_ROOT}/supabase/migrations/${MIGRATION}`, "utf8")
+    .replace(/\s+/g, " ");
 }
 
 describe("agent_actions · asistente con escritura (fase 2)", () => {

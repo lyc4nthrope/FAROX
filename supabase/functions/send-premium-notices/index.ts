@@ -8,7 +8,9 @@ interface NoticeRow {
   user_id: string;
   kind: string;
   period_key: string;
-  user: { full_name?: string; email?: string | null } | Array<{ full_name?: string; email?: string | null }>;
+  user:
+    | { full_name?: string; email?: string | null }
+    | Array<{ full_name?: string; email?: string | null }>;
 }
 
 const KINDS: ReadonlySet<string> = new Set([
@@ -40,9 +42,7 @@ Deno.serve(async (request) => {
   const appUrl = Deno.env.get("APP_URL");
 
   try {
-    const { data: enqueued, error: enqueueError } = await service.rpc(
-      "enqueue_premium_notices",
-    );
+    const { data: enqueued, error: enqueueError } = await service.rpc("enqueue_premium_notices");
     if (enqueueError !== null) {
       return errorJson("No se pudieron preparar los avisos.", 500, true);
     }

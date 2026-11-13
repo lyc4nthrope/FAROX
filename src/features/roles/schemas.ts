@@ -15,8 +15,7 @@ import { ROLE_NAMES } from "../auth/types";
 // 23505 amigable vía mapError).
 export const roleSchema = z.object({
   name: z.enum(ROLE_NAMES, {
-    message:
-      "Elegí un nombre de rol del catálogo de la app (admin, operador o distribuidor).",
+    message: "Elegí un nombre de rol del catálogo de la app (admin, operador o distribuidor).",
   }),
   // roles.description es nullable (0002:44): "" viaja como NULL (convención
   // profile/api → users/api updateUserProfile).

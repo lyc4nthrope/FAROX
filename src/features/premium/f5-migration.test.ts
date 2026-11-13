@@ -20,9 +20,13 @@ describe("0036 · avisos y operación admin", () => {
   });
 
   it("agrega rotación de conciliación a pagos y suscripciones", () => {
-    expect(sql).toMatch(/ALTER TABLE public\.payments[\s\S]*ADD COLUMN IF NOT EXISTS last_reconciled_at timestamptz/);
+    expect(sql).toMatch(
+      /ALTER TABLE public\.payments[\s\S]*ADD COLUMN IF NOT EXISTS last_reconciled_at timestamptz/,
+    );
     expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS idx_payments_pending_reconcile/);
-    expect(sql).toMatch(/ALTER TABLE public\.subscriptions[\s\S]*ADD COLUMN IF NOT EXISTS last_reconciled_at timestamptz/);
+    expect(sql).toMatch(
+      /ALTER TABLE public\.subscriptions[\s\S]*ADD COLUMN IF NOT EXISTS last_reconciled_at timestamptz/,
+    );
     expect(sql).toMatch(/CREATE INDEX IF NOT EXISTS idx_subscriptions_active_reconcile/);
   });
 

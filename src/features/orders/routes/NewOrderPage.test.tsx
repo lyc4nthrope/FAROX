@@ -259,9 +259,7 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     expect(screen.getByLabelText("Distribuidor")).toHaveValue("");
     expect(screen.queryByLabelText("Cantidad de Arroz")).not.toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Buscá un producto arriba o agregá un faltante para empezar la solicitud.",
-      ),
+      screen.getByText("Buscá un producto arriba o agregá un faltante para empezar la solicitud."),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(storeLinksApi.fetchLinkedDistributorOptions).toHaveBeenCalledWith(4),
@@ -371,9 +369,7 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
     });
     renderPage("operador", "/pedidos/nuevo?storeId=3&distributorId=7");
 
-    expect(
-      await screen.findByText("No está en el catálogo del distribuidor"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No está en el catálogo del distribuidor")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Agregar faltante Detergente" })).toBeDisabled();
   });
 

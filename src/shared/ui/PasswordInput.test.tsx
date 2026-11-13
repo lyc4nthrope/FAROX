@@ -34,9 +34,10 @@ describe("PasswordInput", () => {
 
     await user.click(screen.getByRole("button", { name: "Mostrar contraseña" }));
     expect(input).toHaveAttribute("type", "text");
-    expect(
-      screen.getByRole("button", { name: "Ocultar contraseña" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Ocultar contraseña" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     await user.click(screen.getByRole("button", { name: "Ocultar contraseña" }));
     expect(input).toHaveAttribute("type", "password");

@@ -99,9 +99,7 @@ describe("PremiumDowngradeModal (0033)", () => {
     await user.click(screen.getByRole("radio", { name: /Tienda Norte/ }));
     await user.click(screen.getByRole("button", { name: "Conservar esta tienda" }));
 
-    await waitFor(() =>
-      expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2),
-    );
+    await waitFor(() => expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2));
   });
 
   it("después de la gracia es bloqueante: sin cerrar ni posponer", async () => {

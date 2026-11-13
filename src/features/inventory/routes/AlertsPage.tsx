@@ -20,9 +20,7 @@ export function AlertsPage() {
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Operación
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Operación</p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Alertas</h1>
         {alerts.data !== null && (

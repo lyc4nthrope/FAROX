@@ -7,8 +7,7 @@ export interface AdminActor {
 }
 
 type AdminResult =
-  | { actor: AdminActor; service: ReturnType<typeof serviceClient> }
-  | { response: Response };
+  { actor: AdminActor; service: ReturnType<typeof serviceClient> } | { response: Response };
 
 export async function requireAdmin(request: Request): Promise<AdminResult> {
   const header = authHeader(request);
@@ -35,9 +34,7 @@ export async function requireAdmin(request: Request): Promise<AdminResult> {
     const roleRaw = row?.role;
     const role = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
     const roleName =
-      typeof role === "object" && role !== null
-        ? (role as { name?: unknown }).name
-        : undefined;
+      typeof role === "object" && role !== null ? (role as { name?: unknown }).name : undefined;
     if (roleName !== "admin" || row?.is_active !== true) {
       return { response: errorJson("Solo un administrador activo puede hacer esto.", 403, true) };
     }

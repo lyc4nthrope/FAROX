@@ -84,10 +84,7 @@ describe("write tools", () => {
   });
 
   it("no prepara nada si writesEnabled=false", async () => {
-    stubFetch(
-      toolCall("preparar_faltante", { store_id: 10, product_id: 2, shortage: true }),
-      text,
-    );
+    stubFetch(toolCall("preparar_faltante", { store_id: 10, product_id: 2, shortage: true }), text);
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
     await runAgent({
       ...baseInput,
@@ -106,9 +103,9 @@ describe("write tools", () => {
       writesEnabled: false,
     });
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
-    ) as { tools: { function: { name: string } }[] };
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body) as {
+      tools: { function: { name: string } }[];
+    };
     const names = body.tools.map((tool) => tool.function.name);
     expect(names).toContain("buscar_producto");
     expect(names).not.toContain("preparar_salida_tienda");
@@ -122,9 +119,7 @@ describe("write tools", () => {
       writesEnabled: true,
     });
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
-    ) as {
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body) as {
       messages: { content: string }[];
       tools: { function: { name: string } }[];
     };
@@ -143,9 +138,9 @@ describe("write tools", () => {
       writesEnabled: false,
     });
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
-    ) as { messages: { content: string }[] };
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body) as {
+      messages: { content: string }[];
+    };
     expect(body.messages[0]?.content).toContain(
       "Alcance: solo respondés sobre la operación de FARØX",
     );

@@ -28,10 +28,10 @@ al número que el usuario declaró en la app; si no coinciden, la RPC responde
 
 ## Contrato
 
-| Método | Uso |
-|---|---|
-| `GET` | Verificación de Meta: `hub.mode=subscribe` + `hub.verify_token` + `hub.challenge` |
-| `POST` | Mensajes entrantes; exige `x-hub-signature-256` válida sobre el body **crudo** |
+| Método | Uso                                                                               |
+| ------ | --------------------------------------------------------------------------------- |
+| `GET`  | Verificación de Meta: `hub.mode=subscribe` + `hub.verify_token` + `hub.challenge` |
+| `POST` | Mensajes entrantes; exige `x-hub-signature-256` válida sobre el body **crudo**    |
 
 Siempre responde `200` rápido (salvo firma inválida) y procesa en background:
 un `500` o un timeout hace que Meta reintente y duplique mensajes. `expired` no
@@ -42,12 +42,12 @@ genera respuesta para no contestar en los reintentos.
 Cada mensaje de texto se deduplica por `message.id` en `whatsapp_inbound` y se
 procesa en background (`EdgeRuntime.waitUntil`) para responder rápido a Meta.
 
-| Texto | Ruta |
-|---|---|
-| `FAROX A1B2C3` | `phone_verification_confirm_whatsapp` |
-| `CONFIRMAR A1B2C3` | `agent_execute_action_for_user` |
-| `CANCELAR A1B2C3` | `agent_cancel_action_for_user` |
-| otro texto | asistente (`runAgent` con `channel: "whatsapp"`) |
+| Texto              | Ruta                                             |
+| ------------------ | ------------------------------------------------ |
+| `FAROX A1B2C3`     | `phone_verification_confirm_whatsapp`            |
+| `CONFIRMAR A1B2C3` | `agent_execute_action_for_user`                  |
+| `CANCELAR A1B2C3`  | `agent_cancel_action_for_user`                   |
+| otro texto         | asistente (`runAgent` con `channel: "whatsapp"`) |
 
 Identidad: `wa_id` → `internal_user_for_wa_id` (teléfono verificado + usuario
 activo). Sin teléfono verificado no hay asistente ni acciones. El asistente usa

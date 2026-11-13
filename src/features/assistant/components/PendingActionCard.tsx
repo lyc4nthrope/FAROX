@@ -99,7 +99,10 @@ function priceLines(lines: readonly unknown[]) {
       {lines.map((raw, index) => {
         const line = asRecord(raw);
         return (
-          <li key={`${text(line.product)}-${index}`} className="border-t border-amber-200/70 pt-1.5">
+          <li
+            key={`${text(line.product)}-${index}`}
+            className="border-t border-amber-200/70 pt-1.5"
+          >
             <p className="font-medium text-gray-900">{text(line.product)}</p>
             <p className="text-xs text-gray-600">
               Costo: {money(line.old_purchase)} → {money(line.new_purchase)}
@@ -205,8 +208,7 @@ export function PendingActionCard({
 
       {store !== "" && <p className="mt-1 text-xs text-gray-600">{store}</p>}
 
-      {(kind === "store_exit" || kind === "distributor_sale") &&
-        movementLines(lines, "unit_price")}
+      {(kind === "store_exit" || kind === "distributor_sale") && movementLines(lines, "unit_price")}
       {kind === "distributor_purchase" && movementLines(lines, "unit_cost")}
       {kind === "price_update" && priceLines(lines)}
       {kind === "shortage_toggle" && (
@@ -242,9 +244,7 @@ export function PendingActionCard({
             <button
               type="button"
               className={buttonClass}
-              disabled={
-                busyWithServer || (strong && confirmation.trim() !== "CONFIRMAR")
-              }
+              disabled={busyWithServer || (strong && confirmation.trim() !== "CONFIRMAR")}
               onClick={() => void confirm()}
             >
               {busy === "executing" ? "Confirmando…" : "Confirmar"}

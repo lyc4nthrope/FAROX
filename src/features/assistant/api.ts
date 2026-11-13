@@ -75,10 +75,7 @@ async function edgeErrorDetail(error: unknown): Promise<string | null> {
 }
 
 /** Invoca la Edge Function «agent». Devuelve el texto, el borrador o un error. */
-export async function askAgent(input: {
-  conversationId: number;
-  message: string;
-}): Promise<{
+export async function askAgent(input: { conversationId: number; message: string }): Promise<{
   reply: string | null;
   action: AssistantAction | null;
   error: string | null;
@@ -127,9 +124,7 @@ export async function executeAction(
 }
 
 /** Cancela un borrador pendiente. */
-export async function cancelAction(
-  actionId: number,
-): Promise<{ data: unknown; error: Err }> {
+export async function cancelAction(actionId: number): Promise<{ data: unknown; error: Err }> {
   const { data, error } = await supabase.rpc("agent_cancel_action", { p_action: actionId });
   return { data, error };
 }

@@ -17,12 +17,12 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S1-S2, S4-S6 | inline | hecho | `/premium`: comparativa, FAQ, estado actual, planes/desglose |
-| T2 | S3 | inline | hecho | sección Premium en landing + «Ver planes» y «Gestionar mis tiendas» en perfil |
-| T3 | S7 | inline | hecho | backlog de edición/eliminación/transferencia en el plan |
-| T4 | S1-S6 | inline | hecho | tests UI/copys, typecheck, lint, check-scope, build |
+| ID  | Specs        | Ruta   | Estado | Evidencia                                                                     |
+| --- | ------------ | ------ | ------ | ----------------------------------------------------------------------------- |
+| T1  | S1-S2, S4-S6 | inline | hecho  | `/premium`: comparativa, FAQ, estado actual, planes/desglose                  |
+| T2  | S3           | inline | hecho  | sección Premium en landing + «Ver planes» y «Gestionar mis tiendas» en perfil |
+| T3  | S7           | inline | hecho  | backlog de edición/eliminación/transferencia en el plan                       |
+| T4  | S1-S6        | inline | hecho  | tests UI/copys, typecheck, lint, check-scope, build                           |
 
 ## Log
 

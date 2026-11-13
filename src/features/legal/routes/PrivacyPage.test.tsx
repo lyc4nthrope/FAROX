@@ -26,9 +26,7 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
 
   it("renderiza el título, la versión vigente y el aviso de BORRADOR", () => {
     renderPrivacy();
-    expect(
-      screen.getByRole("heading", { name: "Política de Privacidad" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Política de Privacidad" })).toBeInTheDocument();
     expect(screen.getByText(`Versión vigente: ${PRIVACY_VERSION}`)).toBeInTheDocument();
     expect(
       screen.getByText("BORRADOR — requiere revisión legal antes de publicar"),

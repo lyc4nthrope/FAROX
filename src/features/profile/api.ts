@@ -20,8 +20,7 @@ function normalizeRow(raw: Record<string, unknown>): ProfileRow {
     contact_preference: isContactPreference(raw.contact_preference)
       ? raw.contact_preference
       : "whatsapp",
-    phone_verified_at:
-      typeof raw.phone_verified_at === "string" ? raw.phone_verified_at : null,
+    phone_verified_at: typeof raw.phone_verified_at === "string" ? raw.phone_verified_at : null,
     default_margin_pct: normalizeMargin(raw.default_margin_pct),
   };
 }
@@ -100,9 +99,7 @@ export async function startPhoneVerification(
   });
   if (error !== null) return { data: null, error };
 
-  const first = Array.isArray(data)
-    ? (data[0] as Record<string, unknown> | undefined)
-    : undefined;
+  const first = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
   const code = typeof first?.code === "string" ? first.code : "";
   const phoneE164 = typeof first?.phone_e164 === "string" ? first.phone_e164 : "";
   const expiresAt = typeof first?.expires_at === "string" ? first.expires_at : "";

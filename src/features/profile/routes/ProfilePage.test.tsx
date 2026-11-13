@@ -116,11 +116,7 @@ describe("ProfilePage (§S2 fila /profile)", () => {
     expect(profileApi.updateMyProfile).toHaveBeenCalledTimes(1);
     const [userId, values] = vi.mocked(profileApi.updateMyProfile).mock.calls[0];
     expect(userId).toBe("u1");
-    expect(Object.keys(values).sort()).toEqual([
-      "contact_preference",
-      "full_name",
-      "phone_number",
-    ]);
+    expect(Object.keys(values).sort()).toEqual(["contact_preference", "full_name", "phone_number"]);
   });
 
   it("el margen de ganancia se guarda por RPC y muestra el ejemplo (0045)", async () => {

@@ -164,9 +164,7 @@ export function MovementCart({
 
   function onScanned(raw: string): void {
     const code = raw.trim();
-    const match = options.find(
-      (option) => option.barcode !== null && option.barcode === code,
-    );
+    const match = options.find((option) => option.barcode !== null && option.barcode === code);
     if (match === undefined) {
       setNotice(`El código ${code} no está en el catálogo de esta tienda.`);
       return;
@@ -265,7 +263,8 @@ export function MovementCart({
   const discountAmount = Math.max(0, subtotal - total);
   const discountPct = Number(discount);
   const discountInvalid =
-    discount.trim() !== "" && (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100);
+    discount.trim() !== "" &&
+    (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100);
 
   return (
     <div>

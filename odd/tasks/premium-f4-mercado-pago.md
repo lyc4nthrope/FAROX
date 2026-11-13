@@ -19,16 +19,16 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S4 | inline | hecho | `20261029000035_f4_mercado_pago.sql`: columnas, índice único de referencia e índice de una suscripción activa por usuario |
-| T2 | S1-S3, S7 | inline | hecho | `_shared/mercadopago.ts` + 9 tests de firma/manifiesto/payload/estados |
-| T3 | S1 | inline | hecho | `create-subscription`: plan/versión desde DB, fila local primero, init_point sandbox/producción, reutilización y stale cleanup |
-| T4 | S2 | inline | hecho | `mp-webhook`: firma, idempotencia, consulta real, monto/moneda, activación/extensión y mapeo de estados |
-| T5 | S3 | inline | hecho | `cancel-subscription`: auth, MP PUT, `cancel_at_period_end`, sin tocar `premium_until` |
-| T6 | S5-S6 | inline | hecho | API, `/premium`, `/premium/resultado`, perfil con cancelación |
-| T7 | S7-S8 | inline | hecho | README de funciones, manual, `APLICAR-EN-PRODUCCION.md`, tests y checks |
-| T8 | S1-S8 | delegated | hecho | verificación independiente: blocker de período corregido con RPC SQL y recheck PASS |
+| ID  | Specs     | Ruta      | Estado | Evidencia                                                                                                                      |
+| --- | --------- | --------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| T1  | S4        | inline    | hecho  | `20261029000035_f4_mercado_pago.sql`: columnas, índice único de referencia e índice de una suscripción activa por usuario      |
+| T2  | S1-S3, S7 | inline    | hecho  | `_shared/mercadopago.ts` + 9 tests de firma/manifiesto/payload/estados                                                         |
+| T3  | S1        | inline    | hecho  | `create-subscription`: plan/versión desde DB, fila local primero, init_point sandbox/producción, reutilización y stale cleanup |
+| T4  | S2        | inline    | hecho  | `mp-webhook`: firma, idempotencia, consulta real, monto/moneda, activación/extensión y mapeo de estados                        |
+| T5  | S3        | inline    | hecho  | `cancel-subscription`: auth, MP PUT, `cancel_at_period_end`, sin tocar `premium_until`                                         |
+| T6  | S5-S6     | inline    | hecho  | API, `/premium`, `/premium/resultado`, perfil con cancelación                                                                  |
+| T7  | S7-S8     | inline    | hecho  | README de funciones, manual, `APLICAR-EN-PRODUCCION.md`, tests y checks                                                        |
+| T8  | S1-S8     | delegated | hecho  | verificación independiente: blocker de período corregido con RPC SQL y recheck PASS                                            |
 
 ## Log
 

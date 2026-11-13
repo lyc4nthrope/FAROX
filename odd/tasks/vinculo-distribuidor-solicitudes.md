@@ -44,4 +44,3 @@ Rama: `feat/catalogo-por-rol` · Entrega: commits por unidad en la rama (push al
 - Distribuidor: `/vincular` tiene “Escanear QR” (permiso de cámara bajo demanda), fallback manual y errores amigables; el QR solo se acepta si el código es hex de 18 caracteres y, si es URL, del mismo origen.
 - Pedidos: operador elige solo distribuidores vinculados y la RPC devuelve la intersección `distributor_products ∩ stock` con precio activo; productos sin precio deshabilitados. El admin no cambia.
 - Gate: typecheck 0, lint 0, check-scope 0 en 228 archivos, **65 archivos / 529 tests** verdes, build OK. Sin Supabase/Postgres local: el SQL se valida por contenido y las pruebas de cámara/DB real quedan UNVERIFIED.
-

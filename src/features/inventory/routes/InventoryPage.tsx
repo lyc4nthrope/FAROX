@@ -17,7 +17,13 @@ import { MovementList } from "../components/MovementList";
 import { BulkPriceEditor, type BulkPriceLine } from "../components/BulkPriceEditor";
 import { MovementCart, netUnitPrice, type CartLine } from "../components/MovementCart";
 import { sortBySalesRanking } from "../ranking";
-import { EmptyState, PremiumLock, ProductPicker, SectionIcon, type ProductPickerOption } from "../../../shared/ui";
+import {
+  EmptyState,
+  PremiumLock,
+  ProductPicker,
+  SectionIcon,
+  type ProductPickerOption,
+} from "../../../shared/ui";
 import { Modal } from "../../../shared/ui/Modal";
 import { StoreCatalogPanel } from "../../products/components/StoreCatalogPanel";
 import { fetchStoreProductMargins, fetchStorePurchasePrices } from "../../products/api";
@@ -47,17 +53,14 @@ export function InventoryStoresPage() {
   const stores = useLoad(() => fetchMyStores(role === "admin"), [role]);
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Inventario
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Inventario</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Inventario</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Elegí una tienda para ver su stock, registrar movimientos y ajustar precios.
       </p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-medium text-gray-500">
-          {stores.data?.length ?? 0}{" "}
-          {stores.data?.length === 1 ? "tienda" : "tiendas"}
+          {stores.data?.length ?? 0} {stores.data?.length === 1 ? "tienda" : "tiendas"}
         </span>
         <Link className={buttonClass} to="/stores/new">
           <svg
@@ -556,11 +559,7 @@ export function InventoryPage() {
         }}
         action={
           <button className={buttonClass} type="submit" disabled={busy}>
-            {busy
-              ? "Registrando…"
-              : mov.type === "entry"
-                ? "Registrar compra"
-                : "Registrar venta"}
+            {busy ? "Registrando…" : mov.type === "entry" ? "Registrar compra" : "Registrar venta"}
           </button>
         }
       />

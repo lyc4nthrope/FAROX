@@ -16,10 +16,10 @@ describe("0034 · gestión de tiendas", () => {
   });
 
   it("reactivar respeta la razón y serializa el tope por usuario", () => {
-    expect(sql).toMatch(/reactivate_store: renová Premium para reactivar tiendas pausadas por plan/);
     expect(sql).toMatch(
-      /IF v_role <> 'admin' AND v_reason IS DISTINCT FROM 'user_removed' THEN/,
+      /reactivate_store: renová Premium para reactivar tiendas pausadas por plan/,
     );
+    expect(sql).toMatch(/IF v_role <> 'admin' AND v_reason IS DISTINCT FROM 'user_removed' THEN/);
     expect(sql).toMatch(
       /pg_advisory_xact_lock\(\s*pg_catalog\.hashtextextended\(auth\.uid\(\)::text, 0\)\s*\)/,
     );

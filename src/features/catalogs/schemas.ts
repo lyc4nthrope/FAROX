@@ -18,16 +18,8 @@ export const unitTypeSchema = z.object({
     .trim()
     .min(1, "Ingresá el nombre del tipo de unidad")
     .max(LIMITS.catalogName, `Máximo ${LIMITS.catalogName} caracteres`),
-  abbreviation: z
-    .string()
-    .trim()
-    .min(1, "Ingresá la abreviatura")
-    .max(10, "Máximo 10 caracteres"),
-  category: z
-    .string()
-    .trim()
-    .min(1, "Ingresá la categoría")
-    .max(40, "Máximo 40 caracteres"),
+  abbreviation: z.string().trim().min(1, "Ingresá la abreviatura").max(10, "Máximo 10 caracteres"),
+  category: z.string().trim().min(1, "Ingresá la categoría").max(40, "Máximo 40 caracteres"),
 });
 
 // ADM-9.5 · store_types: name UNIQUE NOT NULL (0002:22) — seed 0005:36-38.

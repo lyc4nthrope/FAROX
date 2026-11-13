@@ -72,6 +72,7 @@ El usuario eligió **con migración**: se agrega ledger de compras del distribui
 - `npm run ci` en verde: 762 tests.
 
 ### L8 — tickets recurrentes (2026-11-03)
+
 - **S16.** Desde el ticket se puede **guardar como recurrente** con un nombre; se guarda producto + cantidad (sin precios históricos).
 - **S17.** Las recurrentes aparecen como chips sobre el ticket; un toque **suma sus líneas** al ticket actual resolviendo el precio vigente del catálogo.
 - **S18.** El alcance es por tienda (operador/admin) o por distribuidora; RLS + guard en las RPC impiden ver o borrar plantillas de otro alcance.

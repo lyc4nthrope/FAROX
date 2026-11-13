@@ -155,9 +155,7 @@ export function ShortagePanel() {
 export function ShortagePage() {
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Reposición
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Reposición</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Faltantes</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Productos que marcaste como faltantes para reponer. El distribuidor no ve esta lista: le

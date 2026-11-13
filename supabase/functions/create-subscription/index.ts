@@ -17,11 +17,7 @@ Deno.serve(async (request) => {
   if (!isPost(request)) return errorJson("Método no permitido.", 405, true);
 
   if (Deno.env.get("PREMIUM_CHECKOUT_ENABLED") !== "true") {
-    return errorJson(
-      "El pago con Mercado Pago todavía no está habilitado.",
-      503,
-      true,
-    );
+    return errorJson("El pago con Mercado Pago todavía no está habilitado.", 503, true);
   }
 
   const header = authHeader(request);
@@ -78,9 +74,7 @@ Deno.serve(async (request) => {
     const roleRaw = userRow?.role;
     const role = Array.isArray(roleRaw) ? roleRaw[0] : roleRaw;
     const roleName =
-      typeof role === "object" && role !== null
-        ? (role as { name?: unknown }).name
-        : undefined;
+      typeof role === "object" && role !== null ? (role as { name?: unknown }).name : undefined;
     const premiumActive =
       roleName === "admin" ||
       (userRow?.premium === true &&
@@ -157,15 +151,8 @@ Deno.serve(async (request) => {
               true,
             );
           } else if (mpStatus === "paused") {
-            await service
-              .from("subscriptions")
-              .update({ status: "paused" })
-              .eq("id", existing.id);
-            return errorJson(
-              "Tu suscripción está pausada. Gestionála desde tu perfil.",
-              409,
-              true,
-            );
+            await service.from("subscriptions").update({ status: "paused" }).eq("id", existing.id);
+            return errorJson("Tu suscripción está pausada. Gestionála desde tu perfil.", 409, true);
           } else if (mpStatus === null) {
             return errorJson(
               "No se pudo verificar el estado del pago. Intentá de nuevo.",
@@ -201,10 +188,7 @@ Deno.serve(async (request) => {
         const stale = Number.isNaN(createdAt) || Date.now() - createdAt > 10 * 60 * 1000;
         if (stale) {
           // Un intento anterior quedó a medias; se libera el cupo de suscripción.
-          await service
-            .from("subscriptions")
-            .update({ status: "cancelled" })
-            .eq("id", existing.id);
+          await service.from("subscriptions").update({ status: "cancelled" }).eq("id", existing.id);
           existingReleased = true;
         } else {
           return errorJson(
@@ -214,11 +198,7 @@ Deno.serve(async (request) => {
           );
         }
       } else if (!existingReleased) {
-        return errorJson(
-          "Ya tenés una suscripción activa. Gestionála desde tu perfil.",
-          409,
-          true,
-        );
+        return errorJson("Ya tenés una suscripción activa. Gestionála desde tu perfil.", 409, true);
       }
     }
 
@@ -272,11 +252,7 @@ Deno.serve(async (request) => {
             true,
           );
         }
-        return errorJson(
-          "Ya tenés una suscripción activa. Gestionála desde tu perfil.",
-          409,
-          true,
-        );
+        return errorJson("Ya tenés una suscripción activa. Gestionála desde tu perfil.", 409, true);
       }
       return errorJson("No se pudo guardar la suscripción. Intentá de nuevo.", 500, true);
     }
@@ -299,10 +275,9 @@ Deno.serve(async (request) => {
       body: JSON.stringify(payload),
     });
     const accessToken = Deno.env.get("MP_ACCESS_TOKEN") ?? "";
-    const initPoint =
-      accessToken.startsWith("TEST-")
-        ? (mp.data?.sandbox_init_point ?? mp.data?.init_point)
-        : mp.data?.init_point;
+    const initPoint = accessToken.startsWith("TEST-")
+      ? (mp.data?.sandbox_init_point ?? mp.data?.init_point)
+      : mp.data?.init_point;
     if (mp.error !== null || mp.data === null || !mp.data.id || !initPoint) {
       if (typeof mp.data?.id === "string") {
         await mpRequest(`/preapproval/${mp.data.id}`, {
@@ -310,15 +285,8 @@ Deno.serve(async (request) => {
           body: JSON.stringify({ status: "cancelled" }),
         });
       }
-      await service
-        .from("subscriptions")
-        .update({ status: "cancelled" })
-        .eq("id", subscription.id);
-      return errorJson(
-        "No se pudo iniciar el pago con Mercado Pago. Intentá de nuevo.",
-        502,
-        true,
-      );
+      await service.from("subscriptions").update({ status: "cancelled" }).eq("id", subscription.id);
+      return errorJson("No se pudo iniciar el pago con Mercado Pago. Intentá de nuevo.", 502, true);
     }
 
     const mpStart = mp.data.date_created ?? start;
@@ -338,18 +306,11 @@ Deno.serve(async (request) => {
         method: "PUT",
         body: JSON.stringify({ status: "cancelled" }),
       });
-      await service
-        .from("subscriptions")
-        .update({ status: "cancelled" })
-        .eq("id", subscription.id);
+      await service.from("subscriptions").update({ status: "cancelled" }).eq("id", subscription.id);
       return errorJson("No se pudo guardar la suscripción. Intentá de nuevo.", 500, true);
     }
 
-    return json(
-      { init_point: initPoint, subscription_id: subscription.id },
-      200,
-      true,
-    );
+    return json({ init_point: initPoint, subscription_id: subscription.id }, 200, true);
   } catch {
     return errorJson("No se pudo iniciar el pago. Intentá de nuevo.", 500, true);
   }

@@ -45,11 +45,7 @@ const ROW: CatalogEntry = {
 
 function renderPanel(canSetPrice = false) {
   return render(
-    <StoreCatalogPanel
-      storeId={10}
-      storeName="Tienda Centro"
-      canSetPrice={canSetPrice}
-    />,
+    <StoreCatalogPanel storeId={10} storeName="Tienda Centro" canSetPrice={canSetPrice} />,
   );
 }
 
@@ -111,13 +107,9 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     await user.click(await screen.findByRole("button", { name: "Editar" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
 
-    await user.click(
-      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }));
     const umbral = within(dialog).getByLabelText("Umbral de alerta (opcional)");
-    expect(
-      within(dialog).getByText(/Vacío: avisa al llegar a 0\./),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/Vacío: avisa al llegar a 0\./)).toBeInTheDocument();
     await user.clear(umbral);
     await user.type(umbral, "8");
     await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
@@ -199,9 +191,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
 
     await user.click(await screen.findByRole("button", { name: "Editar" }));
     const dialog = await screen.findByRole("dialog", { name: "Editar Arroz Diana" });
-    await user.click(
-      within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Sumar cantidad de Arroz Diana" }));
     await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
 
     expect(productsApi.updateStoreProductFull).not.toHaveBeenCalled();
@@ -311,9 +301,7 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
     await user.click(await screen.findByRole("button", { name: "Quitar" }));
 
     expect(confirm).toHaveBeenCalledTimes(2);
-    await waitFor(() =>
-      expect(productsApi.removeStoreProduct).toHaveBeenCalledWith(10, 1, true),
-    );
+    await waitFor(() => expect(productsApi.removeStoreProduct).toHaveBeenCalledWith(10, 1, true));
     confirm.mockRestore();
   });
 
@@ -367,7 +355,9 @@ describe("StoreCatalogPanel · catálogo y asignación de la tienda", () => {
 
     await user.click(await screen.findByRole("button", { name: "Agregar productos" }));
     const dialog = await screen.findByRole("dialog", { name: "Agregar productos a la tienda" });
-    expect(within(dialog).getByRole("columnheader", { name: "Precio de venta" })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("columnheader", { name: "Precio de venta" }),
+    ).toBeInTheDocument();
     await user.type(within(dialog).getByLabelText("Precio de venta de Arroz blanco"), "2500");
     await user.click(within(dialog).getByRole("button", { name: "Agregar" }));
 

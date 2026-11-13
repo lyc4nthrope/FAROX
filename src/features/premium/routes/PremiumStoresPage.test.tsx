@@ -88,15 +88,17 @@ describe("PremiumStoresPage (0033)", () => {
     const reactivate = screen.getAllByRole("button", { name: "Reactivar" })[0];
     await user.click(reactivate);
 
-    await waitFor(() =>
-      expect(premiumApi.reactivatePremiumStores).toHaveBeenCalledWith([2]),
-    );
+    await waitFor(() => expect(premiumApi.reactivatePremiumStores).toHaveBeenCalledWith([2]));
     expect(await screen.findByText("Tienda reactivada.")).toBeInTheDocument();
   });
 
   it("sin Premium permite elegir la tienda principal desde la página", async () => {
     vi.mocked(premiumApi.fetchMyOwnedStores).mockResolvedValue({
-      data: [STORES[0], { ...STORES[1], isActive: true, deactivatedReason: null }, { ...STORES[2], isActive: true, deactivatedReason: null }],
+      data: [
+        STORES[0],
+        { ...STORES[1], isActive: true, deactivatedReason: null },
+        { ...STORES[2], isActive: true, deactivatedReason: null },
+      ],
       error: null,
     });
     const user = userEvent.setup();
@@ -106,9 +108,7 @@ describe("PremiumStoresPage (0033)", () => {
     await user.click(screen.getByRole("radio", { name: "Tienda Norte" }));
     await user.click(screen.getByRole("button", { name: "Conservar esta tienda" }));
 
-    await waitFor(() =>
-      expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2),
-    );
+    await waitFor(() => expect(premiumApi.chooseStoreForFreePlan).toHaveBeenCalledWith(2));
   });
 
   it("el dueño reactiva una tienda que desactivó (0034)", async () => {

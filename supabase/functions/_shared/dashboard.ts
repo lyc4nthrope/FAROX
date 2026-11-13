@@ -222,9 +222,7 @@ export function summarizeDashboard(
             sales_count: distributor.sales_count,
           }))
           .filter((distributor) => distributor.sales_value > 0)
-          .sort(
-            (a, b) => b.sales_value - a.sales_value || a.name.localeCompare(b.name),
-          )
+          .sort((a, b) => b.sales_value - a.sales_value || a.name.localeCompare(b.name))
           .slice(0, TOP_DISTRIBUTORS)
       : [];
 

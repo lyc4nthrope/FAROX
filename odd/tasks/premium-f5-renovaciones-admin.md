@@ -19,16 +19,16 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S1, S3-S6 | inline | hecho | migración 0036: `premium_notices`, `preview_plan_quote`, `enqueue_premium_notices` |
-| T2 | S1 | inline | hecho | API de planes/versiones/preview, `/planes` y tests |
-| T3 | S2 | inline | hecho | API de suscripciones/pagos, `/pagos`, conciliación y tests |
-| T4 | S2, S6 | inline | hecho | `admin-cancel-subscription`, `refund-payment`, audit_log |
-| T5 | S3 | inline | hecho | `premiumProcessor` compartido + `reconcile-subscriptions` |
-| T6 | S4 | inline | hecho | outbox, plantillas, `send-premium-notices` (Resend) |
-| T7 | S1-S7 | inline | hecho | router/nav, README de funciones, manual, APLICAR, tests y checks |
-| T8 | S1-S8 | delegated | hecho | verificación independiente: 3 blockers corregidos y recheck PASS |
+| ID  | Specs     | Ruta      | Estado | Evidencia                                                                          |
+| --- | --------- | --------- | ------ | ---------------------------------------------------------------------------------- |
+| T1  | S1, S3-S6 | inline    | hecho  | migración 0036: `premium_notices`, `preview_plan_quote`, `enqueue_premium_notices` |
+| T2  | S1        | inline    | hecho  | API de planes/versiones/preview, `/planes` y tests                                 |
+| T3  | S2        | inline    | hecho  | API de suscripciones/pagos, `/pagos`, conciliación y tests                         |
+| T4  | S2, S6    | inline    | hecho  | `admin-cancel-subscription`, `refund-payment`, audit_log                           |
+| T5  | S3        | inline    | hecho  | `premiumProcessor` compartido + `reconcile-subscriptions`                          |
+| T6  | S4        | inline    | hecho  | outbox, plantillas, `send-premium-notices` (Resend)                                |
+| T7  | S1-S7     | inline    | hecho  | router/nav, README de funciones, manual, APLICAR, tests y checks                   |
+| T8  | S1-S8     | delegated | hecho  | verificación independiente: 3 blockers corregidos y recheck PASS                   |
 
 ## Log
 

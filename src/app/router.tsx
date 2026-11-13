@@ -1,11 +1,22 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { CallbackPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../features/auth";
+import {
+  CallbackPage,
+  ForgotPasswordPage,
+  LoginPage,
+  RegisterPage,
+  ResetPasswordPage,
+} from "../features/auth";
 import { AssistantPage } from "../features/assistant";
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
-import { AlertsPage, DistributorMovementsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
+import {
+  AlertsPage,
+  DistributorMovementsPage,
+  InventoryPage,
+  InventoryStoresPage,
+} from "../features/inventory";
 import { LandingPage } from "../features/landing";
 import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
@@ -284,22 +295,99 @@ export function AppRoutes() {
                 </RequireRole>
               }
             />
-            <Route path="/inventario" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryStoresPage /></RequireRole>} />
-            <Route path="/inventario/:storeId" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryPage /></RequireRole>} />
+            <Route
+              path="/inventario"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <InventoryStoresPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/inventario/:storeId"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <InventoryPage />
+                </RequireRole>
+              }
+            />
             <Route path="/alertas" element={<AlertsPage />} />
             <Route path="/pedidos" element={<OrdersPage />} />
-            <Route path="/pedidos/nuevo" element={<RequireRole roles={ADMIN_OR_OPERATOR}><NewOrderPage /></RequireRole>} />
+            <Route
+              path="/pedidos/nuevo"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <NewOrderPage />
+                </RequireRole>
+              }
+            />
             <Route path="/pedidos/:orderId" element={<OrderDetailPage />} />
-            <Route path="/fiado" element={<RequireRole roles={ADMIN_OR_OPERATOR}><CreditsPage /></RequireRole>} />
-            <Route path="/rutas" element={<RequireRole roles={ADMIN_ONLY}><RoutesPage /></RequireRole>} />
-            <Route path="/rutas/:routeId" element={<RequireRole roles={ADMIN_ONLY}><RouteDetailPage /></RequireRole>} />
-            <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
-            <Route path="/movimientos" element={<RequireRole roles={DISTRIBUTOR_ONLY}><DistributorMovementsPage /></RequireRole>} />
+            <Route
+              path="/fiado"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <CreditsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/rutas"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RoutesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/rutas/:routeId"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RouteDetailPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/mi-ruta"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <MyRoutePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/movimientos"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <DistributorMovementsPage />
+                </RequireRole>
+              }
+            />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/asistente" element={<AssistantPage />} />
-            <Route path="/tiendas/:storeId/qr" element={<RequireRole roles={ADMIN_OR_OPERATOR}><StoreQrPage /></RequireRole>} />
-            <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
-            <Route path="/vincular/:code" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
+            <Route
+              path="/tiendas/:storeId/qr"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <StoreQrPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vincular"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <LinkStorePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vincular/:code"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <LinkStorePage />
+                </RequireRole>
+              }
+            />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/premium" element={<PremiumPage />} />
             <Route path="/premium/resultado" element={<PremiumResultPage />} />

@@ -30,9 +30,7 @@ Deno.serve(async (request) => {
     const service = serviceClient();
     const { data: subscription, error: readError } = await service
       .from("subscriptions")
-      .select(
-        "id, status, provider_subscription_id, current_period_end, cancel_at_period_end",
-      )
+      .select("id, status, provider_subscription_id, current_period_end, cancel_at_period_end")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -83,7 +81,11 @@ Deno.serve(async (request) => {
       .update({ status: "cancelled", cancel_at_period_end: true })
       .eq("id", subscription.id);
     if (updateError !== null) {
-      return errorJson("Se canceló en Mercado Pago, pero no se pudo guardar el estado local.", 500, true);
+      return errorJson(
+        "Se canceló en Mercado Pago, pero no se pudo guardar el estado local.",
+        500,
+        true,
+      );
     }
 
     return json(

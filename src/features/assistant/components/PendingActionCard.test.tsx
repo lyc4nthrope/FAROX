@@ -117,9 +117,7 @@ describe("PendingActionCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Confirmar" }));
 
-    expect(
-      await screen.findByText("No hay stock suficiente para esa salida."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No hay stock suficiente para esa salida.")).toBeInTheDocument();
     expect(screen.queryByText(/register_exit/)).not.toBeInTheDocument();
   });
 

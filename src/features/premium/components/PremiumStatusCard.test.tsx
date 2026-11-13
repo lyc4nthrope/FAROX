@@ -117,7 +117,9 @@ describe("PremiumStatusCard (0032)", () => {
 
     renderCard();
 
-    expect(await screen.findByText("Renovación automática activa con Mercado Pago.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Renovación automática activa con Mercado Pago."),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancelar suscripción" }));
 
     await waitFor(() => expect(premiumApi.cancelSubscription).toHaveBeenCalled());
@@ -146,7 +148,9 @@ describe("PremiumStatusCard (0032)", () => {
     renderCard();
 
     expect(
-      await screen.findByText("Renovación cancelada. El acceso sigue hasta el final del período pagado."),
+      await screen.findByText(
+        "Renovación cancelada. El acceso sigue hasta el final del período pagado.",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancelar suscripción" })).not.toBeInTheDocument();
   });

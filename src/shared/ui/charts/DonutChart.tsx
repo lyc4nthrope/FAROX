@@ -69,12 +69,7 @@ export function DonutChart({
 
   return (
     <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-6">
-      <svg
-        role="img"
-        aria-label={ariaLabel}
-        viewBox="0 0 200 200"
-        className="h-40 w-40 shrink-0"
-      >
+      <svg role="img" aria-label={ariaLabel} viewBox="0 0 200 200" className="h-40 w-40 shrink-0">
         <circle cx="100" cy="100" r={radius} fill="none" stroke="#f3f4f6" strokeWidth="22" />
         {arcs}
         <text x="100" y="94" textAnchor="middle" fontSize="11" fill="#6b7280">
@@ -100,10 +95,7 @@ export function DonutChart({
               className="h-2.5 w-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: slice.color }}
             />
-            <span
-              className="min-w-0 flex-1 truncate text-gray-700"
-              title={slice.label}
-            >
+            <span className="min-w-0 flex-1 truncate text-gray-700" title={slice.label}>
               {slice.label}
             </span>
             <span className="shrink-0 font-medium tabular-nums text-gray-900">

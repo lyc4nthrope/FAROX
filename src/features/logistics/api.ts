@@ -147,7 +147,10 @@ export async function fetchStoresWithRequests(): Promise<LoadResult<RequestStore
     };
     current.orderCount += 1;
     const expected = typeof raw.expected_at === "string" ? raw.expected_at : null;
-    if (expected !== null && (current.nextExpectedAt === null || expected < current.nextExpectedAt)) {
+    if (
+      expected !== null &&
+      (current.nextExpectedAt === null || expected < current.nextExpectedAt)
+    ) {
       current.nextExpectedAt = expected;
     }
     grouped.set(id, current);
@@ -179,13 +182,19 @@ export async function fetchStoresWithRequests(): Promise<LoadResult<RequestStore
 }
 
 /** Ruta por id, o la ruta de hoy del distribuidor si id es null (la RLS filtra). */
-export async function fetchRouteDetail(routeId: number | null, today: string): Promise<LoadResult<RouteDetail>> {
+export async function fetchRouteDetail(
+  routeId: number | null,
+  today: string,
+): Promise<LoadResult<RouteDetail>> {
   let query = supabase
     .from("routes")
     .select(
       "id,route_date,status,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
     );
-  query = routeId === null ? query.eq("route_date", today).neq("status", "cancelled") : query.eq("id", routeId);
+  query =
+    routeId === null
+      ? query.eq("route_date", today).neq("status", "cancelled")
+      : query.eq("id", routeId);
   const { data, error } = await query.limit(1).maybeSingle();
   if (error || !data) return { data: null, error };
   const r = data as Record<string, unknown>;
@@ -271,7 +280,13 @@ export async function markStop(stopId: number, status: StopStatus): Promise<{ er
   return { error };
 }
 
-export async function updateRouteStatus(routeId: number, status: RouteStatus): Promise<{ error: Err }> {
-  const { error } = await supabase.rpc("update_route_status", { p_route: routeId, p_status: status });
+export async function updateRouteStatus(
+  routeId: number,
+  status: RouteStatus,
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("update_route_status", {
+    p_route: routeId,
+    p_status: status,
+  });
   return { error };
 }

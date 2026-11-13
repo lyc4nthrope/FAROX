@@ -69,13 +69,7 @@ describe("TransferStorePanel (0034)", () => {
   it("solo ofrece operadores/admin activos distintos del dueño y transfiere", async () => {
     const user = userEvent.setup();
     const onTransferred = vi.fn();
-    render(
-      <TransferStorePanel
-        storeId={7}
-        currentOwnerId="u1"
-        onTransferred={onTransferred}
-      />,
-    );
+    render(<TransferStorePanel storeId={7} currentOwnerId="u1" onTransferred={onTransferred} />);
 
     const select = await screen.findByLabelText("Nuevo dueño");
     expect(screen.queryByRole("option", { name: /Dueño Actual/ })).not.toBeInTheDocument();

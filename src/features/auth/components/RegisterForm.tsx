@@ -43,10 +43,7 @@ export function RegisterForm({
     >
       {formError !== null && <ErrorBanner message={formError} />}
       <div>
-        <label
-          htmlFor="register-full-name"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="register-full-name" className="block text-sm font-medium text-gray-700">
           Nombre completo
         </label>
         <input
@@ -56,9 +53,7 @@ export function RegisterForm({
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.full_name}
           aria-invalid={errors.full_name !== undefined}
-          aria-describedby={
-            errors.full_name === undefined ? undefined : "register-full-name-error"
-          }
+          aria-describedby={errors.full_name === undefined ? undefined : "register-full-name-error"}
           onChange={(event) => onChange({ ...values, full_name: event.target.value })}
         />
         {errors.full_name !== undefined && (
@@ -122,9 +117,7 @@ export function RegisterForm({
             checked={values.privacy_policy_accepted}
             aria-invalid={errors.privacy_policy_accepted !== undefined}
             aria-describedby={
-              errors.privacy_policy_accepted === undefined
-                ? undefined
-                : "register-privacy-error"
+              errors.privacy_policy_accepted === undefined ? undefined : "register-privacy-error"
             }
             onChange={(event) =>
               onChange({ ...values, privacy_policy_accepted: event.target.checked })

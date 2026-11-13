@@ -68,7 +68,9 @@ function normalizeQuote(raw: Record<string, unknown>): PlanQuote {
   };
 }
 
-export async function fetchPlanQuote(code: string): Promise<{ quote: PlanQuote | null; error: Err }> {
+export async function fetchPlanQuote(
+  code: string,
+): Promise<{ quote: PlanQuote | null; error: Err }> {
   const { data, error } = await supabase.rpc("quote_plan", { p_code: code });
   if (error !== null) {
     return { quote: null, error };
@@ -103,7 +105,9 @@ export async function chooseStoreForFreePlan(storeId: number): Promise<{ error: 
   return { error };
 }
 
-export async function reactivatePremiumStores(storeIds: readonly number[]): Promise<{ error: Err }> {
+export async function reactivatePremiumStores(
+  storeIds: readonly number[],
+): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("reactivate_premium_stores", { p_ids: storeIds });
   return { error };
 }
@@ -416,9 +420,7 @@ function normalizeAdminPayment(raw: Record<string, unknown>): AdminPaymentRow {
   };
 }
 
-export async function fetchAdminPayments(
-  limit = 50,
-): Promise<LoadResult<AdminPaymentRow[]>> {
+export async function fetchAdminPayments(limit = 50): Promise<LoadResult<AdminPaymentRow[]>> {
   const { data, error } = await supabase
     .from("payments")
     .select(

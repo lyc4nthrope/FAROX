@@ -23,10 +23,7 @@ export function AppShell() {
   // navegar (sin realtime) y respeta el alcance de la RLS.
   const showAlerts = items.some((item) => item.to === "/alertas");
   const alerts = useLoad(
-    () =>
-      showAlerts
-        ? fetchOpenAlerts()
-        : Promise.resolve({ data: [], error: null }),
+    () => (showAlerts ? fetchOpenAlerts() : Promise.resolve({ data: [], error: null })),
     [showAlerts, location.pathname],
   );
   // El badge cuenta las NO leídas para alinearse con «N abiertas» de la
@@ -36,10 +33,7 @@ export function AppShell() {
   // 0028: notificación de pedidos abiertos en «Pedidos» / «Mis pedidos».
   const showOrders = items.some((item) => item.to === "/pedidos");
   const openOrders = useLoad(
-    () =>
-      showOrders
-        ? fetchOpenOrdersCount()
-        : Promise.resolve({ data: 0, error: null }),
+    () => (showOrders ? fetchOpenOrdersCount() : Promise.resolve({ data: 0, error: null })),
     [showOrders, location.pathname],
   );
   const orderCount = openOrders.data ?? 0;
@@ -199,9 +193,7 @@ export function AppShell() {
                       <span
                         aria-label={`${orderCount} pedidos abiertos`}
                         className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                          isActive
-                            ? "bg-white/20 text-white"
-                            : "bg-sky-100 text-sky-800"
+                          isActive ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"
                         }`}
                       >
                         {orderCount > 99 ? "99+" : orderCount}
@@ -211,9 +203,7 @@ export function AppShell() {
                       <span
                         aria-label={`${alertCount} alertas`}
                         className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                          isActive
-                            ? "bg-white/20 text-white"
-                            : "bg-red-100 text-red-700"
+                          isActive ? "bg-white/20 text-white" : "bg-red-100 text-red-700"
                         }`}
                       >
                         {alertCount > 99 ? "99+" : alertCount}

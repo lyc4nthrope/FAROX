@@ -138,7 +138,12 @@ export function PremiumDowngradeModal() {
 
         <Status error={error} />
         <div className="flex flex-wrap items-center gap-2">
-          <button className={buttonClass} type="button" disabled={saving} onClick={() => void keepStore()}>
+          <button
+            className={buttonClass}
+            type="button"
+            disabled={saving}
+            onClick={() => void keepStore()}
+          >
             {saving ? "Guardando…" : "Conservar esta tienda"}
           </button>
           <Link className={secondaryButtonClass} to="/premium">

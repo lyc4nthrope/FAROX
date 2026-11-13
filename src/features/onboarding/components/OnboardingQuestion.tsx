@@ -68,7 +68,8 @@ const QUESTION_COPY: Record<Extract<OnboardingStep, "role" | "store">, QuestionC
   store: {
     title: "Contanos sobre tu relación con la tienda",
     groupLabel: "¿Ya tenés tu tienda?",
-    idleBody: "Esto define qué podés hacer desde hoy y qué necesita un administrador para habilitarte.",
+    idleBody:
+      "Esto define qué podés hacer desde hoy y qué necesita un administrador para habilitarte.",
     options: [
       {
         id: "mi-tienda",
@@ -186,9 +187,7 @@ export function OnboardingQuestion({
                   aria-checked={isSelected}
                   // Roving tabindex: UNA opción lleva el Tab (la seleccionada,
                   // o la primera si no hay selección).
-                  tabIndex={
-                    isSelected || (selected === null && index === 0) ? 0 : -1
-                  }
+                  tabIndex={isSelected || (selected === null && index === 0) ? 0 : -1}
                   onKeyDown={(event) => moverSeleccion(event, index)}
                   onClick={() => setSelected(option.id)}
                   className={`${optionButtonBase} ${
@@ -222,11 +221,7 @@ export function OnboardingQuestion({
         </section>
       </main>
       <footer className="pb-6 text-center">
-        <button
-          type="button"
-          className="text-sm text-gray-500 hover:underline"
-          onClick={onSignOut}
-        >
+        <button type="button" className="text-sm text-gray-500 hover:underline" onClick={onSignOut}>
           Salir
         </button>
       </footer>

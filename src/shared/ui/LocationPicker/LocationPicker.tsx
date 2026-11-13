@@ -248,7 +248,16 @@ export function LocationPicker({
     if (!disabledRef.current) {
       emitCoords(nextLat, nextLon);
     }
-  }, [hasLocation, hasCoords, geoLoading, geoAccuracy, geoLatitude, geoLongitude, setMarkerPosition, emitCoords]);
+  }, [
+    hasLocation,
+    hasCoords,
+    geoLoading,
+    geoAccuracy,
+    geoLatitude,
+    geoLongitude,
+    setMarkerPosition,
+    emitCoords,
+  ]);
 
   // ─── Sync coords externas -> marker, con de-dupe por firma ────────────────
   // (NOSEE StoreMapPicker.jsx:325-337): la firma evita el loop

@@ -57,9 +57,7 @@ export function PremiumStoresPage() {
     setBusyId(id);
     setMsg({ error: null, ok: null });
     const error = await runAction(() =>
-      reason === "user_removed"
-        ? reactivateStore(id)
-        : reactivatePremiumStores([id]),
+      reason === "user_removed" ? reactivateStore(id) : reactivatePremiumStores([id]),
     );
     setBusyId(null);
     if (error !== null) {
@@ -127,7 +125,10 @@ export function PremiumStoresPage() {
 
       {stores.data !== null && stores.data.length === 0 && (
         <div className="mt-4">
-          <EmptyState title="Todavía no tenés tiendas" hint="Creá una tienda desde Red → Tiendas." />
+          <EmptyState
+            title="Todavía no tenés tiendas"
+            hint="Creá una tienda desde Red → Tiendas."
+          />
         </div>
       )}
 
@@ -197,10 +198,16 @@ export function PremiumStoresPage() {
       )}
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Link to="/profile" className="text-sm font-medium text-gray-700 underline-offset-4 hover:underline">
+        <Link
+          to="/profile"
+          className="text-sm font-medium text-gray-700 underline-offset-4 hover:underline"
+        >
           Volver al perfil
         </Link>
-        <Link to="/premium" className="text-sm font-medium text-gray-900 underline-offset-4 hover:underline">
+        <Link
+          to="/premium"
+          className="text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+        >
           Ver planes
         </Link>
       </div>

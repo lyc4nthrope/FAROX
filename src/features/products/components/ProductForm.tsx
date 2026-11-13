@@ -176,9 +176,7 @@ export function ProductForm({
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.category_id}
           aria-invalid={errors.category_id !== undefined}
-          aria-describedby={
-            errors.category_id === undefined ? undefined : "product-category-error"
-          }
+          aria-describedby={errors.category_id === undefined ? undefined : "product-category-error"}
           onChange={(event) => onChange({ ...values, category_id: event.target.value })}
         >
           <option value="">Seleccioná una categoría</option>

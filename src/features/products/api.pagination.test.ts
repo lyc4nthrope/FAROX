@@ -39,11 +39,7 @@ vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: { from: vi.fn(() => h.makeQuery()), rpc: vi.fn() },
 }));
 
-import {
-  fetchActiveProductsForCatalog,
-  fetchDistributorCatalog,
-  fetchStoreCatalog,
-} from "./api";
+import { fetchActiveProductsForCatalog, fetchDistributorCatalog, fetchStoreCatalog } from "./api";
 
 const NO_FILTERS = { q: "", categoryId: null, onlyShortage: false };
 const SECOND_PAGE = { page: 1, pageSize: 25 };

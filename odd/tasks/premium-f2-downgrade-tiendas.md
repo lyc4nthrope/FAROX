@@ -19,13 +19,13 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S1-S2, S5-S6 | inline | hecho | migración 0033: columnas, `my_store_ids`, RPCs, job/cron |
-| T2 | S8-S9 | inline | hecho | API premium: `my_owned_stores`, choose/reactivate, tipos |
-| T3 | S1-S3, S7 | inline | hecho | modal bloqueante/descartable, perfil con enlace, página `/premium/tiendas` |
-| T4 | S8 | inline | hecho | rutas `/premium` (desglose inicial) y `/premium/tiendas`; pago deshabilitado hasta F4 |
-| T5 | S1-S9 | inline | hecho | tests UI/API/estáticas, typecheck, lint, check-scope, 700 tests y build en verde |
+| ID  | Specs        | Ruta   | Estado | Evidencia                                                                             |
+| --- | ------------ | ------ | ------ | ------------------------------------------------------------------------------------- |
+| T1  | S1-S2, S5-S6 | inline | hecho  | migración 0033: columnas, `my_store_ids`, RPCs, job/cron                              |
+| T2  | S8-S9        | inline | hecho  | API premium: `my_owned_stores`, choose/reactivate, tipos                              |
+| T3  | S1-S3, S7    | inline | hecho  | modal bloqueante/descartable, perfil con enlace, página `/premium/tiendas`            |
+| T4  | S8           | inline | hecho  | rutas `/premium` (desglose inicial) y `/premium/tiendas`; pago deshabilitado hasta F4 |
+| T5  | S1-S9        | inline | hecho  | tests UI/API/estáticas, typecheck, lint, check-scope, 700 tests y build en verde      |
 
 ## Log
 

@@ -12,9 +12,7 @@ describe("LineChart", () => {
     render(
       <LineChart
         labels={["1 nov", "2 nov"]}
-        series={[
-          { key: "sales", label: "Ventas", color: "#059669", values: [100, 200] },
-        ]}
+        series={[{ key: "sales", label: "Ventas", color: "#059669", values: [100, 200] }]}
         formatValue={(value) => `$${value}`}
         formatAxis={(value) => `$${value}`}
         ariaLabel="Ventas por día"
@@ -92,9 +90,7 @@ describe("BarChart", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("list", { name: "Ventas por distribuidor" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Ventas por distribuidor" })).toBeInTheDocument();
     expect(screen.getByText("Norte")).toBeInTheDocument();
     expect(screen.getAllByText("$60").length).toBeGreaterThan(0);
   });

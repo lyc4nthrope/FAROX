@@ -220,9 +220,7 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
 
     await user.click(screen.getByRole("button", { name: "Salidas" }));
     expect(screen.getByRole("button", { name: "Registrar venta" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Registrar compra" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Registrar compra" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Entradas" }));
     expect(screen.getByRole("button", { name: "Registrar compra" })).toBeInTheDocument();
@@ -278,9 +276,7 @@ describe("DistributorMovementsPage · historial del distribuidor (S19)", () => {
       within(dialog).getByRole("button", { name: "Agregar Arroz Diana de últimos vendidos" }),
     );
 
-    expect(
-      within(dialog).getByLabelText("Precio de venta de Arroz Diana"),
-    ).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Precio de venta de Arroz Diana")).toBeInTheDocument();
   });
 
   it("0038: aplicar una recurrente carga sus líneas con el precio vigente", async () => {

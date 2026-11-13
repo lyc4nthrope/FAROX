@@ -8,20 +8,20 @@ No modifica nada: es re-escritura verbatim. Si alguna vez divergen, **mandan las
 
 Abrí cada archivo y pegá su contenido completo, en este orden numérico exacto:
 
-| # | Archivo | Origen (migración) |
-|---|---------|--------------------|
-| 00 | `00_foundation.sql` | 0001 (ext+enums) + **helpers de alcance finales** (0009) + `assert_admin` (0011) + `touch_updated_at` (0004) + `audit_diff` final (0010) |
-| 01-06 | `01_store_types` … `06_motives` | 0002/0003 (tablas catálogo) + 0006 (RLS) |
-| 07-11 | `07_users` … `11_user_stores` | 0002/0003 + 0006 + 0004 (triggers/RPCs) |
-| 12-16 | `12_price_publications` … `16_movements` | ídem |
-| 17-20 | `17_routes` … `20_credit_payments` | ídem |
-| 21-25 | `21_alerts` … `25_audit_log` | ídem |
-| **30** | **`30_negocio.sql`** | RPCs multi-entidad: 0004 (`internal_stock_entry`, `create_store`) + 0009 (`register_entry/exit`) + 0010 (`confirm_delivery`, `create_order`) + 0011 (`update_user_role`, `set_user_premium`, `set_user_active`, `register_reverse`) — **versiones FINALES** |
-| **40** | **`40_seeds.sql`** | 0005 (seeds de catálogos; grep confirma: 0003 NO tiene seeds) |
-| **50** | **`50_realtime.sql`** | 0007 (poda de la publicación `supabase_realtime`: solo `alerts` + `dashboard_daily`) |
-| **60** | **`60_jobs.sql`** | 0004 (`job_scan_expiry_soon/order_late/credit_overdue` — únicas definiciones del proyecto) + 0007 (`cron.schedule` diario 11:00 UTC = 06:00 America/Bogota) |
-| **90** | **`90_security.sql`** | 0011 §D-5 (lockdown global: default privileges, sweep, whitelist de 31 firmas, PostGIS re-grant, anon sin DML, audit_log append-only) + **sentencias de 0006/0009 consolidadas** — ver "Regla anti-forward-ref" abajo (§4bis: REVOKE DML de las 15 tablas RPC-only + SELECT de `user_stores`/`order_items` · §4ter: policies `stock_select`, `routes_select`) |
-| **95** | **`95_verify.sql`** | 0012 completo (checks H0-H4; NO modifica nada; correrla es opcional pero recomendada) |
+| #      | Archivo                                  | Origen (migración)                                                                                                                                                                                                                                                                                                                                            |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 00     | `00_foundation.sql`                      | 0001 (ext+enums) + **helpers de alcance finales** (0009) + `assert_admin` (0011) + `touch_updated_at` (0004) + `audit_diff` final (0010)                                                                                                                                                                                                                      |
+| 01-06  | `01_store_types` … `06_motives`          | 0002/0003 (tablas catálogo) + 0006 (RLS)                                                                                                                                                                                                                                                                                                                      |
+| 07-11  | `07_users` … `11_user_stores`            | 0002/0003 + 0006 + 0004 (triggers/RPCs)                                                                                                                                                                                                                                                                                                                       |
+| 12-16  | `12_price_publications` … `16_movements` | ídem                                                                                                                                                                                                                                                                                                                                                          |
+| 17-20  | `17_routes` … `20_credit_payments`       | ídem                                                                                                                                                                                                                                                                                                                                                          |
+| 21-25  | `21_alerts` … `25_audit_log`             | ídem                                                                                                                                                                                                                                                                                                                                                          |
+| **30** | **`30_negocio.sql`**                     | RPCs multi-entidad: 0004 (`internal_stock_entry`, `create_store`) + 0009 (`register_entry/exit`) + 0010 (`confirm_delivery`, `create_order`) + 0011 (`update_user_role`, `set_user_premium`, `set_user_active`, `register_reverse`) — **versiones FINALES**                                                                                                   |
+| **40** | **`40_seeds.sql`**                       | 0005 (seeds de catálogos; grep confirma: 0003 NO tiene seeds)                                                                                                                                                                                                                                                                                                 |
+| **50** | **`50_realtime.sql`**                    | 0007 (poda de la publicación `supabase_realtime`: solo `alerts` + `dashboard_daily`)                                                                                                                                                                                                                                                                          |
+| **60** | **`60_jobs.sql`**                        | 0004 (`job_scan_expiry_soon/order_late/credit_overdue` — únicas definiciones del proyecto) + 0007 (`cron.schedule` diario 11:00 UTC = 06:00 America/Bogota)                                                                                                                                                                                                   |
+| **90** | **`90_security.sql`**                    | 0011 §D-5 (lockdown global: default privileges, sweep, whitelist de 31 firmas, PostGIS re-grant, anon sin DML, audit_log append-only) + **sentencias de 0006/0009 consolidadas** — ver "Regla anti-forward-ref" abajo (§4bis: REVOKE DML de las 15 tablas RPC-only + SELECT de `user_stores`/`order_items` · §4ter: policies `stock_select`, `routes_select`) |
+| **95** | **`95_verify.sql`**                      | 0012 completo (checks H0-H4; NO modifica nada; correrla es opcional pero recomendada)                                                                                                                                                                                                                                                                         |
 
 `00_foundation.sql` **DEBE correr primero**: los enums y los 6 helpers (`my_role`, `is_premium`, `my_store_ids`, `my_distributor_id`, `has_scope`, `assert_admin`) los usan las policies RLS de 01-25 y las RPC de 30. (PostgreSQL analiza el qual de un `CREATE POLICY` al CREARLO — `CreatePolicy` → `transformWhereClause`, src `backend/commands/policy.c` — así que `my_role()` tiene que existir ANTES del primer `CREATE POLICY`, que está en `01_store_types.sql`.)
 
@@ -33,17 +33,17 @@ Los helpers SQL-language de `00_foundation` referencian tablas (`users`, `roles`
 
 **Ninguna sentencia de un archivo puede referenciar un objeto que se define en un archivo posterior** — PostgreSQL resuelve al crear: `CREATE POLICY` analiza su `USING`, una función `LANGUAGE sql` valida su cuerpo, un `ALTER TABLE … REFERENCES` necesita la tabla referenciada y un `REVOKE/GRANT ON` necesita el objeto. En `migrations/` esto nunca falla (las tablas van todas primero: 0002/0003 → policies/grants en 0006); en la vista por entidad, donde cada archivo se pega solo y en orden numérico, esas sentencias rompían. Por eso se **consolidaron** (contenido VERBATIM, solo cambia el lugar — cada archivo de origen quedó con un puntero):
 
-| Sentencia | Vivía en | Ahora corre en |
-|---|---|---|
-| `REVOKE INSERT, UPDATE, DELETE` de las 15 tablas RPC-only (0006:351-357) | duplicado en 15 archivos (`11`…`25`) | `90_security.sql` §4bis (una sola vez) |
-| `REVOKE SELECT ON user_stores, order_items` (0006:371-373 / 0011:547) | `11`, `14` | `90_security.sql` §4bis |
-| `REVOKE EXECUTE` de `internal_*` y `job_scan_*` (0006:405-411, 417-421) | `21_alerts.sql` | cubiertos por el sweep global de `90_security.sql` §2 + whitelist §3 |
-| `GRANT SELECT ON chat_conversations, chat_messages` (0006:380) | `22` (referenciaba `chat_messages`, archivo 23) | en `23_chat_messages.sql` (donde existen ambas) |
-| policy `stock_select` (0006:232-244) — `EXISTS … route_stops/routes` | `15_stock.sql` | `90_security.sql` §4ter |
-| policy `routes_select` (0009:537-546, DROP+CREATE) — `EXISTS … route_stops` | `17_routes.sql` | `90_security.sql` §4ter |
-| FK `users_distributor_id_fkey` (0003:276-278) | `07_users.sql` | `08_distributors.sql` §2bis (donde nace `distributors`) |
-| FK `orders_route_id_fkey` (0003:285-287) | `13_orders.sql` **y** `17_routes.sql` (duplicada: si corriera en ambas, el segundo paste falla por constraint existente) | solo `17_routes.sql` (§ FK entrante) |
-| función `get_stock` (0004:1362-1387, `LANGUAGE sql` ⇒ cuerpo analizado al crear) | `15_stock.sql` | `30_negocio.sql` §11 |
+| Sentencia                                                                        | Vivía en                                                                                                                 | Ahora corre en                                                       |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `REVOKE INSERT, UPDATE, DELETE` de las 15 tablas RPC-only (0006:351-357)         | duplicado en 15 archivos (`11`…`25`)                                                                                     | `90_security.sql` §4bis (una sola vez)                               |
+| `REVOKE SELECT ON user_stores, order_items` (0006:371-373 / 0011:547)            | `11`, `14`                                                                                                               | `90_security.sql` §4bis                                              |
+| `REVOKE EXECUTE` de `internal_*` y `job_scan_*` (0006:405-411, 417-421)          | `21_alerts.sql`                                                                                                          | cubiertos por el sweep global de `90_security.sql` §2 + whitelist §3 |
+| `GRANT SELECT ON chat_conversations, chat_messages` (0006:380)                   | `22` (referenciaba `chat_messages`, archivo 23)                                                                          | en `23_chat_messages.sql` (donde existen ambas)                      |
+| policy `stock_select` (0006:232-244) — `EXISTS … route_stops/routes`             | `15_stock.sql`                                                                                                           | `90_security.sql` §4ter                                              |
+| policy `routes_select` (0009:537-546, DROP+CREATE) — `EXISTS … route_stops`      | `17_routes.sql`                                                                                                          | `90_security.sql` §4ter                                              |
+| FK `users_distributor_id_fkey` (0003:276-278)                                    | `07_users.sql`                                                                                                           | `08_distributors.sql` §2bis (donde nace `distributors`)              |
+| FK `orders_route_id_fkey` (0003:285-287)                                         | `13_orders.sql` **y** `17_routes.sql` (duplicada: si corriera en ambas, el segundo paste falla por constraint existente) | solo `17_routes.sql` (§ FK entrante)                                 |
+| función `get_stock` (0004:1362-1387, `LANGUAGE sql` ⇒ cuerpo analizado al crear) | `15_stock.sql`                                                                                                           | `30_negocio.sql` §11                                                 |
 
 Los `ALTER TABLE … ENABLE ROW LEVEL SECURITY` y los `DROP/CREATE` que solo tocan la tabla del propio archivo **sí quedan en su entidad**. Verificación: script sobre los 34 archivos que compara cada referencia `public.X` contra la posición de definición de `X` ⇒ 0 referencias hacia adelante (excepto los 10 helpers de `00_foundation`, cubiertos por `check_function_bodies = off`).
 
@@ -55,18 +55,18 @@ Abrí el archivo, copiá TODO el contenido y pegalo en el SQL editor (New query 
 
 ## RPCs colocadas en `30_negocio.sql` (multi-entidad) — con las tablas que tocan
 
-| RPC | Tablas tocadas | Versión final = |
-|-----|----------------|-----------------|
-| `internal_stock_entry` | stock, movements, alerts (vía `internal_eval_stock_alert`) | 0004:185 (única definición) |
-| `create_store` | stores, user_stores (+ valida store_types; tope D34 vía triggers de 09) | 0004:635 (única definición) |
-| `update_user_role` | users, roles (+ distributor_id) | **0011:85** (guard `assert_admin`) |
-| `set_user_premium` | users (columna privilegiada D47) | **0011:111** |
-| `set_user_active` | users (columna privilegiada D47) | **0011:126** |
-| `register_entry` | orders, order_items, price_publications, stock, movements, dashboard_daily | **0009:101** (0011 no la re-definió) |
-| `register_exit` | ídem (sin expiry) | **0009:159** |
-| `confirm_delivery` | orders, order_items, stock, movements, dashboard_daily, motives, alerts | **0010:58** (batcheado D-2 + dedup) |
-| `create_order` | orders, order_items, price_publications, products, stores, distributors | **0010:187** (set-based R12) |
-| `register_reverse` | movements, stock, dashboard_daily, alerts, audit_log | **0011:192** (guard `assert_admin`) |
+| RPC                    | Tablas tocadas                                                             | Versión final =                      |
+| ---------------------- | -------------------------------------------------------------------------- | ------------------------------------ |
+| `internal_stock_entry` | stock, movements, alerts (vía `internal_eval_stock_alert`)                 | 0004:185 (única definición)          |
+| `create_store`         | stores, user_stores (+ valida store_types; tope D34 vía triggers de 09)    | 0004:635 (única definición)          |
+| `update_user_role`     | users, roles (+ distributor_id)                                            | **0011:85** (guard `assert_admin`)   |
+| `set_user_premium`     | users (columna privilegiada D47)                                           | **0011:111**                         |
+| `set_user_active`      | users (columna privilegiada D47)                                           | **0011:126**                         |
+| `register_entry`       | orders, order_items, price_publications, stock, movements, dashboard_daily | **0009:101** (0011 no la re-definió) |
+| `register_exit`        | ídem (sin expiry)                                                          | **0009:159**                         |
+| `confirm_delivery`     | orders, order_items, stock, movements, dashboard_daily, motives, alerts    | **0010:58** (batcheado D-2 + dedup)  |
+| `create_order`         | orders, order_items, price_publications, products, stores, distributors    | **0010:187** (set-based R12)         |
+| `register_reverse`     | movements, stock, dashboard_daily, alerts, audit_log                       | **0011:192** (guard `assert_admin`)  |
 
 ### Dónde vive cada resto (NO duplicado en 30)
 

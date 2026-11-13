@@ -1,11 +1,7 @@
 import { supabase } from "../../shared/lib/supabase/client";
 import { buildLocationEWKT } from "../stores/geo";
 import type { DistributorRegistrationValues, MyStoreValues } from "./schemas";
-import {
-  hasDistributorId,
-  hasOwnedStores,
-  hasStoreIds,
-} from "./detection";
+import { hasDistributorId, hasOwnedStores, hasStoreIds } from "./detection";
 import type { OnboardingSignals, StoreTypeOption } from "./types";
 
 // Onboarding DERIVADO (design #538 §5.1 · R-D3.2): la detección usa SOLO
@@ -25,9 +21,7 @@ export interface OnboardingSignalsResult {
 // 3 reads en paralelo; cualquier error ⇒ se reporta crudo y el call site lo
 // pasa por mapError() (HARD-1). Las 3 señales se combinan en la capa api y
 // el predicado puro vive en detection.ts.
-export async function fetchOnboardingSignals(
-  userId: string,
-): Promise<OnboardingSignalsResult> {
+export async function fetchOnboardingSignals(userId: string): Promise<OnboardingSignalsResult> {
   const [distributor, storeIds, owned] = await Promise.all([
     supabase.rpc("my_distributor_id"),
     supabase.rpc("my_store_ids"),

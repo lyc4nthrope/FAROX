@@ -139,11 +139,7 @@ export async function fetchStores(
 export async function fetchStore(
   id: number,
 ): Promise<{ row: StoreRow | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("stores")
-    .select(FORM_SELECT)
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("stores").select(FORM_SELECT).eq("id", id).single();
   if (error !== null) {
     return { row: null, error };
   }
@@ -251,9 +247,7 @@ export async function updateStore(
 // Paso 1 del borrado en dos pasos (STORE-3 "deactivate-then-delete"): la
 // policy stores_delete exige is_active = false (0006:172-174), así que SIEMPRE
 // se desactiva ANTES de borrar.
-export async function deactivateStore(
-  id: number,
-): Promise<{ error: { message: string } | null }> {
+export async function deactivateStore(id: number): Promise<{ error: { message: string } | null }> {
   const { error } = await supabase.rpc("deactivate_store", { p_store: id });
   return { error };
 }
@@ -274,14 +268,8 @@ export async function transferStore(
 // operador que lo fuerce recibe 0 filas ⇒ RLS_NO_ROWS amigable; el control ni
 // se ofrece (SEC-01 idea:114 operador sin eliminar, idea:130 "sin destruir" —
 // ocultar es UX, la DB manda).
-export async function deleteStore(
-  id: number,
-): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("stores")
-    .delete()
-    .eq("id", id)
-    .select("id");
+export async function deleteStore(id: number): Promise<{ error: { message: string } | null }> {
+  const { data, error } = await supabase.from("stores").delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }

@@ -28,18 +28,9 @@ export const storeSchema = z.object({
     .min(1, "Ingresá el nombre de la tienda")
     .max(LIMITS.storeName, `Máximo ${LIMITS.storeName} caracteres`),
   store_type_id: z.string().trim().refine(esIdDeCatalogo, "Elegí un tipo de tienda"),
-  address: z
-    .string()
-    .trim()
-    .max(LIMITS.storeAddress, `Máximo ${LIMITS.storeAddress} caracteres`),
-  city: z
-    .string()
-    .trim()
-    .max(LIMITS.storeCity, `Máximo ${LIMITS.storeCity} caracteres`),
-  phone: z
-    .string()
-    .trim()
-    .max(LIMITS.storePhone, `Máximo ${LIMITS.storePhone} caracteres`),
+  address: z.string().trim().max(LIMITS.storeAddress, `Máximo ${LIMITS.storeAddress} caracteres`),
+  city: z.string().trim().max(LIMITS.storeCity, `Máximo ${LIMITS.storeCity} caracteres`),
+  phone: z.string().trim().max(LIMITS.storePhone, `Máximo ${LIMITS.storePhone} caracteres`),
   // D3 (#486) SUPERSEDE: la ubicación ya no son campos numéricos manuales —
   // se elige en el MAPA (shared/ui/LocationPicker). Coordenadas
   // OBLIGATORIAS: stores.location NOT NULL (0002:131) mientras p_location es
@@ -47,14 +38,14 @@ export const storeSchema = z.object({
   // (0004:652-657) — omitirlas produciría un not_null_violation crudo
   // (STORE-1 escenario "coordinates omitted blocked client-side"). Los inputs
   // numéricos quedan SOLO en el escape hatch si el mapa no carga.
-  lat: z.string().trim().refine(
-    (value) => esRango(value, -90, 90),
-    "Ingresá una latitud válida entre -90 y 90",
-  ),
-  lng: z.string().trim().refine(
-    (value) => esRango(value, -180, 180),
-    "Ingresá una longitud válida entre -180 y 180",
-  ),
+  lat: z
+    .string()
+    .trim()
+    .refine((value) => esRango(value, -90, 90), "Ingresá una latitud válida entre -90 y 90"),
+  lng: z
+    .string()
+    .trim()
+    .refine((value) => esRango(value, -180, 180), "Ingresá una longitud válida entre -180 y 180"),
 });
 
 export type StoreFormValues = z.infer<typeof storeSchema>;

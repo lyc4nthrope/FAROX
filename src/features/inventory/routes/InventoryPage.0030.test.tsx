@@ -212,7 +212,14 @@ describe("0030 · el prellenado refleja el precio recién editado", () => {
     await user.click(within(edit).getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() =>
       expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
-        10, 2, 30, null, false, null, 2000, 3000,
+        10,
+        2,
+        30,
+        null,
+        false,
+        null,
+        2000,
+        3000,
       ),
     );
 
@@ -240,7 +247,14 @@ describe("0030 · el prellenado refleja el precio recién editado", () => {
     await user.click(within(edit).getByRole("button", { name: "Guardar cambios" }));
     await waitFor(() =>
       expect(productsApi.updateStoreProductFull).toHaveBeenCalledWith(
-        10, 2, 30, null, false, null, 1000, 4000,
+        10,
+        2,
+        30,
+        null,
+        false,
+        null,
+        1000,
+        4000,
       ),
     );
 

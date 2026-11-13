@@ -216,9 +216,13 @@ describe("DistributorFormPage (DIST-1 · §S2 fila Distributor form)", () => {
 
     expect(await screen.findByDisplayValue("Distribuidora Andes")).toBeInTheDocument();
     expect(screen.getByDisplayValue("900123456")).toBeInTheDocument();
-    expect(screen.getByText("Vista de solo lectura: solo un administrador puede editar distribuidores.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Vista de solo lectura: solo un administrador puede editar distribuidores."),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Desactivar distribuidor" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Desactivar distribuidor" }),
+    ).not.toBeInTheDocument();
   });
 });

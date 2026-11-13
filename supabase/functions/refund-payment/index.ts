@@ -69,7 +69,11 @@ Deno.serve(async (request) => {
       .update({ status: "refunded" })
       .eq("id", payment.id);
     if (updateError !== null) {
-      return errorJson("Se reembolsó en Mercado Pago, pero no se guardó el estado local.", 500, true);
+      return errorJson(
+        "Se reembolsó en Mercado Pago, pero no se guardó el estado local.",
+        500,
+        true,
+      );
     }
 
     await service.from("payment_events").insert({

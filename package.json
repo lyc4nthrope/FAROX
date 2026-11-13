@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check-scope": "node scripts/check-scope.mjs",
-    "ci": "npm run lint && npm run typecheck && npm run test && npm run check-scope"
+    "ci": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run check-scope"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

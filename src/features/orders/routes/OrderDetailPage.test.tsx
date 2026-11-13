@@ -266,9 +266,7 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
 
     expect(await screen.findByText(/2\.500/)).toBeInTheDocument();
     expect(screen.getByText("Total cotizado por el distribuidor:")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Guardar cotización" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar cotización" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Precio de Arroz")).not.toBeInTheDocument();
   });
 

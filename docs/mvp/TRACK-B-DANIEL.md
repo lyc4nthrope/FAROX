@@ -8,21 +8,21 @@
 
 > **Orden:** primero la Fase 0 (B0.1–B0.5; **B0.1 es lo más urgente del proyecto**), después las funcionalidades (B3–B10).
 
-| ID | Tarea | Día | Depende de | Estado |
-|---|---|---|---|---|
-| **B0.1** | Corregir 0011 (`session_user`) + estado real del remoto + aplicar 0011–0014 | 1 | — | ✅ |
-| **B0.2** | Doc-first de 0013/0014 en el doc de BD + nota de 0012 | 1 | B0.1 | 🟡 Doc de BD actualizado con el índice 0013-0051; §2-§4 sigue siendo el baseline |
-| **B0.3** | `schema-check` dinámico y parser con salida real | 2 | B0.1 | ✅ |
-| **B0.4** | Proteger `main` + endurecer el backup + permisos de CI | 2 | B0.3 | 🟡 CI y `schema-check` ✅; backup con `schedule` desactivado y sin `age`; protección de `main` no verificable desde el repo |
-| **B0.5** | Higiene: `.atl`, Node, Prettier, `check-scope`, README | 3 | B0.4 | 🟡 Prettier/Node/check-scope ✅; `.atl/skill-registry.md` sigue con rutas absolutas y `format:check` no está en CI |
-| B3 | Harness pgTAP + plantilla | 3 | B0.3 | ❌ No existe `supabase/tests/` |
-| B4 | Inventario: asignar producto ↔ tienda + umbral | 4 | Fase 0 | ✅ RPC reales: `add_store_product`, `update_store_product_full` (no `assign_product_to_store`) |
-| B5 | Movimientos: entrada, salida, reverso | 5 | B4 | ✅ Incluye movimientos masivos y reversos |
-| B6 | Alertas + realtime | 6 | B5 | 🟡 Listado y marcar leída ✅; realtime de alertas pendiente |
-| B7 | Precios | 6 | B4 | ✅ Incluye carga masiva, autollenado, margen y costo manual |
-| B8 | Fiado (créditos y pagos) | 7 | C4 | ✅ Bajo `src/features/orders` (`CreditsPage`) |
-| B9 | Despliegue del front (Azure SWA) | 7–8 | B0.4 | ✅ `deploy-front.yml` + `public/staticwebapp.config.json` |
-| B10 | Baseline + aplicar todo al remoto + verificación final | 9–10 | A0.1, A1, A5, todas | ✅ Historial remoto baselineado hasta 0051 (0001-0048 marcadas, 0049-0051 aplicadas); 0052 queda pendiente |
+| ID       | Tarea                                                                       | Día  | Depende de          | Estado                                                                                                                      |
+| -------- | --------------------------------------------------------------------------- | ---- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **B0.1** | Corregir 0011 (`session_user`) + estado real del remoto + aplicar 0011–0014 | 1    | —                   | ✅                                                                                                                          |
+| **B0.2** | Doc-first de 0013/0014 en el doc de BD + nota de 0012                       | 1    | B0.1                | 🟡 Doc de BD actualizado con el índice 0013-0051; §2-§4 sigue siendo el baseline                                            |
+| **B0.3** | `schema-check` dinámico y parser con salida real                            | 2    | B0.1                | ✅                                                                                                                          |
+| **B0.4** | Proteger `main` + endurecer el backup + permisos de CI                      | 2    | B0.3                | 🟡 CI y `schema-check` ✅; backup con `schedule` desactivado y sin `age`; protección de `main` no verificable desde el repo |
+| **B0.5** | Higiene: `.atl`, Node, Prettier, `check-scope`, README                      | 3    | B0.4                | 🟡 Prettier/Node/check-scope ✅; `.atl/skill-registry.md` sigue con rutas absolutas y `format:check` no está en CI          |
+| B3       | Harness pgTAP + plantilla                                                   | 3    | B0.3                | ❌ No existe `supabase/tests/`                                                                                              |
+| B4       | Inventario: asignar producto ↔ tienda + umbral                              | 4    | Fase 0              | ✅ RPC reales: `add_store_product`, `update_store_product_full` (no `assign_product_to_store`)                              |
+| B5       | Movimientos: entrada, salida, reverso                                       | 5    | B4                  | ✅ Incluye movimientos masivos y reversos                                                                                   |
+| B6       | Alertas + realtime                                                          | 6    | B5                  | 🟡 Listado y marcar leída ✅; realtime de alertas pendiente                                                                 |
+| B7       | Precios                                                                     | 6    | B4                  | ✅ Incluye carga masiva, autollenado, margen y costo manual                                                                 |
+| B8       | Fiado (créditos y pagos)                                                    | 7    | C4                  | ✅ Bajo `src/features/orders` (`CreditsPage`)                                                                               |
+| B9       | Despliegue del front (Azure SWA)                                            | 7–8  | B0.4                | ✅ `deploy-front.yml` + `public/staticwebapp.config.json`                                                                   |
+| B10      | Baseline + aplicar todo al remoto + verificación final                      | 9–10 | A0.1, A1, A5, todas | ✅ Historial remoto baselineado hasta 0051 (0001-0048 marcadas, 0049-0051 aplicadas); 0052 queda pendiente                  |
 
 **Notas de actualización (2026-11-12):**
 

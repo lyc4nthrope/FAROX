@@ -265,14 +265,19 @@ export function MyRoutePage() {
       return;
     }
     setSavingRoute(true);
-    if (route.data !== null && (route.data.status === "completed" || route.data.status === "cancelled")) {
+    if (
+      route.data !== null &&
+      (route.data.status === "completed" || route.data.status === "cancelled")
+    ) {
       setRouteMsg({ error: "La ruta de hoy ya está cerrada; no se puede reemplazar.", ok: null });
       setSavingRoute(false);
       return;
     }
     if (
       route.data?.status === "active" &&
-      !window.confirm("La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?")
+      !window.confirm(
+        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
+      )
     ) {
       setSavingRoute(false);
       return;
@@ -322,9 +327,7 @@ export function MyRoutePage() {
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Logística
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Logística</p>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Ruta del día</h1>
@@ -380,169 +383,168 @@ export function MyRoutePage() {
           Marcá las tiendas con solicitudes y guardá las paradas de hoy.
         </p>
         <div className="mt-2 grid border border-gray-300 bg-white lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
-        <section
-          aria-label="Mapa de tiendas"
-          className="min-w-0 border-b border-gray-300 lg:border-b-0 lg:border-r"
-        >
-          <header className="flex items-center justify-between border-b border-gray-300 px-4 py-2.5">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
-              Mapa
-            </h2>
-            <span className="text-[11px] text-gray-500">Solo tiendas marcadas</span>
-          </header>
-          <div className="h-[24rem] lg:h-[34rem]">
-            <StoreRouteMap stores={selectedStores} />
-          </div>
-        </section>
-
-        <section className="min-w-0" aria-label="Tiendas con solicitudes">
-          <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 px-4 py-2.5">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
-              Tiendas con solicitudes
-            </h2>
-            <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-              <button
-                type="button"
-                className="underline underline-offset-4 hover:text-gray-900"
-                onClick={selectAll}
-              >
-                Marcar todas
-              </button>
-              <button
-                type="button"
-                className="underline underline-offset-4 hover:text-gray-900"
-                onClick={clearAll}
-              >
-                Limpiar
-              </button>
-            </div>
-          </header>
-
-          {stores.length === 0 && !requests.loading ? (
-            <div className="px-4 py-10">
-              <EmptyState
-                title="No hay tiendas con solicitudes abiertas"
-                hint="Cuando tengas pedidos pendientes o en ruta, sus tiendas van a aparecer acá."
-              />
-              <p className="mt-3 text-center text-sm text-gray-600">
-                ¿No ves tus tiendas?{" "}
-                <Link className="font-medium underline underline-offset-4" to="/vincular">
-                  Vinculá una tienda
-                </Link>
-              </p>
-            </div>
-          ) : (
-            <ul className="max-h-[24rem] divide-y divide-gray-200 overflow-y-auto lg:max-h-[34rem]">
-              {stores.map((store) => {
-                const selected = selectedIds.has(store.id);
-                const index = orderIndex.get(store.id);
-                return (
-                  <li
-                    key={store.id}
-                    className={`flex items-start border-l-4 transition-colors ${
-                      selected ? "border-gray-900 bg-gray-50" : "border-transparent"
-                    }`}
-                  >
-                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 shrink-0 accent-gray-900"
-                        checked={selected}
-                        onChange={() => toggle(store.id)}
-                        aria-label={`Incluir ${store.name}`}
-                      />
-                      <span
-                        aria-hidden="true"
-                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center border text-xs font-semibold tabular-nums ${
-                          selected
-                            ? "border-gray-900 bg-gray-900 text-white"
-                            : "border-gray-300 text-gray-400"
-                        }`}
-                      >
-                        {selected ? index : "—"}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-                          <span className="break-words text-sm font-medium text-gray-900">
-                            {store.name}
-                          </span>
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-                            {store.orderCount}{" "}
-                            {store.orderCount === 1 ? "solicitud" : "solicitudes"}
-                          </span>
-                        </span>
-                        <span className="mt-0.5 block break-words text-xs text-gray-500">
-                          {[store.address, store.city].filter(Boolean).join(" · ") ||
-                            "Sin dirección"}
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-gray-500">
-                          Próxima entrega: {formatExpectedDate(store.nextExpectedAt)}
-                        </span>
-                      </span>
-                    </label>
-                    <div className="shrink-0 px-3 py-3">
-                      <ContactButton kind="store" id={store.id} name={store.name} />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-x border-b border-gray-300 bg-white px-4 py-3">
-        <p className="text-sm text-gray-600">
-          <span className="font-semibold text-gray-900">{selectedStores.length}</span>{" "}
-          {selectedStores.length === 1 ? "tienda" : "tiendas"} ·{" "}
-          <span className="font-semibold text-gray-900">{selectedOrders}</span>{" "}
-          {selectedOrders === 1 ? "solicitud" : "solicitudes"}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            className="inline-flex items-center gap-2 border border-gray-900 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            disabled={savingRoute}
-            onClick={() => void saveTodayRoute()}
+          <section
+            aria-label="Mapa de tiendas"
+            className="min-w-0 border-b border-gray-300 lg:border-b-0 lg:border-r"
           >
-            {savingRoute ? "Guardando…" : "Guardar ruta"}
-          </button>
-          {mapsUrl !== null ? (
-            <a
-              className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+            <header className="flex items-center justify-between border-b border-gray-300 px-4 py-2.5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
+                Mapa
+              </h2>
+              <span className="text-[11px] text-gray-500">Solo tiendas marcadas</span>
+            </header>
+            <div className="h-[24rem] lg:h-[34rem]">
+              <StoreRouteMap stores={selectedStores} />
+            </div>
+          </section>
+
+          <section className="min-w-0" aria-label="Tiendas con solicitudes">
+            <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 px-4 py-2.5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
+                Tiendas con solicitudes
+              </h2>
+              <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                <button
+                  type="button"
+                  className="underline underline-offset-4 hover:text-gray-900"
+                  onClick={selectAll}
+                >
+                  Marcar todas
+                </button>
+                <button
+                  type="button"
+                  className="underline underline-offset-4 hover:text-gray-900"
+                  onClick={clearAll}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </header>
+
+            {stores.length === 0 && !requests.loading ? (
+              <div className="px-4 py-10">
+                <EmptyState
+                  title="No hay tiendas con solicitudes abiertas"
+                  hint="Cuando tengas pedidos pendientes o en ruta, sus tiendas van a aparecer acá."
+                />
+                <p className="mt-3 text-center text-sm text-gray-600">
+                  ¿No ves tus tiendas?{" "}
+                  <Link className="font-medium underline underline-offset-4" to="/vincular">
+                    Vinculá una tienda
+                  </Link>
+                </p>
+              </div>
+            ) : (
+              <ul className="max-h-[24rem] divide-y divide-gray-200 overflow-y-auto lg:max-h-[34rem]">
+                {stores.map((store) => {
+                  const selected = selectedIds.has(store.id);
+                  const index = orderIndex.get(store.id);
+                  return (
+                    <li
+                      key={store.id}
+                      className={`flex items-start border-l-4 transition-colors ${
+                        selected ? "border-gray-900 bg-gray-50" : "border-transparent"
+                      }`}
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 shrink-0 accent-gray-900"
+                          checked={selected}
+                          onChange={() => toggle(store.id)}
+                          aria-label={`Incluir ${store.name}`}
+                        />
+                        <span
+                          aria-hidden="true"
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center border text-xs font-semibold tabular-nums ${
+                            selected
+                              ? "border-gray-900 bg-gray-900 text-white"
+                              : "border-gray-300 text-gray-400"
+                          }`}
+                        >
+                          {selected ? index : "—"}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                            <span className="break-words text-sm font-medium text-gray-900">
+                              {store.name}
+                            </span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-600">
+                              {store.orderCount}{" "}
+                              {store.orderCount === 1 ? "solicitud" : "solicitudes"}
+                            </span>
+                          </span>
+                          <span className="mt-0.5 block break-words text-xs text-gray-500">
+                            {[store.address, store.city].filter(Boolean).join(" · ") ||
+                              "Sin dirección"}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] text-gray-500">
+                            Próxima entrega: {formatExpectedDate(store.nextExpectedAt)}
+                          </span>
+                        </span>
+                      </label>
+                      <div className="shrink-0 px-3 py-3">
+                        <ContactButton kind="store" id={store.id} name={store.name} />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-x border-b border-gray-300 bg-white px-4 py-3">
+          <p className="text-sm text-gray-600">
+            <span className="font-semibold text-gray-900">{selectedStores.length}</span>{" "}
+            {selectedStores.length === 1 ? "tienda" : "tiendas"} ·{" "}
+            <span className="font-semibold text-gray-900">{selectedOrders}</span>{" "}
+            {selectedOrders === 1 ? "solicitud" : "solicitudes"}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className="inline-flex items-center gap-2 border border-gray-900 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 transition hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              disabled={savingRoute}
+              onClick={() => void saveTodayRoute()}
             >
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                viewBox="0 0 24 24"
+              {savingRoute ? "Guardando…" : "Guardar ruta"}
+            </button>
+            {mapsUrl !== null ? (
+              <a
+                className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                <path d="M12 21s6-4.6 6-10a6 6 0 1 0-12 0c0 5.4 6 10 6 10Z" />
-                <circle cx="12" cy="11" r="2" />
-              </svg>
-              Abrir en Google Maps
-            </a>
-          ) : (
-            <span className="border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400">
-              Marcá al menos una tienda
-            </span>
-          )}
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 21s6-4.6 6-10a6 6 0 1 0-12 0c0 5.4 6 10 6 10Z" />
+                  <circle cx="12" cy="11" r="2" />
+                </svg>
+                Abrir en Google Maps
+              </a>
+            ) : (
+              <span className="border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-400">
+                Marcá al menos una tienda
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      {(routeMsg.error !== null || routeMsg.ok !== null) && (
-        <div className="border-x border-b border-gray-300 bg-white px-4 py-2">
-          <Status error={routeMsg.error} ok={routeMsg.ok} />
-        </div>
-      )}
-
+        {(routeMsg.error !== null || routeMsg.ok !== null) && (
+          <div className="border-x border-b border-gray-300 bg-white px-4 py-2">
+            <Status error={routeMsg.error} ok={routeMsg.ok} />
+          </div>
+        )}
       </div>
     </section>
   );
@@ -628,9 +630,7 @@ export function RoutesPage() {
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Logística
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Logística</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Rutas</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Planificá el recorrido de cada distribuidor, ordená las paradas y seguí su avance.

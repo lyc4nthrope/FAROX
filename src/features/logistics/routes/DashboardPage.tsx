@@ -178,9 +178,7 @@ export function DashboardPage() {
   if (!premium) {
     return (
       <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-          Analítica
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Analítica</p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-500">
           {esDistribuidor
@@ -236,9 +234,7 @@ export function DashboardPage() {
   const topDays = topSalesDays(dailyPoints, scope, metric, 7);
 
   const dailySales = dailyPoints.map((point) => salesOf(point, scope, metric));
-  const dailyPurchases = dailyPoints.map(
-    (point) => purchasesOf(point, scope, metric) ?? 0,
-  );
+  const dailyPurchases = dailyPoints.map((point) => purchasesOf(point, scope, metric) ?? 0);
   const averageSales = movingAverage(dailySales, 7);
   const lineLabels = dailyPoints.map((point) => formatShortDay(point.day));
 
@@ -410,9 +406,7 @@ export function DashboardPage() {
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Analítica
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Analítica</p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <PremiumBadge />

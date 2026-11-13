@@ -63,10 +63,8 @@ export function LineChart({
   const scale = niceScale(maxValue, 4);
 
   const xAt = (index: number) =>
-    marginLeft +
-    (labels.length === 1 ? plotWidth / 2 : (index / (labels.length - 1)) * plotWidth);
-  const yAt = (value: number) =>
-    marginTop + plotHeight - (value / scale.max) * plotHeight;
+    marginLeft + (labels.length === 1 ? plotWidth / 2 : (index / (labels.length - 1)) * plotWidth);
+  const yAt = (value: number) => marginTop + plotHeight - (value / scale.max) * plotHeight;
   const labelIndices = pickLabelIndices(labels.length, 6);
 
   const primary = series[0];
@@ -80,8 +78,7 @@ export function LineChart({
 
   // Si el rango cambia mientras el puntero estaba activo, el índice viejo
   // puede quedar fuera de las etiquetas nuevas.
-  const safeActiveIndex =
-    activeIndex !== null && activeIndex < labels.length ? activeIndex : null;
+  const safeActiveIndex = activeIndex !== null && activeIndex < labels.length ? activeIndex : null;
   const activeRow =
     safeActiveIndex === null
       ? null
@@ -97,11 +94,7 @@ export function LineChart({
   const tooltipX =
     activeRow === null
       ? 0
-      : clamp(
-          activeRow.x - tooltipWidth / 2,
-          marginLeft,
-          safeWidth - marginRight - tooltipWidth,
-        );
+      : clamp(activeRow.x - tooltipWidth / 2, marginLeft, safeWidth - marginRight - tooltipWidth);
   const tooltipY =
     activeRow === null
       ? 0
@@ -116,9 +109,7 @@ export function LineChart({
     if (rect.width <= 0) return;
     const relative = clamp(event.clientX - rect.left, 0, rect.width);
     const index =
-      labels.length === 1
-        ? 0
-        : Math.round((relative / rect.width) * (labels.length - 1));
+      labels.length === 1 ? 0 : Math.round((relative / rect.width) * (labels.length - 1));
     setActiveIndex(clamp(index, 0, labels.length - 1));
   }
 
@@ -265,12 +256,7 @@ export function LineChart({
               fill="#111827"
               opacity="0.96"
             />
-            <text
-              x={tooltipX + 10}
-              y={tooltipY + 15}
-              fill="#9ca3af"
-              fontSize="10"
-            >
+            <text x={tooltipX + 10} y={tooltipY + 15} fill="#9ca3af" fontSize="10">
               {activeRow.label}
             </text>
             {series.map((item, index) => {
@@ -286,12 +272,7 @@ export function LineChart({
                     rx={2}
                     fill={item.color}
                   />
-                  <text
-                    x={tooltipX + 23}
-                    y={rowY}
-                    fill="#e5e7eb"
-                    fontSize="10"
-                  >
+                  <text x={tooltipX + 23} y={rowY} fill="#e5e7eb" fontSize="10">
                     {item.label}
                   </text>
                   <text

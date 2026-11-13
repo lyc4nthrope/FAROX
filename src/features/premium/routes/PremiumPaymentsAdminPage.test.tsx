@@ -118,13 +118,9 @@ describe("PremiumPaymentsAdminPage (F5)", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(
-      await screen.findByRole("button", { name: "Cargar más suscripciones" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Cargar más suscripciones" }));
 
-    await waitFor(() =>
-      expect(premiumApi.fetchAdminSubscriptions).toHaveBeenLastCalledWith(100),
-    );
+    await waitFor(() => expect(premiumApi.fetchAdminSubscriptions).toHaveBeenLastCalledWith(100));
   });
 
   it("muestra cada contador de salud y refresca tras conciliar", async () => {
@@ -162,9 +158,7 @@ describe("PremiumPaymentsAdminPage (F5)", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(
-      await screen.findByRole("button", { name: "Conciliar con Mercado Pago" }),
-    );
+    await user.click(await screen.findByRole("button", { name: "Conciliar con Mercado Pago" }));
 
     expect(
       await screen.findByText(/Conciliación: 1 suscripciones, 1 pagos, 2 actualizados/),

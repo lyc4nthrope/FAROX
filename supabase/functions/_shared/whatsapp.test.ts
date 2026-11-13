@@ -19,9 +19,7 @@ async function sign(rawBody: string, secret: string): Promise<string> {
     false,
     ["sign"],
   );
-  const signature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody)),
-  );
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody)));
   let hex = "";
   for (const byte of signature) {
     hex += byte.toString(16).padStart(2, "0");
@@ -216,7 +214,9 @@ describe("extractVerificationCommands", () => {
   it("acepta un código con typo alfanumérico (la RPC decide que es inválido)", () => {
     expect(
       extractVerificationCommands(
-        payload([{ from: "573001234567", id: "wamid.2", type: "text", text: { body: "FAROX ZZZZZZ" } }]),
+        payload([
+          { from: "573001234567", id: "wamid.2", type: "text", text: { body: "FAROX ZZZZZZ" } },
+        ]),
       )[0]?.code,
     ).toBe("ZZZZZZ");
   });

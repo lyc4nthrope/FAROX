@@ -102,9 +102,7 @@ export function RoleFormPage() {
     void (async () => {
       try {
         const result =
-          roleId === null
-            ? await createRole(parsed.data)
-            : await updateRole(roleId, parsed.data);
+          roleId === null ? await createRole(parsed.data) : await updateRole(roleId, parsed.data);
         if (result.error !== null) {
           setFormError(mapError(result.error)); // mapError en el call site (HARD-1)
           return;
@@ -147,9 +145,7 @@ export function RoleFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {isEdit ? "Rol" : "Nuevo rol"}
-      </h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{isEdit ? "Rol" : "Nuevo rol"}</h1>
       {loadingRow ? (
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (
@@ -161,9 +157,7 @@ export function RoleFormPage() {
             notice={null}
             saving={saving}
             nombreDeshabilitado={nombreDeshabilitado}
-            onDelete={
-              nombreOriginal !== null && !esFilaSemilla ? handleDelete : undefined
-            }
+            onDelete={nombreOriginal !== null && !esFilaSemilla ? handleDelete : undefined}
             onChange={setValues}
             onSubmit={handleSubmit}
           />

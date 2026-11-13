@@ -76,9 +76,10 @@ describe("LoginPage (§S2 fila /login)", () => {
 
   it("cross-link al registro (D1): Link a la ruta pública /register", () => {
     renderLogin();
-    expect(
-      screen.getByRole("link", { name: "¿No tenés cuenta? Registrate" }),
-    ).toHaveAttribute("href", "/register");
+    expect(screen.getByRole("link", { name: "¿No tenés cuenta? Registrate" })).toHaveAttribute(
+      "href",
+      "/register",
+    );
   });
 
   it("pantalla pública sin chrome: ofrece volver al inicio", () => {

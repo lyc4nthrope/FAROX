@@ -157,7 +157,10 @@ describe("auth api · confirmEmailConfirmationCode (D2 · canje PKCE)", () => {
   });
 
   it("A0.2: sin code pero con sesión ya creada (flujo implícito): ok", async () => {
-    authGetSessionMock.mockResolvedValue({ data: { session: { user: { id: "u1" } } }, error: null } as never);
+    authGetSessionMock.mockResolvedValue({
+      data: { session: { user: { id: "u1" } } },
+      error: null,
+    } as never);
     const outcome = await confirmEmailConfirmationCode();
 
     expect(outcome).toEqual({ status: "ok" });
@@ -207,7 +210,9 @@ describe("auth api · recuperación de contraseña", () => {
   });
 
   it("propaga el error del pedido con { message }", async () => {
-    const error = { message: "For security purposes, you can only request this after 60 seconds" } as AuthError;
+    const error = {
+      message: "For security purposes, you can only request this after 60 seconds",
+    } as AuthError;
     resetPasswordMock.mockResolvedValue({ data: null, error });
 
     const result = await requestPasswordReset("demo@farox.app");

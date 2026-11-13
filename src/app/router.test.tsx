@@ -286,9 +286,7 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     vi.mocked(authApi.getSession).mockResolvedValue(null);
     renderRuta("/register");
     // El form monta sin sesión: nunca cae al guard de /login.
-    expect(
-      await screen.findByRole("heading", { name: "Crear tu cuenta" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Crear tu cuenta" })).toBeInTheDocument();
     expect(screen.getByLabelText("Nombre completo")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
     expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
@@ -340,9 +338,7 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     expect(
       await screen.findByRole("heading", { name: "No pudimos confirmar tu cuenta" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Iniciá sesión" }),
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Iniciá sesión" })).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("heading", { name: "Iniciar sesión" })).not.toBeInTheDocument();
     expect(authApi.fetchPrivileges).not.toHaveBeenCalled();
   });
@@ -437,9 +433,7 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     });
     renderRuta("/users");
 
-    expect(
-      await screen.findByRole("link", { name: "Ana Pérez" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Ana Pérez" })).toBeInTheDocument();
     // Badge de rol de la FILA (el header del AppShell también muestra el rol
     // de la sesión ⇒ getAllByText).
     expect(screen.getAllByText("Administrador").length).toBeGreaterThan(1);
@@ -453,9 +447,7 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     expect(await screen.findByText("2")).toBeInTheDocument();
     // Copy del placeholder B4 (ADM-13): jamás en esta ruta.
     expect(screen.queryByText(/lote B4/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/aún no está disponible/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/aún no está disponible/)).not.toBeInTheDocument();
   });
 
   it("ADM-13.2: el fuente de router.tsx ya no referencia RoutePlaceholder ni el copy del lote B4", async () => {
@@ -565,19 +557,22 @@ describe("AppRoutes (V0-2/V0-4/§S2)", () => {
     });
     renderRuta("/catalogs");
 
-    expect(
-      await screen.findByRole("link", { name: "Tipos de unidad" }),
-    ).toHaveAttribute("href", "/catalogs/unit_types");
-    expect(
-      screen.getByRole("link", { name: "Tipos de tienda" }),
-    ).toHaveAttribute("href", "/catalogs/store_types");
+    expect(await screen.findByRole("link", { name: "Tipos de unidad" })).toHaveAttribute(
+      "href",
+      "/catalogs/unit_types",
+    );
+    expect(screen.getByRole("link", { name: "Tipos de tienda" })).toHaveAttribute(
+      "href",
+      "/catalogs/store_types",
+    );
     expect(screen.getByRole("link", { name: "Marcas" })).toHaveAttribute(
       "href",
       "/catalogs/brands",
     );
-    expect(
-      screen.getByRole("link", { name: "Categorías de producto" }),
-    ).toHaveAttribute("href", "/catalogs/product_categories");
+    expect(screen.getByRole("link", { name: "Categorías de producto" })).toHaveAttribute(
+      "href",
+      "/catalogs/product_categories",
+    );
     cleanup();
 
     renderRuta("/roles");

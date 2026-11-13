@@ -46,8 +46,8 @@ export function PremiumResultPage() {
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-medium">Pago pendiente de confirmación.</p>
           <p className="mt-1">
-            Mercado Pago puede tardar unos segundos en avisarnos. Si ya pagaste, actualizá el estado.
-            Si el pago fue rechazado, podés intentarlo de nuevo desde la página de planes.
+            Mercado Pago puede tardar unos segundos en avisarnos. Si ya pagaste, actualizá el
+            estado. Si el pago fue rechazado, podés intentarlo de nuevo desde la página de planes.
           </p>
         </div>
       )}

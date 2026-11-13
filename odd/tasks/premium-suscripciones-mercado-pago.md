@@ -23,11 +23,11 @@
 
 ### 2.1 Planes propuestos
 
-| Plan | Precio | Equivalente | Nota |
-|---|---:|---:|---|
-| Mensual | 10.000 COP | 10.000/mes | Precio de entrada; la comisión fija pesa. |
-| Anual | 100.000 COP | 8.333/mes | 2 meses gratis; reduce comisión y churn. |
-| Trial | 0 COP, 7 días | — | Opcional; no en la v1 para evitar abuso. |
+| Plan    |        Precio | Equivalente | Nota                                      |
+| ------- | ------------: | ----------: | ----------------------------------------- |
+| Mensual |    10.000 COP |  10.000/mes | Precio de entrada; la comisión fija pesa. |
+| Anual   |   100.000 COP |   8.333/mes | 2 meses gratis; reduce comisión y churn.  |
+| Trial   | 0 COP, 7 días |           — | Opcional; no en la v1 para evitar abuso.  |
 
 El precio final debe incluir impuestos y costos (Art. 26 Ley 1480). Si 10.000 es el precio “de vitrina”, calcular el neto después de comisión de Mercado Pago (referencia pública: ~2,99%–3,29% + $800 + IVA para pagos online; **confirmar la tarifa de Suscripciones en el panel**). A 10.000, la comisión puede representar ~10–15%; el anual la diluye. Ejemplo orientativo: si querés recibir ~10.000 netos por mes, el precio de vitrina debería rondar 11.500–12.000, según la tarifa final.
 
@@ -37,12 +37,12 @@ El precio final debe incluir impuestos y costos (Art. 26 Ley 1480). Si 10.000 es
 
 La página `/premium` y el checkout muestran un desglose **informativo** (no suman cargos sorpresa):
 
-| Concepto | Ejemplo con precio final 10.000 |
-|---|---:|
-| Precio final que paga el usuario | 10.000 |
-| IVA incluido (19%) | 1.597 |
-| Comisión estimada de Mercado Pago | 1.343 |
-| Neto estimado para FAROX | 7.060 |
+| Concepto                          | Ejemplo con precio final 10.000 |
+| --------------------------------- | ------------------------------: |
+| Precio final que paga el usuario  |                          10.000 |
+| IVA incluido (19%)                |                           1.597 |
+| Comisión estimada de Mercado Pago |                           1.343 |
+| Neto estimado para FAROX          |                           7.060 |
 
 - La comisión de Mercado Pago se **descuenta del recaudo**; no se suma al precio. Si el negocio decide trasladarla al cliente, se configura `fee_passed_to_customer=true` y el precio final sube; por defecto se absorbe para mantener los 10.000.
 - Los porcentajes/fijos son configurables: `tax_rate_bps`, `mp_fee_bps`, `mp_fee_fixed_cents`, `mp_fee_tax_bps`. El cálculo se hace en servidor (`quote_plan`) para que la UI y el checkout usen el mismo número.
@@ -51,17 +51,17 @@ La página `/premium` y el checkout muestran un desglose **informativo** (no sum
 
 ### 2.3 Matriz Free vs Premium (solo lo implementado)
 
-| Función | Gratis | Premium |
-|---|:---:|:---:|
-| 1 tienda activa | ✅ | ✅ |
-| Hasta 3 tiendas activas | ❌ | ✅ |
-| Inventario, pedidos, entregas, rutas, fiado | ✅ | ✅ |
-| Alertas de stock/caducidad | ✅ | ✅ |
-| Dashboard | ❌ | ✅ |
-| Movimientos manuales con precio | ❌ | ✅ |
-| Precios de compra/venta y venta directa | ❌ | ✅ |
-| QR masivo | ❌ | ⚠️ implementar o no prometer |
-| Soporte prioritario | — | opcional, no inventar |
+| Función                                     | Gratis |           Premium            |
+| ------------------------------------------- | :----: | :--------------------------: |
+| 1 tienda activa                             |   ✅   |              ✅              |
+| Hasta 3 tiendas activas                     |   ❌   |              ✅              |
+| Inventario, pedidos, entregas, rutas, fiado |   ✅   |              ✅              |
+| Alertas de stock/caducidad                  |   ✅   |              ✅              |
+| Dashboard                                   |   ❌   |              ✅              |
+| Movimientos manuales con precio             |   ❌   |              ✅              |
+| Precios de compra/venta y venta directa     |   ❌   |              ✅              |
+| QR masivo                                   |   ❌   | ⚠️ implementar o no prometer |
+| Soporte prioritario                         |   —    |    opcional, no inventar     |
 
 No vender «QR masivo» hasta que exista la pantalla real.
 
@@ -500,7 +500,6 @@ ALTER TABLE public.stores
 12. **Legal:** validar todo con abogado colombiano; este documento no es asesoría legal.
 
 ## 10. Log
-
 
 - **L1 (2026-11-01):** «Me gusta tu plan, pero si el usuario tiene 3 tiendas, porque es premium, si deja de serlo perderia 2 tiendas, deberia estar la opcion de que escoja una tienda o que renueve el premium. Y lo de mercado pago me convence mas por la renovacion automatica. Una cosa a revisar, es la ley en colombia para las suscripciones y los terminos de mercado pago para implementar. Genera un plan lo mas completo posible para luego ir desarrollando fase a fase y disminuir los errores.»
 - **L2 (diseño):** Mercado Pago Suscripciones; `premium_until` + `premium_grace_until`; downgrade con elección/pausa; `my_store_ids` filtra activas; fases F0–F6; revisión legal y de comisiones pendiente.

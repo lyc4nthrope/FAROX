@@ -7,9 +7,9 @@ import { mapError } from "./mapError";
 // 598/617/656 · 0011:66).
 describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
   it("42501 (RLS / GRANT de columna)", () => {
-    expect(
-      mapError({ code: "42501", message: "permission denied for table products" }),
-    ).toBe("No tenés permisos para esta operación.");
+    expect(mapError({ code: "42501", message: "permission denied for table products" })).toBe(
+      "No tenés permisos para esta operación.",
+    );
   });
 
   it("'solo admin' (RPC RAISE 0004:552/581/598/617 y assert_admin 0011:66)", () => {
@@ -19,18 +19,16 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     expect(mapError({ message: "set_user_premium: solo admin" })).toBe(
       "Solo un administrador puede hacer esto.",
     );
-    expect(mapError({ message: "solo admin" })).toBe(
-      "Solo un administrador puede hacer esto.",
-    );
+    expect(mapError({ message: "solo admin" })).toBe("Solo un administrador puede hacer esto.");
   });
 
   it("M11 (0004:555 y su variante trigger 0004:318)", () => {
-    expect(
-      mapError({ message: "M11: rol distribuidor requiere distributor_id" }),
-    ).toBe("El rol distribuidor requiere elegir un distribuidor.");
-    expect(
-      mapError({ message: "M11: el rol distribuidor requiere distributor_id" }),
-    ).toBe("El rol distribuidor requiere elegir un distribuidor.");
+    expect(mapError({ message: "M11: rol distribuidor requiere distributor_id" })).toBe(
+      "El rol distribuidor requiere elegir un distribuidor.",
+    );
+    expect(mapError({ message: "M11: el rol distribuidor requiere distributor_id" })).toBe(
+      "El rol distribuidor requiere elegir un distribuidor.",
+    );
   });
 
   it("'rol inexistente' (0004:559)", () => {
@@ -46,9 +44,9 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
   });
 
   it("D34 tope de tiendas (0004:376)", () => {
-    expect(
-      mapError({ message: "D34: tope de tiendas alcanzado (1 activas, tope 1)" }),
-    ).toBe("Alcanzaste el tope de tiendas (1 activa; 3 con premium).");
+    expect(mapError({ message: "D34: tope de tiendas alcanzado (1 activas, tope 1)" })).toBe(
+      "Alcanzaste el tope de tiendas (1 activa; 3 con premium).",
+    );
   });
 
   it("0034: desactivar tienda con pedidos abiertos", () => {
@@ -72,13 +70,12 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
   });
 
   it("F6: checkout apagado y allowlist de canary", () => {
-    expect(
-      mapError({ message: "El pago con Mercado Pago todavía no está habilitado." }),
-    ).toBe("El pago con Mercado Pago todavía no está habilitado.");
+    expect(mapError({ message: "El pago con Mercado Pago todavía no está habilitado." })).toBe(
+      "El pago con Mercado Pago todavía no está habilitado.",
+    );
     expect(
       mapError({
-        message:
-          "El pago está en pruebas. Pedile al administrador que active Premium manualmente.",
+        message: "El pago está en pruebas. Pedile al administrador que active Premium manualmente.",
       }),
     ).toBe("El pago está en pruebas. Pedile al administrador que active Premium manualmente.");
   });
@@ -111,9 +108,9 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
     expect(mapError(new TypeError("Failed to fetch"))).toBe(
       "No se pudo conectar, revisá tu conexión.",
     );
-    expect(
-      mapError(new Error("NetworkError when attempting to fetch resource.")),
-    ).toBe("No se pudo conectar, revisá tu conexión.");
+    expect(mapError(new Error("NetworkError when attempting to fetch resource."))).toBe(
+      "No se pudo conectar, revisá tu conexión.",
+    );
     expect(mapError(new Error("The operation timed out."))).toBe(
       "No se pudo conectar, revisá tu conexión.",
     );
@@ -122,8 +119,7 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
   it("fallback: el texto crudo JAMÁS se devuelve (HARD-1)", () => {
     expect(
       mapError({
-        message:
-          'column "role_id" is of type role_enum but expression is of type text',
+        message: 'column "role_id" is of type role_enum but expression is of type text',
       }),
     ).toBe("Ocurrió un error inesperado. Intentá de nuevo.");
     expect(mapError(null)).toBe("Ocurrió un error inesperado. Intentá de nuevo.");
@@ -132,9 +128,9 @@ describe("mapError (D5 · HARD-1 — los 10 triggers)", () => {
   });
 
   it("prevalencia D5: SQLSTATE gana sobre el substring de mensaje", () => {
-    expect(
-      mapError({ code: "42501", message: "D34: tope de tiendas alcanzado" }),
-    ).toBe("No tenés permisos para esta operación.");
+    expect(mapError({ code: "42501", message: "D34: tope de tiendas alcanzado" })).toBe(
+      "No tenés permisos para esta operación.",
+    );
   });
 });
 
@@ -185,12 +181,12 @@ describe("mapError · sdd/admin-console T-B1 (23503, 23505, «usuario inexistent
   });
 
   it("prevalencia T-B1: 23503/23505 ganan por SQLSTATE aunque el mensaje traiga otra pista", () => {
-    expect(
-      mapError({ code: "23503", message: "solo admin" }),
-    ).toBe("Este registro está en uso y no se puede eliminar.");
-    expect(
-      mapError({ code: "23505", message: "duplicate key value (raw)" }),
-    ).toBe("Ya existe un registro con ese nombre.");
+    expect(mapError({ code: "23503", message: "solo admin" })).toBe(
+      "Este registro está en uso y no se puede eliminar.",
+    );
+    expect(mapError({ code: "23505", message: "duplicate key value (raw)" })).toBe(
+      "Ya existe un registro con ese nombre.",
+    );
   });
 });
 
@@ -209,7 +205,9 @@ describe("mapError — solicitudes tienda ↔ distribuidor (0021)", () => {
 
   it("tienda/distribuidor obligatorios y lista sin items válidos", () => {
     expect(
-      mapError({ message: "list_store_distributor_products: tienda y distribuidor son obligatorios" }),
+      mapError({
+        message: "list_store_distributor_products: tienda y distribuidor son obligatorios",
+      }),
     ).toBe("Elegí tienda y distribuidor.");
     expect(mapError({ message: "create_order: ningún item válido" })).toBe(
       "Agregá al menos un producto.",
@@ -224,8 +222,7 @@ describe("mapError — límites de longitud y rate limit (0040/0041)", () => {
     expect(
       mapError({
         code: "23514",
-        message:
-          'new row for relation "users" violates check constraint "users_full_name_maxlen"',
+        message: 'new row for relation "users" violates check constraint "users_full_name_maxlen"',
       }),
     ).toBe("El nombre es demasiado largo (máximo 120 caracteres).");
     expect(
@@ -283,14 +280,14 @@ describe("mapError — límites de longitud y rate limit (0040/0041)", () => {
     expect(
       mapError({ message: "Llegaste al límite de consultas por hora. Probá más tarde." }),
     ).toBe("Llegaste al límite de consultas por hora. Probá más tarde.");
-    expect(
-      mapError({ message: "El asistente todavía no está habilitado." }),
-    ).toBe("El asistente todavía no está habilitado.");
-    expect(
-      mapError({ message: "El asistente está en mantenimiento. Probá más tarde." }),
-    ).toBe("El asistente está en mantenimiento. Probá más tarde.");
-    expect(
-      mapError({ message: "No pude responder ahora. Probá de nuevo en un rato." }),
-    ).toBe("El asistente no pudo responder ahora. Probá de nuevo en un rato.");
+    expect(mapError({ message: "El asistente todavía no está habilitado." })).toBe(
+      "El asistente todavía no está habilitado.",
+    );
+    expect(mapError({ message: "El asistente está en mantenimiento. Probá más tarde." })).toBe(
+      "El asistente está en mantenimiento. Probá más tarde.",
+    );
+    expect(mapError({ message: "No pude responder ahora. Probá de nuevo en un rato." })).toBe(
+      "El asistente no pudo responder ahora. Probá de nuevo en un rato.",
+    );
   });
 });

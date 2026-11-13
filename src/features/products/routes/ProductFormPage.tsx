@@ -89,8 +89,7 @@ export function ProductFormPage() {
           fetchProductCategories(),
         ]);
         if (cancelled) return;
-        const catalogError =
-          brandsResult.error ?? unitsResult.error ?? categoriesResult.error;
+        const catalogError = brandsResult.error ?? unitsResult.error ?? categoriesResult.error;
         if (catalogError !== null) {
           setFormError(mapError(catalogError));
         }
@@ -199,7 +198,9 @@ export function ProductFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-semibold tracking-tight">{isEdit ? "Producto" : "Nuevo producto"}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {isEdit ? "Producto" : "Nuevo producto"}
+      </h1>
       {loading ? (
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (

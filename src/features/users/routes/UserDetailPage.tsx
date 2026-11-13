@@ -14,19 +14,12 @@ import {
   updateUserRole,
 } from "../api";
 import { UserDetail } from "../components/UserDetail";
-import {
-  UserProfileForm,
-  type ProfileFormErrors,
-} from "../components/UserProfileForm";
+import { UserProfileForm, type ProfileFormErrors } from "../components/UserProfileForm";
 import { UserRolePanel, type RoleFormErrors } from "../components/UserRolePanel";
 import { UserStoresPanel } from "../components/UserStoresPanel";
 import { roleChangeSchema, userProfileSchema } from "../schemas";
 import type { UserProfileFormValues } from "../schemas";
-import type {
-  DistributorOption,
-  UserDetailRow,
-  UserStoreRow,
-} from "../types";
+import type { DistributorOption, UserDetailRow, UserStoreRow } from "../types";
 
 // Contenedor de /users/:id (sdd/admin-console T-B5..T-B8). Tres mutaciones,
 // cada una por SU vía autorizada (design #599 §2.1):
@@ -55,8 +48,7 @@ export function UserDetailPage() {
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   // ADM-4 · perfil (3 columnas)
-  const [valoresPerfil, setValoresPerfil] =
-    useState<UserProfileFormValues>(EMPTY_PROFILE);
+  const [valoresPerfil, setValoresPerfil] = useState<UserProfileFormValues>(EMPTY_PROFILE);
   const [erroresPerfil, setErroresPerfil] = useState<ProfileFormErrors>({});
   const [errorPerfil, setErrorPerfil] = useState<string | null>(null);
   const [avisoPerfil, setAvisoPerfil] = useState<string | null>(null);
@@ -215,15 +207,13 @@ export function UserDetailPage() {
     if (usuario === null) return;
     const parsed = roleChangeSchema.safeParse({
       role: valoresRol.role,
-      distributor_id:
-        valoresRol.distributorId === "" ? undefined : valoresRol.distributorId,
+      distributor_id: valoresRol.distributorId === "" ? undefined : valoresRol.distributorId,
     });
     if (!parsed.success) {
       const issues = parsed.error.flatten();
       setErroresRol({
         role: issues.fieldErrors.role?.[0],
-        distributor_id:
-          issues.fieldErrors.distributor_id?.[0] ?? issues.formErrors[0],
+        distributor_id: issues.fieldErrors.distributor_id?.[0] ?? issues.formErrors[0],
       });
       setErrorRol(null);
       setAvisoRol(null);
@@ -251,11 +241,7 @@ export function UserDetailPage() {
         : null;
     void (async () => {
       try {
-        const { error } = await updateUserRole(
-          usuario.id,
-          parsed.data.role,
-          distribuidor,
-        );
+        const { error } = await updateUserRole(usuario.id, parsed.data.role, distribuidor);
         if (error !== null) {
           setErrorRol(mapError(error));
           return;
@@ -352,7 +338,10 @@ export function UserDetailPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Usuario</h1>
         <div className="mt-4">
           {/* errorCarga SIEMPRE viene de mapError() (HARD-1) */}
-          <p role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <p
+            role="alert"
+            className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          >
             {errorCarga ?? "Ocurrió un error inesperado. Intentá de nuevo."}
           </p>
         </div>
@@ -404,11 +393,7 @@ export function UserDetailPage() {
         onChange={setValoresRol}
         onSubmit={guardarRol}
       />
-      <UserStoresPanel
-        stores={tiendas}
-        loading={cargandoTiendas}
-        error={errorTiendas}
-      />
+      <UserStoresPanel stores={tiendas} loading={cargandoTiendas} error={errorTiendas} />
     </section>
   );
 }

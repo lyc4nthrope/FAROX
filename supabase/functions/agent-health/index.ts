@@ -63,12 +63,6 @@ Deno.serve(async (request) => {
     return json(body, 200, true);
   }
 
-  console.error(
-    "agent-health MODEL_UNAVAILABLE",
-    primary,
-    first.status,
-    fallback,
-    second.status,
-  );
+  console.error("agent-health MODEL_UNAVAILABLE", primary, first.status, fallback, second.status);
   return json(body, 503, true);
 });

@@ -34,7 +34,7 @@ const ACCEPTED_APP_ISSUES = new Map([
 // no es estable. Solo se acepta el inicio documentado; otra función no pasa.
 const ACCEPTED_APP_PREFIXES = [
   [
-    'public.register_movements_bulk|target type is different type than source type',
+    "public.register_movements_bulk|target type is different type than source type",
     "0048: inicializador '{}' para bigint[]; falso positivo de plpgsql_check, sin efecto en ejecución",
   ],
 ];
@@ -120,9 +120,7 @@ for (const entry of entries) {
       accepted.push(`[${level}] ${fn}: ${message} — ${reason}`);
       continue;
     }
-    fatals.push(
-      `[${level}] ${fn}: ${message}${issue?.context ? ` · ${issue.context}` : ""}`,
-    );
+    fatals.push(`[${level}] ${fn}: ${message}${issue?.context ? ` · ${issue.context}` : ""}`);
   }
 }
 

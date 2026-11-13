@@ -79,9 +79,10 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     expect(screen.getByLabelText("Confirmar contraseña")).toBeInTheDocument();
     expect(screen.getByText("Mínimo 6 caracteres.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Crear cuenta" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "¿Ya tenés cuenta? Iniciá sesión" }),
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "¿Ya tenés cuenta? Iniciá sesión" })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 
   it("pantalla pública sin chrome: ofrece volver al inicio", () => {
@@ -119,9 +120,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     await user.click(screen.getByRole("button", { name: "Crear cuenta" }));
 
     expect(await screen.findByText("Ingresá un email válido")).toBeInTheDocument();
-    expect(
-      screen.getByText("La contraseña debe tener al menos 6 caracteres"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("La contraseña debe tener al menos 6 caracteres")).toBeInTheDocument();
     expect(authApi.signUp).not.toHaveBeenCalled();
   });
 
@@ -151,9 +150,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     expect(password).toHaveAttribute("type", "text");
     expect(confirmation).toHaveAttribute("type", "password");
 
-    await user.click(
-      screen.getByRole("button", { name: "Mostrar confirmación de contraseña" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Mostrar confirmación de contraseña" }));
     expect(confirmation).toHaveAttribute("type", "text");
 
     await user.click(screen.getByRole("button", { name: "Ocultar contraseña" }));
@@ -166,9 +163,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
     await enviarRegistro(user);
 
     expect(await screen.findByRole("heading", { name: "Revisá tu email" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Revisá tu email para confirmar tu cuenta/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Revisá tu email para confirmar tu cuenta/)).toBeInTheDocument();
     // Datos en el ORDEN de la firma: (email, password, fullName, consent) —
     // el paso a options.data (full_name + consentimiento) se prueba en
     // api.test.ts; acá solo el contrato del call site.
@@ -276,9 +271,7 @@ describe("RegisterPage (D1 · ruta pública /register)", () => {
 
   it("la casilla de privacidad existe y está SIN marcar por defecto", () => {
     renderRegister();
-    expect(
-      screen.getByRole("checkbox", { name: /Política de Privacidad/ }),
-    ).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Política de Privacidad/ })).not.toBeChecked();
   });
 
   it("campos válidos pero casilla SIN marcar: error inline y CERO llamadas a la api", async () => {

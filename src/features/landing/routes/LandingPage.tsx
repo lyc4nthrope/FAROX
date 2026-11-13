@@ -51,9 +51,7 @@ const FEATURES: readonly Feature[] = [
     title: "Inventario y alertas",
     description:
       "Stock por tienda con umbrales y vencimientos. Lo que se agota o vence aparece antes de que sea un problema.",
-    icon: (
-      <path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7ZM3.3 8.5 12 13l8.7-4.5M12 13v8" />
-    ),
+    icon: <path d="M21 8.5 12 3 3 8.5v7L12 21l9-5.5v-7ZM3.3 8.5 12 13l8.7-4.5M12 13v8" />,
   },
   {
     title: "Pedidos y entregas",
@@ -83,17 +81,13 @@ const FEATURES: readonly Feature[] = [
     title: "Catálogos",
     description:
       "Marcas, categorías, unidades y tipos de tienda en un solo lugar, listos para toda la red.",
-    icon: (
-      <path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Zm9 9-9 4.5L3 12m18 4.5-9 4.5-9-4.5" />
-    ),
+    icon: <path d="m12 3 9 4.5-9 4.5-9-4.5L12 3Zm9 9-9 4.5L3 12m18 4.5-9 4.5-9-4.5" />,
   },
   {
     title: "Auditoría",
     description:
       "Quién cambió qué y cuándo. Historial legible para resolver dudas sin depender de la memoria.",
-    icon: (
-      <path d="M12 3 5 6v6c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Zm0 5v4m0 3h.01" />
-    ),
+    icon: <path d="M12 3 5 6v6c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Zm0 5v4m0 3h.01" />,
   },
 ];
 
@@ -165,9 +159,8 @@ export function LandingPage() {
                 Todo tu negocio, <span className="text-gray-400">en orden.</span>
               </h1>
               <p className="mt-5 max-w-lg text-base leading-relaxed text-gray-600">
-                FARØX conecta tiendas y distribuidores: inventario, pedidos, entregas,
-                rutas y fiado en una sola app. Menos planillas, menos llamadas, más
-                control.
+                FARØX conecta tiendas y distribuidores: inventario, pedidos, entregas, rutas y fiado
+                en una sola app. Menos planillas, menos llamadas, más control.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
@@ -200,8 +193,8 @@ export function LandingPage() {
             Un sistema, tres formas de trabajar
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">
-            Cada persona ve lo que necesita. La misma base de datos mantiene el stock,
-            los pedidos y las rutas sincronizados.
+            Cada persona ve lo que necesita. La misma base de datos mantiene el stock, los pedidos y
+            las rutas sincronizados.
           </p>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {ROLES.map((role) => (
@@ -210,9 +203,7 @@ export function LandingPage() {
                 className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
               >
                 <h3 className="font-semibold text-gray-900">{role.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                  {role.description}
-                </p>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{role.description}</p>
                 <ul className="mt-4 space-y-2 text-sm text-gray-700">
                   {role.bullets.map((bullet) => (
                     <li key={bullet} className="flex gap-2">
@@ -232,8 +223,8 @@ export function LandingPage() {
               Todo lo que pasa en tu operación
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">
-              De la entrada de mercancía al pago del fiado: cada movimiento queda
-              registrado y cada rol ve solo lo que le corresponde.
+              De la entrada de mercancía al pago del fiado: cada movimiento queda registrado y cada
+              rol ve solo lo que le corresponde.
             </p>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map((feature) => (
@@ -272,8 +263,8 @@ export function LandingPage() {
             Empezá en tres pasos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">
-            Sin instalaciones ni configuraciones largas: tu cuenta queda lista para
-            trabajar el mismo día.
+            Sin instalaciones ni configuraciones largas: tu cuenta queda lista para trabajar el
+            mismo día.
           </p>
           <ol className="mt-8 grid gap-4 md:grid-cols-3">
             {STEPS.map((step, index) => (
@@ -282,9 +273,7 @@ export function LandingPage() {
                   {index + 1}
                 </span>
                 <h3 className="mt-4 font-semibold text-gray-900">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                  {step.description}
-                </p>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">{step.description}</p>
               </li>
             ))}
           </ol>

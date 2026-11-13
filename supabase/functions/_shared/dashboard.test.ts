@@ -1,11 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import {
-  resolvePeriod,
-  summarizeDashboard,
-  type DashboardRow,
-} from "./dashboard";
+import { resolvePeriod, summarizeDashboard, type DashboardRow } from "./dashboard";
 
 const NOW = new Date("2026-11-12T15:30:00Z");
 

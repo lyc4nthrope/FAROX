@@ -142,11 +142,7 @@ export function totalPoint(points: readonly DailyPoint[]): DailyPoint {
 }
 
 /** Valor de ventas según el alcance. */
-export function salesOf(
-  point: DailyPoint,
-  scope: DashboardScope,
-  metric: DashboardMetric,
-): number {
+export function salesOf(point: DailyPoint, scope: DashboardScope, metric: DashboardMetric): number {
   if (scope === "distributor") {
     return metric === "value" ? point.entriesValue : point.entriesCount;
   }

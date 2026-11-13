@@ -62,10 +62,7 @@ export function RoleForm({
         </p>
       )}
       <div>
-        <label
-          htmlFor="role-name"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="role-name" className="block text-sm font-medium text-gray-700">
           Nombre del rol
         </label>
         <input
@@ -76,9 +73,7 @@ export function RoleForm({
           value={values.name}
           aria-invalid={errors.name !== undefined}
           aria-describedby={
-            errors.name === undefined
-              ? "role-name-hint"
-              : "role-name-hint role-name-error"
+            errors.name === undefined ? "role-name-hint" : "role-name-hint role-name-error"
           }
           onChange={(event) => onChange({ ...values, name: event.target.value })}
         />
@@ -86,8 +81,8 @@ export function RoleForm({
             catálogo de la app — «superuser» se bloquea con CERO requests y
             este copy explica por qué. */}
         <p id="role-name-hint" className="mt-1 text-xs text-gray-500">
-          Para crear un rol nuevo hay que actualizar el catálogo de la app
-          primero. Válidos: {ROLE_NAMES.join(", ")}.
+          Para crear un rol nuevo hay que actualizar el catálogo de la app primero. Válidos:{" "}
+          {ROLE_NAMES.join(", ")}.
         </p>
         {errors.name !== undefined && (
           <p id="role-name-error" className="mt-1 text-xs text-red-600">
@@ -101,10 +96,7 @@ export function RoleForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="role-description"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="role-description" className="block text-sm font-medium text-gray-700">
           Descripción
         </label>
         <textarea
@@ -114,14 +106,8 @@ export function RoleForm({
           value={values.description}
           maxLength={LIMITS.catalogDescription}
           aria-invalid={errors.description !== undefined}
-          aria-describedby={
-            errors.description === undefined
-              ? undefined
-              : "role-description-error"
-          }
-          onChange={(event) =>
-            onChange({ ...values, description: event.target.value })
-          }
+          aria-describedby={errors.description === undefined ? undefined : "role-description-error"}
+          onChange={(event) => onChange({ ...values, description: event.target.value })}
         />
         {errors.description !== undefined && (
           <p id="role-description-error" className="mt-1 text-xs text-red-600">

@@ -169,10 +169,7 @@ export function DistributorForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="distributor-preference"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="distributor-preference" className="block text-sm font-medium text-gray-700">
           Preferencia de contacto
         </label>
         <select

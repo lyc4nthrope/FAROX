@@ -64,10 +64,7 @@ describe("whatsapp channel routing", () => {
   });
 
   it("prepara con agent_prepare_action_for_user y p_wa_id", async () => {
-    stub(
-      toolCall("preparar_faltante", { store_id: 3, product_id: 5, shortage: true }),
-      text,
-    );
+    stub(toolCall("preparar_faltante", { store_id: 3, product_id: 5, shortage: true }), text);
     const rpc = vi.fn().mockResolvedValue({
       data: { action_id: 1, summary: {}, expires_at: "2030-01-01" },
       error: null,
@@ -86,10 +83,7 @@ describe("whatsapp channel routing", () => {
   });
 
   it("no llega a una RPC de escritura con writesEnabled=false", async () => {
-    stub(
-      toolCall("preparar_faltante", { store_id: 3, product_id: 5, shortage: true }),
-      text,
-    );
+    stub(toolCall("preparar_faltante", { store_id: 3, product_id: 5, shortage: true }), text);
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
     await runAgent({
       ...base,
@@ -104,9 +98,9 @@ describe("whatsapp channel routing", () => {
     const fetchMock = stub(text);
     await runAgent({ ...base, client: { rpc: vi.fn(), from: vi.fn() } as never });
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0] as [string, { body: string }])[1].body,
-    ) as { tools: { function: { name: string } }[] };
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body) as {
+      tools: { function: { name: string } }[];
+    };
     const names = body.tools.map((tool) => tool.function.name);
     expect(names).not.toContain("preparar_cambio_precios");
     expect(names).toContain("preparar_salida_tienda");

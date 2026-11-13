@@ -11,10 +11,7 @@ export const profileSchema = z.object({
     .trim()
     .min(1, "Ingresá tu nombre")
     .max(LIMITS.userName, `Máximo ${LIMITS.userName} caracteres`),
-  phone_number: z
-    .string()
-    .trim()
-    .max(LIMITS.userPhone, `Máximo ${LIMITS.userPhone} caracteres`),
+  phone_number: z.string().trim().max(LIMITS.userPhone, `Máximo ${LIMITS.userPhone} caracteres`),
   contact_preference: z.enum(CONTACT_PREFERENCES),
 });
 

@@ -242,12 +242,8 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     vi.mocked(logisticsApi.fetchStoresWithRequests).mockResolvedValue({ data: [], error: null });
     renderPage();
 
-    expect(
-      await screen.findByText("No hay tiendas con solicitudes abiertas"),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText("No tenés ruta asignada para hoy"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No hay tiendas con solicitudes abiertas")).toBeInTheDocument();
+    expect(await screen.findByText("No tenés ruta asignada para hoy")).toBeInTheDocument();
   });
 
   it("muestra la ruta asignada cuando existe", async () => {

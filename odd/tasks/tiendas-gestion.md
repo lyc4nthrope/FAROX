@@ -17,13 +17,13 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S2, S5, S6 | inline | hecho | `20261029000034_gestion_tiendas.sql`: `deactivate_store`, guard de pedidos abiertos, soft-delete con razón, grants |
-| T2 | S3, S4, S5 | inline | hecho | migración: `reactivate_store`, `transfer_store`, `user_is_premium`, locks por usuario, cap 1/3, `user_stores` |
-| T3 | S1, S2, S3 | inline | hecho | `StoreFormPage`: dueño/admin ven «Desactivar tienda»; confirmación; reactivación del dueño en `PremiumStoresPage`; banner admin limpia razón |
-| T4 | S4 | inline | hecho | `TransferStorePanel` + `transferStore`; solo operadores/admin activos distintos del dueño |
-| T5 | S1-S7 | inline | hecho | tests de migración/UI, manual, `APLICAR-EN-PRODUCCION.md`, typecheck/lint/check-scope/test/build |
+| ID  | Specs      | Ruta   | Estado | Evidencia                                                                                                                                    |
+| --- | ---------- | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | S2, S5, S6 | inline | hecho  | `20261029000034_gestion_tiendas.sql`: `deactivate_store`, guard de pedidos abiertos, soft-delete con razón, grants                           |
+| T2  | S3, S4, S5 | inline | hecho  | migración: `reactivate_store`, `transfer_store`, `user_is_premium`, locks por usuario, cap 1/3, `user_stores`                                |
+| T3  | S1, S2, S3 | inline | hecho  | `StoreFormPage`: dueño/admin ven «Desactivar tienda»; confirmación; reactivación del dueño en `PremiumStoresPage`; banner admin limpia razón |
+| T4  | S4         | inline | hecho  | `TransferStorePanel` + `transferStore`; solo operadores/admin activos distintos del dueño                                                    |
+| T5  | S1-S7      | inline | hecho  | tests de migración/UI, manual, `APLICAR-EN-PRODUCCION.md`, typecheck/lint/check-scope/test/build                                             |
 
 ## Log
 

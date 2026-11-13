@@ -4,12 +4,7 @@ import { useLoad } from "../../../shared/hooks/useLoad";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { formatCOP } from "../../../shared/lib/format";
 import { Badge, Box, Field, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
-import {
-  fetchAdminPlans,
-  fetchPlanVersions,
-  previewPlanQuote,
-  updatePlanPricing,
-} from "../api";
+import { fetchAdminPlans, fetchPlanVersions, previewPlanQuote, updatePlanPricing } from "../api";
 import type { AdminPlan, PlanPreview } from "../types";
 
 interface FormState {
@@ -176,8 +171,8 @@ export function PremiumPlansAdminPage() {
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Planes y precios</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        El precio nuevo aplica a nuevas suscripciones. Las existentes conservan su precio y el
-        monto ya autorizado en Mercado Pago; no se actualizan en silencio.
+        El precio nuevo aplica a nuevas suscripciones. Las existentes conservan su precio y el monto
+        ya autorizado en Mercado Pago; no se actualizan en silencio.
       </p>
 
       <Status loading={plans.loading} error={plans.error} />
@@ -338,8 +333,13 @@ export function PremiumPlansAdminPage() {
                     </thead>
                     <tbody>
                       {versions.data.map((version) => (
-                        <tr key={version.version} className="border-b border-gray-100 last:border-0">
-                          <td className="py-2 pr-3 tabular-nums text-gray-900">v{version.version}</td>
+                        <tr
+                          key={version.version}
+                          className="border-b border-gray-100 last:border-0"
+                        >
+                          <td className="py-2 pr-3 tabular-nums text-gray-900">
+                            v{version.version}
+                          </td>
                           <td className="py-2 pr-3 tabular-nums text-gray-900">
                             {formatCOP(version.amountCents / 100)}
                           </td>

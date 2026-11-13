@@ -92,11 +92,9 @@ export function StoreRouteMap({ stores }: { stores: readonly RequestStore[] }) {
     } else if (points.length > 1) {
       map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 14 });
     } else {
-      map.setView(
-        [DEFAULT_MAP_CENTER.latitude, DEFAULT_MAP_CENTER.longitude],
-        DEFAULT_MAP_ZOOM,
-        { animate: false },
-      );
+      map.setView([DEFAULT_MAP_CENTER.latitude, DEFAULT_MAP_CENTER.longitude], DEFAULT_MAP_ZOOM, {
+        animate: false,
+      });
     }
   }, [stores]);
 

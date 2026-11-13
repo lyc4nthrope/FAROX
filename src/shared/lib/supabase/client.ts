@@ -6,4 +6,7 @@ import { loadEnv } from "../env";
 // con ConfigError (V0-1). Único punto de creación del cliente en toda la app (D1).
 const env = loadEnv(import.meta.env);
 
-export const supabase: SupabaseClient = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+export const supabase: SupabaseClient = createClient(
+  env.VITE_SUPABASE_URL,
+  env.VITE_SUPABASE_ANON_KEY,
+);

@@ -5,13 +5,7 @@ import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
 import { formatQty } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
-import {
-  Badge,
-  Status,
-  buttonClass,
-  inputClass,
-  runAction,
-} from "../../../shared/ui/Box";
+import { Badge, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
 import { EmptyState, ErrorBanner, QuantityStepper } from "../../../shared/ui";
 import { Pager } from "../../../shared/ui/Pager";
 import {
@@ -219,16 +213,10 @@ export function AddProductsPanel({
     () => new Map((storeStock.data ?? []).map((row) => [row.product_id, row.quantity])),
     [storeStock.data],
   );
-  const distributorSet = useMemo(
-    () => new Set(distributorIds.data ?? []),
-    [distributorIds.data],
-  );
+  const distributorSet = useMemo(() => new Set(distributorIds.data ?? []), [distributorIds.data]);
   const assignedError = storeStock.error ?? distributorIds.error;
   const assignedIds = useMemo(
-    () =>
-      target.kind === "store"
-        ? [...stockByProduct.keys()]
-        : [...distributorSet],
+    () => (target.kind === "store" ? [...stockByProduct.keys()] : [...distributorSet]),
     [target.kind, stockByProduct, distributorSet],
   );
 
@@ -262,9 +250,7 @@ export function AddProductsPanel({
   }, [onlyUnassigned, assignedIds, setPageZero]);
 
   function isAssigned(productId: number): boolean {
-    return target.kind === "store"
-      ? stockByProduct.has(productId)
-      : distributorSet.has(productId);
+    return target.kind === "store" ? stockByProduct.has(productId) : distributorSet.has(productId);
   }
 
   function quantityOf(productId: number): string {
@@ -353,11 +339,7 @@ export function AddProductsPanel({
           />
           Solo no añadidos
         </label>
-        <button
-          className={buttonClass}
-          type="button"
-          onClick={() => setCreating((open) => !open)}
-        >
+        <button className={buttonClass} type="button" onClick={() => setCreating((open) => !open)}>
           {creating ? "Cerrar producto nuevo" : "Crear producto nuevo"}
         </button>
       </div>
@@ -432,9 +414,7 @@ export function AddProductsPanel({
                       if (!assigned) void agregar(row);
                     }}
                     className={`border-b border-gray-100 align-top ${
-                      assigned
-                        ? ""
-                        : "cursor-pointer transition-colors hover:bg-gray-50"
+                      assigned ? "" : "cursor-pointer transition-colors hover:bg-gray-50"
                     }`}
                   >
                     <td
@@ -442,9 +422,7 @@ export function AddProductsPanel({
                       data-label="Producto"
                     >
                       <p className="break-words font-medium text-gray-900">{row.name}</p>
-                      {meta !== "" && (
-                        <p className="break-words text-xs text-gray-500">{meta}</p>
-                      )}
+                      {meta !== "" && <p className="break-words text-xs text-gray-500">{meta}</p>}
                     </td>
                     <td
                       className="py-2 pr-3 align-top"

@@ -45,7 +45,12 @@ export function HomePage() {
             </p>
             {premium && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-200">
-                <svg aria-hidden="true" className="h-3 w-3 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
                 </svg>
                 Premium
@@ -93,9 +98,7 @@ export function HomePage() {
                 <span className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 font-medium text-gray-900">
                     {item.label}
-                    {item.to === "/dashboard" && !premium && (
-                      <PremiumBadge size="sm" />
-                    )}
+                    {item.to === "/dashboard" && !premium && <PremiumBadge size="sm" />}
                   </span>
                   <svg
                     aria-hidden="true"

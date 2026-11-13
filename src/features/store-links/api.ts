@@ -67,20 +67,18 @@ export async function fetchCounterpartContact(
   if (error !== null) {
     return { data: null, error };
   }
-  const rows = ((data ?? []) as Record<string, unknown>[]).map(
-    (row): CounterpartContact => {
-      const preference = row.contact_preference;
-      return {
-        full_name: typeof row.full_name === "string" ? row.full_name : "",
-        phone_number: typeof row.phone_number === "string" ? row.phone_number : null,
-        email: typeof row.email === "string" ? row.email : null,
-        contact_preference:
-          preference === "phone" || preference === "email"
-            ? (preference as "phone" | "email")
-            : "whatsapp",
-      };
-    },
-  );
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row): CounterpartContact => {
+    const preference = row.contact_preference;
+    return {
+      full_name: typeof row.full_name === "string" ? row.full_name : "",
+      phone_number: typeof row.phone_number === "string" ? row.phone_number : null,
+      email: typeof row.email === "string" ? row.email : null,
+      contact_preference:
+        preference === "phone" || preference === "email"
+          ? (preference as "phone" | "email")
+          : "whatsapp",
+    };
+  });
   return { data: rows, error: null };
 }
 

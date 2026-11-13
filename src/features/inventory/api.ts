@@ -222,7 +222,8 @@ export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRo
 /** 0037: catálogo del distribuidor con stock y precios para el ticket. */
 export async function fetchDistributorMovementOptions(): Promise<
   LoadResult<MovementProductOption[]>
-> {  const { data, error } = await supabase
+> {
+  const { data, error } = await supabase
     .from("distributor_products")
     .select(
       "product_id,quantity,purchase_price,sale_price,product:products!inner(name,is_active,barcode,brand:brands(name))",

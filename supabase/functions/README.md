@@ -6,15 +6,15 @@ Supabase y nunca se exponen con prefijo `VITE_`.
 
 ## Funciones
 
-| Función | Autenticación | Qué hace |
-|---|---|---|
-| `create-subscription` | JWT de Supabase | Lee el plan y su última versión en la DB, crea el preapproval en Mercado Pago y devuelve `init_point`. Nunca confía en el monto del cliente. |
-| `mp-webhook` | Firma `x-signature` | Valida el origen, guarda el evento, consulta el recurso real y activa/extiende Premium con `activate_premium`. Tolera duplicados. |
-| `cancel-subscription` | JWT de Supabase | Cancela el preapproval en Mercado Pago y marca `cancel_at_period_end`; no borra el período ya pagado. |
-| `admin-cancel-subscription` | Admin | Cancela la suscripción de otro usuario y audita la acción. |
-| `refund-payment` | Admin | Reembolsa un pago aprobado en Mercado Pago, marca `refunded` y audita. No revoca Premium automáticamente. |
-| `reconcile-subscriptions` | Admin o `CRON_SECRET` | Consulta suscripciones/pagos pendientes en Mercado Pago y corrige estados con el mismo procesador del webhook. |
-| `send-premium-notices` | Admin o `CRON_SECRET` | Encola y envía avisos de renovación/gracia/vencimiento/pago rechazado/cancelación con Resend. |
+| Función                     | Autenticación         | Qué hace                                                                                                                                     |
+| --------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create-subscription`       | JWT de Supabase       | Lee el plan y su última versión en la DB, crea el preapproval en Mercado Pago y devuelve `init_point`. Nunca confía en el monto del cliente. |
+| `mp-webhook`                | Firma `x-signature`   | Valida el origen, guarda el evento, consulta el recurso real y activa/extiende Premium con `activate_premium`. Tolera duplicados.            |
+| `cancel-subscription`       | JWT de Supabase       | Cancela el preapproval en Mercado Pago y marca `cancel_at_period_end`; no borra el período ya pagado.                                        |
+| `admin-cancel-subscription` | Admin                 | Cancela la suscripción de otro usuario y audita la acción.                                                                                   |
+| `refund-payment`            | Admin                 | Reembolsa un pago aprobado en Mercado Pago, marca `refunded` y audita. No revoca Premium automáticamente.                                    |
+| `reconcile-subscriptions`   | Admin o `CRON_SECRET` | Consulta suscripciones/pagos pendientes en Mercado Pago y corrige estados con el mismo procesador del webhook.                               |
+| `send-premium-notices`      | Admin o `CRON_SECRET` | Encola y envía avisos de renovación/gracia/vencimiento/pago rechazado/cancelación con Resend.                                                |
 
 ## Secrets
 

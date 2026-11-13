@@ -268,17 +268,16 @@ export function PremiumPaymentsAdminPage() {
               </table>
             </div>
           )}
-          {subscriptions.data !== null &&
-            subscriptions.data.length === subscriptionsLimit && (
-              <button
-                className={`${buttonClass} mt-3 px-3 py-1.5 text-xs`}
-                type="button"
-                disabled={busy !== null}
-                onClick={() => setSubscriptionsLimit((current) => current + 50)}
-              >
-                Cargar más suscripciones
-              </button>
-            )}
+          {subscriptions.data !== null && subscriptions.data.length === subscriptionsLimit && (
+            <button
+              className={`${buttonClass} mt-3 px-3 py-1.5 text-xs`}
+              type="button"
+              disabled={busy !== null}
+              onClick={() => setSubscriptionsLimit((current) => current + 50)}
+            >
+              Cargar más suscripciones
+            </button>
+          )}
         </Box>
       </div>
 
@@ -321,7 +320,9 @@ export function PremiumPaymentsAdminPage() {
                           ? "—"
                           : `${row.providerPaymentId.slice(0, 12)}…`}
                       </td>
-                      <td className="py-2 pr-3 text-gray-600">{date(row.paidAt ?? row.createdAt)}</td>
+                      <td className="py-2 pr-3 text-gray-600">
+                        {date(row.paidAt ?? row.createdAt)}
+                      </td>
                       <td className="py-2">
                         {row.status === "approved" && row.providerPaymentId !== null ? (
                           <button

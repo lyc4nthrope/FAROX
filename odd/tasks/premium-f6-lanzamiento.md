@@ -18,14 +18,14 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S1-S2 | inline | hecho | `VITE_PREMIUM_CHECKOUT_ENABLED`, `PREMIUM_CHECKOUT_ENABLED`, allowlist y tests |
-| T2 | S3 | inline | hecho | `fetchPremiumHealth` + tarjetas de salud en `/pagos` |
-| T3 | S4, S6-S7 | inline | hecho | `docs/runbooks/premium-lanzamiento.md` |
-| T4 | S5 | inline | hecho | `docs/legal/premium-terminos-borrador.md` + privacidad MP/Resend (v1.1) |
-| T5 | S1-S8 | inline | hecho | tests, docs y checks |
-| T6 | S1-S8 | delegated | hecho | verificación independiente: PASS; advisories de tests/runbook corregidos |
+| ID  | Specs     | Ruta      | Estado | Evidencia                                                                      |
+| --- | --------- | --------- | ------ | ------------------------------------------------------------------------------ |
+| T1  | S1-S2     | inline    | hecho  | `VITE_PREMIUM_CHECKOUT_ENABLED`, `PREMIUM_CHECKOUT_ENABLED`, allowlist y tests |
+| T2  | S3        | inline    | hecho  | `fetchPremiumHealth` + tarjetas de salud en `/pagos`                           |
+| T3  | S4, S6-S7 | inline    | hecho  | `docs/runbooks/premium-lanzamiento.md`                                         |
+| T4  | S5        | inline    | hecho  | `docs/legal/premium-terminos-borrador.md` + privacidad MP/Resend (v1.1)        |
+| T5  | S1-S8     | inline    | hecho  | tests, docs y checks                                                           |
+| T6  | S1-S8     | delegated | hecho  | verificación independiente: PASS; advisories de tests/runbook corregidos       |
 
 ## Log
 

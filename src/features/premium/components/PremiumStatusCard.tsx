@@ -34,7 +34,10 @@ export function PremiumStatusCard() {
       setMsg({ error: mapError(result.error), ok: null });
       return;
     }
-    setMsg({ error: null, ok: "Renovación cancelada. El acceso sigue hasta el final del período." });
+    setMsg({
+      error: null,
+      ok: "Renovación cancelada. El acceso sigue hasta el final del período.",
+    });
     subscription.reload();
     status.reload();
   }

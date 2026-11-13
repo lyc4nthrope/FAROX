@@ -19,13 +19,13 @@
 
 ## Tasks
 
-| ID | Spec | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S1-S9 | inline | hecho | este documento |
-| T2 | S2,S3,S7 | inline | hecho | `supabase/migrations/20261112160559_agent_actions.sql` |
-| T3 | S3,S4 | inline | hecho | RPCs prepare/execute/cancel en la migración |
-| T4 | S5,S6 | inline | hecho | wrappers `_for_user` + `internal_set_actor` |
-| T5 | S4,S9 | inline | hecho | `src/test/agent-actions.test.ts` 9/9 |
+| ID  | Spec     | Ruta   | Estado | Evidencia                                              |
+| --- | -------- | ------ | ------ | ------------------------------------------------------ |
+| T1  | S1-S9    | inline | hecho  | este documento                                         |
+| T2  | S2,S3,S7 | inline | hecho  | `supabase/migrations/20261112160559_agent_actions.sql` |
+| T3  | S3,S4    | inline | hecho  | RPCs prepare/execute/cancel en la migración            |
+| T4  | S5,S6    | inline | hecho  | wrappers `_for_user` + `internal_set_actor`            |
+| T5  | S4,S9    | inline | hecho  | `src/test/agent-actions.test.ts` 9/9                   |
 
 | T6 | S9 | inline | hecho | `_shared/dashboard.ts` + tool `consultar_dashboard`; 9/9 tests; `agent` desplegado |
 | T7 | S1,S4 | inline | hecho | tools `preparar_*` + `PendingActionCard`; 13/13 focused; `agent` desplegado |

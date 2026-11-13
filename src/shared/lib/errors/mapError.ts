@@ -50,9 +50,15 @@ const LENGTH_RULES: ReadonlyArray<readonly [string, string]> = [
   ["stores_city_maxlen", "La ciudad es demasiado larga (máximo 80 caracteres)."],
   ["stores_phone_maxlen", "El teléfono es demasiado largo (máximo 32 caracteres)."],
   ["stores_website_url_maxlen", "El sitio web es demasiado largo (máximo 500 caracteres)."],
-  ["distributors_name_maxlen", "El nombre del distribuidor es demasiado largo (máximo 160 caracteres)."],
+  [
+    "distributors_name_maxlen",
+    "El nombre del distribuidor es demasiado largo (máximo 160 caracteres).",
+  ],
   ["distributors_nit_maxlen", "El NIT es demasiado largo (máximo 32 caracteres)."],
-  ["distributors_contact_name_maxlen", "El nombre de contacto es demasiado largo (máximo 120 caracteres)."],
+  [
+    "distributors_contact_name_maxlen",
+    "El nombre de contacto es demasiado largo (máximo 120 caracteres).",
+  ],
   ["distributors_phone_maxlen", "El teléfono es demasiado largo (máximo 32 caracteres)."],
   ["distributors_email_maxlen", "El email es demasiado largo (máximo 255 caracteres)."],
   ["orders_notes_maxlen", "Las notas son demasiado largas (máximo 2000 caracteres)."],
@@ -72,27 +78,51 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   // Asistente y chat (0040/0041). Van primero: "asistente todavía no está
   // habilitado" debe ganarle al "todavía no está habilitado" de Mercado Pago.
   ["content supera 800 caracteres", "El mensaje supera los 800 caracteres."],
-  ["límite de 120 mensajes por hora", "Alcanzaste el límite de mensajes por hora. Probá más tarde."],
-  ["límite de 30 conversaciones por hora", "Alcanzaste el límite de conversaciones nuevas por hora. Probá más tarde."],
+  [
+    "límite de 120 mensajes por hora",
+    "Alcanzaste el límite de mensajes por hora. Probá más tarde.",
+  ],
+  [
+    "límite de 30 conversaciones por hora",
+    "Alcanzaste el límite de conversaciones nuevas por hora. Probá más tarde.",
+  ],
   ["límite de consultas por hora", "Llegaste al límite de consultas por hora. Probá más tarde."],
   ["asistente todavía no está habilitado", "El asistente todavía no está habilitado."],
   ["asistente está en mantenimiento", "El asistente está en mantenimiento. Probá más tarde."],
   ["no pude responder ahora", "El asistente no pudo responder ahora. Probá de nuevo en un rato."],
   // Teléfono verificado (0042).
-  ["ese teléfono ya está verificado en otra cuenta", "Ese número ya está verificado en otra cuenta."],
-  ["límite de 3 códigos por hora", "Pediste demasiados códigos. Esperá una hora e intentá de nuevo."],
-  ["phone: número inválido", "Ese número no parece válido. Usá el formato 300 222 3333 o el prefijo internacional."],
+  [
+    "ese teléfono ya está verificado en otra cuenta",
+    "Ese número ya está verificado en otra cuenta.",
+  ],
+  [
+    "límite de 3 códigos por hora",
+    "Pediste demasiados códigos. Esperá una hora e intentá de nuevo.",
+  ],
+  [
+    "phone: número inválido",
+    "Ese número no parece válido. Usá el formato 300 222 3333 o el prefijo internacional.",
+  ],
   ["phone: número requerido", "Escribí un número de teléfono."],
-  ["ya existe un distribuidor con ese nit", "Ya hay un distribuidor registrado con ese NIT. Si es tu empresa, contactá al administrador."],
+  [
+    "ya existe un distribuidor con ese nit",
+    "Ya hay un distribuidor registrado con ese NIT. Si es tu empresa, contactá al administrador.",
+  ],
   ["ya tenés un distribuidor asociado", "Tu cuenta ya tiene un distribuidor asociado."],
-  ["ya registraste un distribuidor", "Ya registraste un distribuidor; pedile al administrador cualquier cambio."],
+  [
+    "ya registraste un distribuidor",
+    "Ya registraste un distribuidor; pedile al administrador cualquier cambio.",
+  ],
   ["nit requerido", "El NIT es obligatorio."],
   ["ubicación requerida", "Elegí la ubicación de la tienda en el mapa."],
   ["usuario inactivo", "Tu cuenta está desactivada."],
   ["último administrador", "No se puede quitar al último administrador activo."],
   ["requiere premium", "Esta acción requiere una cuenta Premium."],
   ["stock insuficiente", "No hay stock suficiente para esa salida."],
-  ["sin precio activo", "Ese producto no tiene precio en la tienda. Un administrador debe asignarle precio primero."],
+  [
+    "sin precio activo",
+    "Ese producto no tiene precio en la tienda. Un administrador debe asignarle precio primero.",
+  ],
   ["fuera del alcance", "Esa tienda no está en tu alcance."],
   ["sin alcance", "No tenés acceso a ese registro."],
   ["producto repetido", "Hay un producto repetido en la lista."],
@@ -102,7 +132,7 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["excede la cantidad pedida", "La cantidad recibida no puede superar la pedida."],
   ["ya confirmado", "Este pedido ya fue confirmado."],
   ["no re-entregable", "El pedido no se puede entregar en su estado actual."],
-  ["delivered solo se registra", "La entrega se registra con \"Confirmar entrega\"."],
+  ["delivered solo se registra", 'La entrega se registra con "Confirmar entrega".'],
   ["cancelar exige reason", "Para cancelar hay que escribir un motivo."],
   ["inactivo o inexistente", "Hay un registro inactivo o inexistente en el formulario."],
   ["no pertenece al pedido", "Ese producto no pertenece al pedido."],
@@ -117,35 +147,65 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["ya tiene un crédito vigente", "Ese pedido ya tiene un crédito."],
   ["el fiado solo se registra", "Solo se puede fiar un pedido entregado."],
   ["price debe ser > 0", "El precio debe ser mayor que 0."],
-  ["código de tienda inválido", "El código no corresponde a ninguna tienda activa. Pedile a la tienda su QR actual."],
-  ["solo un distribuidor activo puede vincularse", "Solo una cuenta de distribuidor puede vincularse a una tienda."],
-  ["solo el dueño de la tienda o un admin", "Solo el dueño de la tienda o un administrador puede hacer esto."],
+  [
+    "código de tienda inválido",
+    "El código no corresponde a ninguna tienda activa. Pedile a la tienda su QR actual.",
+  ],
+  [
+    "solo un distribuidor activo puede vincularse",
+    "Solo una cuenta de distribuidor puede vincularse a una tienda.",
+  ],
+  [
+    "solo el dueño de la tienda o un admin",
+    "Solo el dueño de la tienda o un administrador puede hacer esto.",
+  ],
   // Solicitudes tienda ↔ distribuidor (0021): el vínculo y la intersección de
   // catálogos se validan también en create_order.
   ["tienda y distribuidor son obligatorios", "Elegí tienda y distribuidor."],
   ["no está vinculado a la tienda", "Ese distribuidor no está vinculado a la tienda."],
-  ["no está en el catálogo del distribuidor", "Ese producto no está disponible en el catálogo del distribuidor."],
+  [
+    "no está en el catálogo del distribuidor",
+    "Ese producto no está disponible en el catálogo del distribuidor.",
+  ],
   ["no está en el catálogo de la tienda", "Ese producto no está disponible en la tienda."],
   ["no está en tu catálogo", "Ese producto no está en tu catálogo."],
-  ["período pago vigente", "El usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período."],
+  [
+    "período pago vigente",
+    "El usuario tiene un período pago vigente; cancelá la suscripción y dejá vencer el período.",
+  ],
   ["ningún item válido", "Agregá al menos un producto."],
   // Gestión de tiendas (0034): no se puede desactivar con pedidos abiertos.
   ["pedidos abiertos", "Entregá o cancelá los pedidos abiertos antes de desactivar la tienda."],
   // Mercado Pago (F4): mensajes estables de las Edge Functions.
   ["no se pudo iniciar el pago", "No se pudo iniciar el pago. Intentá de nuevo."],
-  ["ya tenés una suscripción activa", "Ya tenés una suscripción activa. Gestionála desde tu perfil."],
+  [
+    "ya tenés una suscripción activa",
+    "Ya tenés una suscripción activa. Gestionála desde tu perfil.",
+  ],
   ["ya tenés premium activo", "Ya tenés Premium activo. No necesitás pagar de nuevo."],
   ["ya autorizaste el pago", "Ya autorizaste el pago. Estamos confirmando la activación."],
   ["tu suscripción está pausada", "Tu suscripción está pausada. Gestionála desde tu perfil."],
-  ["no se pudo verificar el estado del pago", "No se pudo verificar el estado del pago. Intentá de nuevo."],
-  ["estamos preparando tu pago", "Estamos preparando tu pago. Esperá unos segundos e intentá de nuevo."],
+  [
+    "no se pudo verificar el estado del pago",
+    "No se pudo verificar el estado del pago. Intentá de nuevo.",
+  ],
+  [
+    "estamos preparando tu pago",
+    "Estamos preparando tu pago. Esperá unos segundos e intentá de nuevo.",
+  ],
   ["solo un administrador activo", "Solo un administrador activo puede hacer esto."],
   ["solo se puede reembolsar un pago aprobado", "Solo se puede reembolsar un pago aprobado."],
   ["mercado pago no pudo reembolsar", "Mercado Pago no pudo reembolsar el pago. Intentá de nuevo."],
   ["no se pudo conciliar", "No se pudo conciliar con Mercado Pago. Intentá de nuevo."],
   ["todavía no está habilitado", "El pago con Mercado Pago todavía no está habilitado."],
-  ["el pago está en pruebas", "El pago está en pruebas. Pedile al administrador que active Premium manualmente."],
-  ["mercado pago no pudo cancelar", "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo."],
+  [
+    "el pago está en pruebas",
+    "El pago está en pruebas. Pedile al administrador que active Premium manualmente.",
+  ],
+  [
+    "mercado pago no pudo cancelar",
+    "Mercado Pago no pudo cancelar la suscripción. Intentá de nuevo.",
+  ],
   ["no tenés una suscripción para cancelar", "No tenés una suscripción para cancelar."],
 ];
 

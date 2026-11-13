@@ -117,10 +117,7 @@ describe("InventoryPage · pestaña Productos (0024)", () => {
     renderPage();
 
     expect(await screen.findByText("Panel de productos de la tienda")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Productos" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Productos" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("button", { name: "Asignar producto" })).not.toBeInTheDocument();
   });
 });

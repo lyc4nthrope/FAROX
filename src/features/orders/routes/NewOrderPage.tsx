@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatCOP, formatQty } from "../../../shared/lib/format";import { mapError } from "../../../shared/lib/errors/mapError";
+import { formatCOP, formatQty } from "../../../shared/lib/format";
+import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   Box,
   Field,
@@ -153,9 +154,7 @@ export function NewOrderPage() {
         normalizeText(product.brand ?? "").includes(term);
       const matchesQuantity =
         min === null ||
-        (!Number.isNaN(min) &&
-          product.quantity !== null &&
-          product.quantity >= min);
+        (!Number.isNaN(min) && product.quantity !== null && product.quantity >= min);
       return matchesText && matchesQuantity;
     });
   }, [products.data, search, minQuantity]);
@@ -174,9 +173,7 @@ export function NewOrderPage() {
   }
 
   function updateQuantity(index: number, quantity: string): void {
-    setLines((current) =>
-      current.map((line, i) => (i === index ? { ...line, quantity } : line)),
-    );
+    setLines((current) => current.map((line, i) => (i === index ? { ...line, quantity } : line)));
   }
 
   function removeLine(index: number): void {
@@ -195,9 +192,7 @@ export function NewOrderPage() {
   }
 
   function addAllShortages(): void {
-    const ids = storeShortages
-      .map((row) => row.product_id)
-      .filter((id) => requestableIds.has(id));
+    const ids = storeShortages.map((row) => row.product_id).filter((id) => requestableIds.has(id));
     setLines((current) => {
       const existing = new Set(current.map((line) => line.productId));
       const additions = ids
@@ -245,26 +240,21 @@ export function NewOrderPage() {
     if (product === undefined) return "Producto del catálogo";
     const parts: string[] = [];
     if (product.brand !== null && product.brand !== "") parts.push(product.brand);
-    parts.push(
-      product.quantity === null
-        ? "Stock: —"
-        : `Stock: ${formatQty(product.quantity)}`,
-    );
+    parts.push(product.quantity === null ? "Stock: —" : `Stock: ${formatQty(product.quantity)}`);
     if (product.price === null) parts.push("sin precio");
     else if (product.price !== undefined) parts.push(formatCOP(product.price));
     return parts.join(" · ");
   }
 
-  const emptySearchMessage =
-    products.loading
-      ? "Cargando productos…"
-      : storeId === ""
-        ? "Elegí una tienda para buscar productos."
-        : distributors.data !== null && !admin && distributorId === ""
-          ? "Elegí un distribuidor para buscar productos."
-          : minQuantity.trim() !== ""
-            ? "Ningún producto coincide con la búsqueda y el stock mínimo."
-            : "Ningún producto coincide con la búsqueda.";
+  const emptySearchMessage = products.loading
+    ? "Cargando productos…"
+    : storeId === ""
+      ? "Elegí una tienda para buscar productos."
+      : distributors.data !== null && !admin && distributorId === ""
+        ? "Elegí un distribuidor para buscar productos."
+        : minQuantity.trim() !== ""
+          ? "Ningún producto coincide con la búsqueda y el stock mínimo."
+          : "Ningún producto coincide con la búsqueda.";
 
   return (
     <section>

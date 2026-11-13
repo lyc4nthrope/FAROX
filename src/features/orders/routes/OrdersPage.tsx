@@ -60,11 +60,7 @@ export function OrdersPage() {
   }
 
   function deliver(orderId: number): void {
-    if (
-      !window.confirm(
-        `¿Entregar todo el pedido #${orderId} y sumar las cantidades al stock?`,
-      )
-    ) {
+    if (!window.confirm(`¿Entregar todo el pedido #${orderId} y sumar las cantidades al stock?`)) {
       return;
     }
     void act(orderId, () => confirmFullDelivery(orderId), "Pedido entregado.");
@@ -79,11 +75,7 @@ export function OrdersPage() {
             type="button"
             disabled={busyId === o.id}
             onClick={() =>
-              void act(
-                o.id,
-                () => updateOrderStatus(o.id, "in_route", null),
-                "Pedido en ruta.",
-              )
+              void act(o.id, () => updateOrderStatus(o.id, "in_route", null), "Pedido en ruta.")
             }
           >
             En ruta
@@ -124,9 +116,7 @@ export function OrdersPage() {
 
   return (
     <section>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
-        Operación
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Operación</p>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -191,95 +181,95 @@ export function OrdersPage() {
 
       {view === "orders" ? (
         <Box title="Listado">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-48">
-            <Field label="Estado">
-              <select
-                className={inputClass}
-                value={status}
-                onChange={(e) => setStatus(e.target.value as OrderStatus | "all")}
-              >
-                <option value="all">Todos</option>
-                {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          {orders.data !== null && (
-            <span className="mb-3 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
-              {orders.data.length} {orders.data.length === 1 ? "pedido" : "pedidos"}
-            </span>
-          )}
-        </div>
-        <Status loading={orders.loading} error={orders.error} />
-        <Status error={msg.error} ok={msg.ok} />
-        {orders.data?.length === 0 && !orders.loading && (
-          <>
-            <EmptyState
-              title="No hay pedidos"
-              hint="Cuando se cree un pedido o cambie el filtro, la lista se actualiza acá."
-            />
-            {distributor && (
-              <p className="mt-3 text-sm text-gray-600">
-                ¿Todavía no vinculaste una tienda?{" "}
-                <Link className="font-medium underline underline-offset-4" to="/vincular">
-                  Vincular tienda
-                </Link>
-              </p>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-48">
+              <Field label="Estado">
+                <select
+                  className={inputClass}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as OrderStatus | "all")}
+                >
+                  <option value="all">Todos</option>
+                  {Object.entries(ORDER_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            {orders.data !== null && (
+              <span className="mb-3 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">
+                {orders.data.length} {orders.data.length === 1 ? "pedido" : "pedidos"}
+              </span>
             )}
-          </>
-        )}
-        {orders.data !== null && orders.data.length > 0 && (
-          <ResponsiveTable
-            caption="Pedidos"
-            columns={[
-              {
-                key: "store",
-                header: "Tienda",
-                primary: true,
-                render: (o) => <span className="font-medium text-gray-900">{o.store_name}</span>,
-              },
-              {
-                key: "id",
-                header: "#",
-                render: (o) => (
-                  <Link
-                    className="font-medium text-gray-900 underline-offset-4 hover:underline"
-                    to={`/pedidos/${o.id}`}
-                  >
-                    #{o.id}
+          </div>
+          <Status loading={orders.loading} error={orders.error} />
+          <Status error={msg.error} ok={msg.ok} />
+          {orders.data?.length === 0 && !orders.loading && (
+            <>
+              <EmptyState
+                title="No hay pedidos"
+                hint="Cuando se cree un pedido o cambie el filtro, la lista se actualiza acá."
+              />
+              {distributor && (
+                <p className="mt-3 text-sm text-gray-600">
+                  ¿Todavía no vinculaste una tienda?{" "}
+                  <Link className="font-medium underline underline-offset-4" to="/vincular">
+                    Vincular tienda
                   </Link>
-                ),
-              },
-              {
-                key: "status",
-                header: "Estado",
-                render: (o) => (
-                  <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
-                ),
-              },
-              {
-                key: "distributor",
-                header: "Distribuidor",
-                render: (o) => o.distributor_name || "—",
-              },
-              {
-                key: "expected",
-                header: "Fecha prometida",
-                className: "whitespace-nowrap",
-                render: (o) =>
-                  o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—",
-              },
-            ]}
-            rows={orders.data}
-            rowKey={(o) => String(o.id)}
-            actions={distributor ? renderActions : undefined}
-          />
-        )}
-      </Box>
+                </p>
+              )}
+            </>
+          )}
+          {orders.data !== null && orders.data.length > 0 && (
+            <ResponsiveTable
+              caption="Pedidos"
+              columns={[
+                {
+                  key: "store",
+                  header: "Tienda",
+                  primary: true,
+                  render: (o) => <span className="font-medium text-gray-900">{o.store_name}</span>,
+                },
+                {
+                  key: "id",
+                  header: "#",
+                  render: (o) => (
+                    <Link
+                      className="font-medium text-gray-900 underline-offset-4 hover:underline"
+                      to={`/pedidos/${o.id}`}
+                    >
+                      #{o.id}
+                    </Link>
+                  ),
+                },
+                {
+                  key: "status",
+                  header: "Estado",
+                  render: (o) => (
+                    <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                  ),
+                },
+                {
+                  key: "distributor",
+                  header: "Distribuidor",
+                  render: (o) => o.distributor_name || "—",
+                },
+                {
+                  key: "expected",
+                  header: "Fecha prometida",
+                  className: "whitespace-nowrap",
+                  render: (o) =>
+                    o.expected_at ? new Date(o.expected_at).toLocaleDateString("es-CO") : "—",
+                },
+              ]}
+              rows={orders.data}
+              rowKey={(o) => String(o.id)}
+              actions={distributor ? renderActions : undefined}
+            />
+          )}
+        </Box>
       ) : (
         <div className="mt-4">
           <ShortagePanel />

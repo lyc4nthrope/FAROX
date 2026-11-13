@@ -118,11 +118,7 @@ export function OrderDetailPage() {
           raw: quoteValue(item.product_id).trim(),
         }))
         .filter((entry) => entry.raw !== "");
-      if (
-        priced.some(
-          (entry) => !Number.isFinite(Number(entry.raw)) || Number(entry.raw) <= 0,
-        )
-      ) {
+      if (priced.some((entry) => !Number.isFinite(Number(entry.raw)) || Number(entry.raw) <= 0)) {
         setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
         return;
       }
@@ -193,7 +189,7 @@ export function OrderDetailPage() {
     // 0028: si no configuró precio, el precio registrado de la tienda sigue
     // siendo una sugerencia editable para Premium.
     const registered = premium
-      ? (items.data ?? []).find((item) => item.product_id === productId)?.unit_price ?? null
+      ? ((items.data ?? []).find((item) => item.product_id === productId)?.unit_price ?? null)
       : null;
     return registered === null ? "" : String(registered);
   };
@@ -210,9 +206,7 @@ export function OrderDetailPage() {
       product_id: entry.productId,
       distributor_price: Number(entry.value),
     }));
-    if (
-      payload.some((p) => !Number.isFinite(p.distributor_price) || p.distributor_price <= 0)
-    ) {
+    if (payload.some((p) => !Number.isFinite(p.distributor_price) || p.distributor_price <= 0)) {
       setMsg({ error: "Cada precio cotizado debe ser mayor a 0.", ok: null });
       return;
     }
@@ -248,9 +242,7 @@ export function OrderDetailPage() {
       header: "Estado línea",
       render: (item) => (
         <Badge
-          tone={
-            item.status === "received" ? "green" : item.status === "partial" ? "amber" : "gray"
-          }
+          tone={item.status === "received" ? "green" : item.status === "partial" ? "amber" : "gray"}
         >
           {LINE_LABELS[item.status] ?? item.status}
         </Badge>
@@ -458,8 +450,8 @@ export function OrderDetailPage() {
         <Box title="Cotización del distribuidor">
           <p className="text-sm text-gray-600">
             Definí cuánto le cobrás a la tienda por cada producto. Podés ajustarlo mientras el
-            pedido siga abierto (pendiente o en ruta); el precio queda congelado en el movimiento
-            de la entrega.
+            pedido siga abierto (pendiente o en ruta); el precio queda congelado en el movimiento de
+            la entrega.
           </p>
           <div className="mt-3 space-y-2">
             {items.data?.map((item) => (

@@ -256,7 +256,9 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
     await user.click(screen.getByRole("button", { name: "Poner pin" }));
 
-    expect(await screen.findByDisplayValue("Carrera 7 #1-1, Bogotá", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(
+      await screen.findByDisplayValue("Carrera 7 #1-1, Bogotá", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
     expect(nominatim.reverseGeocode).toHaveBeenCalledWith(4.6097, -74.0631);
     await user.click(screen.getByRole("button", { name: "Crear tienda" }));
 
@@ -295,10 +297,10 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     await user.selectOptions(screen.getByLabelText("Tipo de tienda"), "1");
     await user.click(screen.getByRole("button", { name: "Crear tienda" }));
 
-    expect(await screen.findByText("Ingresá una latitud válida entre -90 y 90")).toBeInTheDocument();
     expect(
-      screen.getByText("Ingresá una longitud válida entre -180 y 180"),
+      await screen.findByText("Ingresá una latitud válida entre -90 y 90"),
     ).toBeInTheDocument();
+    expect(screen.getByText("Ingresá una longitud válida entre -180 y 180")).toBeInTheDocument();
     expect(storesApi.createStore).not.toHaveBeenCalled();
     expect(storesApi.updateStore).not.toHaveBeenCalled();
   });
@@ -327,9 +329,7 @@ describe("StoreFormPage (STORE-1/STORE-3 · §S2 fila Store form)", () => {
     await completarAlta(user);
     await user.click(await screen.findByRole("button", { name: "Crear tienda" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "El tipo de tienda no existe.",
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("El tipo de tienda no existe.");
     expect(screen.queryByText(/store_type inexistente/)).not.toBeInTheDocument();
   });
 

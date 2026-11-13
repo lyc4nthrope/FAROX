@@ -7,15 +7,7 @@ import { contactHref } from "../contact";
  * vinculada (WhatsApp, teléfono o email). Si no configuró medio/identificador,
  * muestra una alerta visible para que lo complete en su perfil.
  */
-export function ContactButton({
-  kind,
-  id,
-  name,
-}: {
-  kind: ContactKind;
-  id: number;
-  name: string;
-}) {
+export function ContactButton({ kind, id, name }: { kind: ContactKind; id: number; name: string }) {
   const contact = useLoad(() => fetchCounterpartContact(kind, id), [kind, id]);
 
   if (contact.loading) {

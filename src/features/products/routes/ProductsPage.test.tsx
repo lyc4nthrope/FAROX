@@ -430,7 +430,9 @@ describe("ProductsPage (0019 · catálogo por entidad)", () => {
     const section = await cajaCatalogo();
     await user.click(await within(section).findByRole("button", { name: "Marcar faltante" }));
 
-    await waitFor(() => expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, true));
+    await waitFor(() =>
+      expect(productsApi.setStoreProductShortage).toHaveBeenCalledWith(7, 1, true),
+    );
     expect(await screen.findByText('"Café molido" marcado como faltante.')).toBeInTheDocument();
   });
 

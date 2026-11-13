@@ -233,11 +233,7 @@ export function DistributorMovementsPage() {
       }}
       action={
         <button className={buttonClass} type="submit" disabled={saving}>
-          {saving
-            ? "Registrando…"
-            : mode === "sale"
-              ? "Registrar venta"
-              : "Registrar compra"}
+          {saving ? "Registrando…" : mode === "sale" ? "Registrar venta" : "Registrar compra"}
         </button>
       }
     />

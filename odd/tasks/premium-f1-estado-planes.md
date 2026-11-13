@@ -22,13 +22,13 @@
 
 ## Tasks
 
-| ID | Specs | Ruta | Estado | Evidencia |
-|---|---|---|---|---|
-| T1 | S2-S5, S8, S12 | inline | hecho | migración 0032: columnas, tablas, seed de planes, RLS |
-| T2 | S3-S4, S9-S10 | inline | hecho | `is_premium`, `set_user_premium`, `activate_premium`, `my_premium_status`, job de sincronización |
-| T3 | S5-S7 | inline | hecho | `quote_plan`, `update_plan_pricing`, tests de contrato/matemática en `premium/api.test.ts` |
-| T4 | S11 | inline | hecho | `PremiumStatusCard` en `/profile`; API premium; `refreshPrivileges` ya existía |
-| T5 | S1-S12 | inline | hecho | typecheck, lint, check-scope, 679 tests y build en verde; docs/APLICAR actualizados |
+| ID  | Specs          | Ruta   | Estado | Evidencia                                                                                        |
+| --- | -------------- | ------ | ------ | ------------------------------------------------------------------------------------------------ |
+| T1  | S2-S5, S8, S12 | inline | hecho  | migración 0032: columnas, tablas, seed de planes, RLS                                            |
+| T2  | S3-S4, S9-S10  | inline | hecho  | `is_premium`, `set_user_premium`, `activate_premium`, `my_premium_status`, job de sincronización |
+| T3  | S5-S7          | inline | hecho  | `quote_plan`, `update_plan_pricing`, tests de contrato/matemática en `premium/api.test.ts`       |
+| T4  | S11            | inline | hecho  | `PremiumStatusCard` en `/profile`; API premium; `refreshPrivileges` ya existía                   |
+| T5  | S1-S12         | inline | hecho  | typecheck, lint, check-scope, 679 tests y build en verde; docs/APLICAR actualizados              |
 
 ## Log
 

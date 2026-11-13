@@ -35,11 +35,7 @@ export interface OwnedStore {
 }
 
 export type PremiumSubscriptionStatus =
-  | "pending"
-  | "authorized"
-  | "paused"
-  | "cancelled"
-  | "expired";
+  "pending" | "authorized" | "paused" | "cancelled" | "expired";
 
 /** 0035/F4: suscripción propia (sin exponer ids del proveedor). */
 export interface PremiumSubscription {

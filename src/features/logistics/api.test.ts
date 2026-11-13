@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
-import { googleMapsUrl, markStop, saveRoute, updateRouteStatus, fetchStoresWithRequests } from "./api";
+import {
+  googleMapsUrl,
+  markStop,
+  saveRoute,
+  updateRouteStatus,
+  fetchStoresWithRequests,
+} from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
   supabase: { rpc: vi.fn(), from: vi.fn() },

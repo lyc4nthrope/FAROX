@@ -12,8 +12,7 @@ export function niceScale(maxValue: number, tickCount = 4): ChartScale {
   const rough = safeMax / Math.max(1, tickCount);
   const magnitude = 10 ** Math.floor(Math.log10(rough));
   const normalized = rough / magnitude;
-  const step =
-    (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+  const step = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
   const max = Math.ceil(safeMax / step) * step;
   const ticks: number[] = [];
   for (let value = 0; value <= max + step / 1000; value += step) {

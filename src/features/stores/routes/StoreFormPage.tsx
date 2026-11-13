@@ -73,9 +73,7 @@ export function StoreFormPage() {
   // Dirección SOLO si estaba vacía — jamás pisa lo que el usuario escribió.
   // Best-effort: si Nominatim falla, p_address en create_store queda NULL.
   const { schedule: scheduleAddressResolution } = useReverseGeocode((address) => {
-    setValues((previous) =>
-      previous.address.trim() === "" ? { ...previous, address } : previous,
-    );
+    setValues((previous) => (previous.address.trim() === "" ? { ...previous, address } : previous));
   });
 
   // ÚNICA vía de mutación de coordenadas desde el mapa (supersede del D3 de
@@ -222,7 +220,9 @@ export function StoreFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-semibold tracking-tight">{isEdit ? "Tienda" : "Nueva tienda"}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {isEdit ? "Tienda" : "Nueva tienda"}
+      </h1>
       {loading ? (
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (

@@ -134,8 +134,9 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     ).toBeInTheDocument();
 
     // Sin vínculos el bloque se rotula como invitación y explica el flujo.
-    const box = (await screen.findByRole("heading", { name: "Vinculá algún distribuidor" }))
-      .closest("section") as HTMLElement;
+    const box = (
+      await screen.findByRole("heading", { name: "Vinculá algún distribuidor" })
+    ).closest("section") as HTMLElement;
     expect(within(box).getByText("Así funciona el vínculo, en tres pasos:")).toBeInTheDocument();
     expect(within(box).getAllByRole("listitem")).toHaveLength(3);
 
@@ -215,9 +216,7 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
     renderPagina("admin");
 
     const link = await screen.findByRole("link", { name: "Distribuidora Andes" });
-    expect(
-      screen.getByRole("columnheader", { name: "Usuarios asignados" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Usuarios asignados" })).toBeInTheDocument();
     const fila = within(link.closest("tr") as HTMLElement);
     expect(fila.getByText("3")).toBeInTheDocument();
     expect(distributorsApi.fetchDistributorUserCounts).toHaveBeenCalledTimes(1);
@@ -227,10 +226,10 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
   it("T-E2: operador ⇒ vista de vínculos, SIN columna y CERO query de usuarios", async () => {
     renderPagina("operador");
 
-    expect(await screen.findByText(/Todavía no vinculaste ningún distribuidor/)).toBeInTheDocument();
     expect(
-      screen.queryByRole("columnheader", { name: "Usuarios asignados" }),
-    ).toBeNull();
+      await screen.findByText(/Todavía no vinculaste ningún distribuidor/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Usuarios asignados" })).toBeNull();
     expect(distributorsApi.fetchDistributorUserCounts).not.toHaveBeenCalled();
   });
 
@@ -243,9 +242,7 @@ describe("DistributorsPage (DIST-1 · §S2 fila /distributors)", () => {
 
     const link = await screen.findByRole("link", { name: "Distribuidora Andes" });
     const fila = within(link.closest("tr") as HTMLElement);
-    expect(
-      screen.getByRole("columnheader", { name: "Usuarios asignados" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Usuarios asignados" })).toBeInTheDocument();
     expect(fila.getByText("—")).toBeInTheDocument();
     expect(fila.queryByText(/permission denied/)).toBeNull();
     // La lista NO depende del conteo: la fila sigue renderizada.

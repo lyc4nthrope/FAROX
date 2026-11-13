@@ -405,9 +405,9 @@ export async function runAgent(input: {
   const tools = input.writesEnabled ? [...TOOLS, ...writeTools] : TOOLS;
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
-    ...input.history.slice(-MAX_HISTORY).map(
-      (item): ChatMessage => ({ role: item.role, content: item.content }),
-    ),
+    ...input.history
+      .slice(-MAX_HISTORY)
+      .map((item): ChatMessage => ({ role: item.role, content: item.content })),
     { role: "user", content: input.message },
   ];
   const toolLog: AgentToolLog[] = [];
@@ -462,7 +462,8 @@ export async function runAgent(input: {
 
     if (calls.length === 0) {
       return {
-        reply: text === "" ? "No pude generar una respuesta. Probá reformulando la pregunta." : text,
+        reply:
+          text === "" ? "No pude generar una respuesta. Probá reformulando la pregunta." : text,
         toolLog,
         model: activeModel,
       };
@@ -523,9 +524,7 @@ function parseArgs(raw: string | undefined): Record<string, unknown> {
   if (raw === undefined || raw === "") return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
+    return parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -744,8 +743,7 @@ async function runTool(
         const line = raw as Record<string, unknown>;
         const setPurchase =
           line.set_purchase === true || line.set_purchase === "true" || line.set_purchase === 1;
-        const setSale =
-          line.set_sale === true || line.set_sale === "true" || line.set_sale === 1;
+        const setSale = line.set_sale === true || line.set_sale === "true" || line.set_sale === 1;
         return {
           product_id: line.product_id,
           set_purchase: setPurchase,

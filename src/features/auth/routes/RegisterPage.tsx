@@ -154,9 +154,9 @@ export function RegisterPage() {
         <BackToHomeLink />
         <h1 className="mt-6 text-2xl font-semibold tracking-tight">Revisá tu email</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Revisá tu email para confirmar tu cuenta. Te enviamos el link de confirmación
-          a <span className="font-medium">{pendingEmail}</span>. Sin confirmar tu email no
-          vas a poder iniciar sesión.
+          Revisá tu email para confirmar tu cuenta. Te enviamos el link de confirmación a{" "}
+          <span className="font-medium">{pendingEmail}</span>. Sin confirmar tu email no vas a poder
+          iniciar sesión.
         </p>
         {resend.message !== null && resend.status === "sent" && (
           <p

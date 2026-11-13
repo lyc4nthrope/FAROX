@@ -142,16 +142,12 @@ export function MovementList({
                     ? movement.motive_name
                     : `Reverso de #${movement.reverso_of_id}`}
                 </span>
-                {showPrice &&
-                  movement.unit_price !== null &&
-                  movement.unit_price !== undefined && (
+                {showPrice && movement.unit_price !== null && movement.unit_price !== undefined && (
                   <>
-                      <span aria-hidden="true">·</span>
-                      <span className="tabular-nums">
-                        Precio: {formatCOP(movement.unit_price)}
-                      </span>
-                    </>
-                  )}
+                    <span aria-hidden="true">·</span>
+                    <span className="tabular-nums">Precio: {formatCOP(movement.unit_price)}</span>
+                  </>
+                )}
                 {movement.discount_pct !== null && movement.discount_pct !== undefined && (
                   <Badge tone="amber">Desc. {movement.discount_pct}%</Badge>
                 )}

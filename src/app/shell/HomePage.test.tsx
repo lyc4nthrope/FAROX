@@ -41,9 +41,7 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
   it("distribuidor: no muestra la vista de ejemplo en el inicio", async () => {
     renderHome("distribuidor");
 
-    expect(
-      await screen.findByRole("heading", { name: "Bienvenido a FARØX" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
     expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
     expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
     expect(screen.queryByText("Tienda Central")).not.toBeInTheDocument();
@@ -54,9 +52,7 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
   it("operador: conserva el inicio actual sin la vista del distribuidor", async () => {
     renderHome("operador");
 
-    expect(
-      await screen.findByRole("heading", { name: "Bienvenido a FARØX" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
     expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
     expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
   });
@@ -65,8 +61,6 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
     renderHome("operador", true);
 
     expect(await screen.findByText("Premium")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Bienvenido a FARØX" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
   });
 });

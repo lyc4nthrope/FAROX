@@ -134,7 +134,9 @@ describe("StoreFormPage · escape hatch numérico (chunk de Leaflet caído)", ()
     await user.type(screen.getByLabelText("Longitud (-180 a 180)"), "-74.0631");
     await user.click(screen.getByRole("button", { name: "Crear tienda" }));
 
-    expect(await screen.findByText("Ingresá una latitud válida entre -90 y 90")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Ingresá una latitud válida entre -90 y 90"),
+    ).toBeInTheDocument();
     expect(storesApi.createStore).not.toHaveBeenCalled();
   });
 });

@@ -14,10 +14,7 @@ function accessToken(): string {
   return token;
 }
 
-export async function mpRequest<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<MpResult<T>> {
+export async function mpRequest<T>(path: string, init: RequestInit = {}): Promise<MpResult<T>> {
   const headers = new Headers(init.headers);
   headers.set("Authorization", `Bearer ${accessToken()}`);
   if (init.body !== undefined) headers.set("Content-Type", "application/json");

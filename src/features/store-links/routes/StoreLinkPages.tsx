@@ -93,11 +93,7 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
                     desde {new Date(l.created_at).toLocaleDateString("es-CO")}
                   </span>
                 </span>
-                <ContactButton
-                  kind="distribuidor"
-                  id={l.distributor_id}
-                  name={l.name}
-                />
+                <ContactButton kind="distribuidor" id={l.distributor_id} name={l.name} />
                 <Link
                   className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
                   to={`/pedidos/nuevo?storeId=${storeId}&distributorId=${l.distributor_id}`}

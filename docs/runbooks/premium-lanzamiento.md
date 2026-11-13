@@ -62,13 +62,13 @@ avisos por la mañana.
 
 Panel `/pagos` → «Salud de pagos»:
 
-| Señal | Qué significa | Acción |
-|---|---|---|
-| Pagos pendientes > 1 h | Webhook perdido o MP demorado | Ejecutar «Conciliar»; revisar `payment_events` |
-| Suscripciones pendientes > 1 h | Checkout abandonado o preapproval atascado | Revisar `subscriptions`/MP; cancelar si corresponde |
-| Avisos fallidos | Resend rechazó o faltó config | Revisar `premium_notices.error`; corregir la causa y devolver el aviso a `pending` (SQL de abajo) |
-| Usuarios en gracia | Premium vencido, aún con acceso | Confirmar aviso de gracia y downgrade |
-| Eventos webhook 24 h | Volumen de notificaciones | Si cae a 0 con pagos, revisar webhook/secreto |
+| Señal                          | Qué significa                              | Acción                                                                                            |
+| ------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Pagos pendientes > 1 h         | Webhook perdido o MP demorado              | Ejecutar «Conciliar»; revisar `payment_events`                                                    |
+| Suscripciones pendientes > 1 h | Checkout abandonado o preapproval atascado | Revisar `subscriptions`/MP; cancelar si corresponde                                               |
+| Avisos fallidos                | Resend rechazó o faltó config              | Revisar `premium_notices.error`; corregir la causa y devolver el aviso a `pending` (SQL de abajo) |
+| Usuarios en gracia             | Premium vencido, aún con acceso            | Confirmar aviso de gracia y downgrade                                                             |
+| Eventos webhook 24 h           | Volumen de notificaciones                  | Si cae a 0 con pagos, revisar webhook/secreto                                                     |
 
 Consultas útiles (SQL editor, admin):
 

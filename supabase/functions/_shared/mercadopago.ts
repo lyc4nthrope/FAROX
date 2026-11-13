@@ -204,7 +204,9 @@ export function matchesAmountAndCurrency(
 ): boolean {
   const cents = amountCents(amount);
   if (cents === null) return false;
-  return cents === expectedCents && (currency ?? "").toUpperCase() === expectedCurrency.toUpperCase();
+  return (
+    cents === expectedCents && (currency ?? "").toUpperCase() === expectedCurrency.toUpperCase()
+  );
 }
 
 export function addMonths(dateIso: string, months: number): string {
@@ -238,11 +240,7 @@ export function extractTopic(searchParams: URLSearchParams, body: Record<string,
   return searchParams.get("type") ?? searchParams.get("topic") ?? "";
 }
 
-export function eventIdFor(
-  body: Record<string, unknown>,
-  topic: string,
-  dataId: string,
-): string {
+export function eventIdFor(body: Record<string, unknown>, topic: string, dataId: string): string {
   const id = body["id"];
   if (typeof id === "string" || typeof id === "number") return String(id);
   return `${topic}:${dataId}`;

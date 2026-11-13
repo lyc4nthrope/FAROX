@@ -80,9 +80,7 @@ describe("LandingPage (presentación pública)", () => {
     expect(screen.getByText("Administrador")).toBeInTheDocument();
     expect(screen.getByText("Operador de tienda")).toBeInTheDocument();
     expect(screen.getByText("Distribuidor")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Sin confirmarlo no vas a poder iniciar sesión/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Sin confirmarlo no vas a poder iniciar sesión/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Política de Privacidad" })).toHaveAttribute(
       "href",
       "/privacidad",
@@ -92,7 +90,9 @@ describe("LandingPage (presentación pública)", () => {
   it("muestra la sección Premium con el precio de quote_plan", async () => {
     renderLanding();
 
-    expect(await screen.findByRole("heading", { name: "Más tiendas y control para tu operación." })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Más tiendas y control para tu operación." }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Hasta 3 tiendas activas")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Crear cuenta y ver planes" })).toHaveAttribute(
       "href",
