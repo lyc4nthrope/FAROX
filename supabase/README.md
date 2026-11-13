@@ -49,6 +49,7 @@ El esquema creció bastante más allá del Sprint 1. Estas son las migraciones p
 
 - **Dos "0040":** `20261103000040_ranking_productos.sql` y `20261104000040_limites_texto.sql`. No colisionan porque el timestamp completo es distinto, pero el número corto se repite.
 - **0016 no existe:** el `append_chat_reply` planificado nunca se creó. El asistente escribe `assistant`/`tool` desde la Edge Function con `service_role`, después de validar el JWT.
+- **Convención de nombres:** 0019-0048 usan `YYYYMMDD0000NN` (el número corto va en los segundos); desde 0049 usan `YYYYMMDDHHMMSS` real, el default de `supabase migration new`. El orden siempre lo decide el prefijo completo.
 - **Baseline remoto:** el historial de `supabase_migrations.schema_migrations` se marcó hasta 0048 y luego se aplicaron 0049-0051; **0052 queda pendiente**. `supabase migration list` mostrará esa pendiente.
 - **Edge Functions:** `agent` (verify_jwt), `whatsapp-webhook` (verify_jwt=false, valida firma de Meta), `agent-health` (verify_jwt=false, `x-cron-secret`). Deploy: `supabase functions deploy agent`, `supabase functions deploy whatsapp-webhook --no-verify-jwt`.
 

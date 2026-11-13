@@ -267,11 +267,11 @@ Web responsive para **tiendas y distribuidores**: qué tiene cada tienda, qué s
 | D3-15 | **Asistente = Edge Functions** `agent` + `whatsapp-webhook`: JWT del usuario, proveedor compatible con OpenAI, tools de lectura y borradores; sin n8n | Reemplaza D3-7/D3-9/D3-13. Menos infraestructura, mismo aislamiento por RLS y un solo despliegue |
 | D3-16 | **Escrituras = borradores** en `agent_actions` + confirmación humana; WhatsApp exige `CONFIRMAR <code>`; `price_update` solo web | Un prompt injection no escribe solo. El código de WhatsApp evita confirmar por error desde otro chat |
 | D3-17 | **Identidad de WhatsApp = teléfono verificado** (`phone_verified_at`), no auto-declarado | Sin verificación, cualquiera que escriba al número opera como otra cuenta |
-| D3-18 | **Migraciones por timestamp** desde 0019; 0015-0017 son históricas y 0016 nunca se creó | Evita choques entre ramas; el esquema vigente es `supabase/migrations/` hasta 0051 |
+| D3-18 | **Migraciones por timestamp real desde 0049**; 0015-0017 son históricas y 0016 nunca se creó. 0019-0048 conservan el patrón sintético `YYYYMMDD0000NN` | Evita choques entre ramas; el esquema vigente es `supabase/migrations/` hasta 0052 |
 
 ### 3.3 Números de migración reservados (histórico)
 
-> Los números 0015-0017 se usaron (0016 nunca se creó). Desde 0019 se numera con timestamp. La lista vigente es `supabase/migrations/`.
+> Los números 0015-0017 se usaron (0016 nunca se creó). 0019-0048 usan el patrón sintético `YYYYMMDD0000NN`; desde 0049 el CLI genera `YYYYMMDDHHMMSS`. La lista vigente es `supabase/migrations/`.
 
 | Número | Contenido | Track |
 |---|---|---|

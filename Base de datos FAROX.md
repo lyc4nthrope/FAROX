@@ -1022,7 +1022,7 @@ END $$;
 
 ### 10.4 Convenciones que cambiaron
 
-- **Numeración:** desde 0019 se usa timestamp completo (`YYYYMMDDHHMMSS`). Los prefijos cortos 0015-0018 son históricos. `0016` nunca se creó.
+- **Numeración:** 0019-0048 usan el patrón sintético `YYYYMMDD0000NN`; desde 0049 el CLI genera `YYYYMMDDHHMMSS`. Los prefijos cortos 0015-0018 son históricos. `0016` nunca se creó.
 - **Dos "0040":** `ranking_productos` y `limites_texto` comparten número corto pero no timestamp.
 - **Grants:** deny-by-default; toda migración nueva trae su `GRANT EXECUTE` explícito.
 - **Migraciones aplicadas no se editan:** cambio de esquema = archivo nuevo.
