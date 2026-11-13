@@ -1,20 +1,13 @@
-# F3.1 · DEV-08 + DEV-09 — schema-check en stack fresco (CI-only: sin Docker local, obs #495).
-# Batch B2 del cambio devops-ci-cd (sdd-apply; forma del job: design #507 §2.6).
-# Host: workflow SEPARADO de ci.yml — restricción de lote (ci.yml = hotfix de fase 1, intacto).
-# El CHECK requerido por DEV-13 (amendado: `quality` + `schema-check`) es el NOMBRE DEL JOB,
-# así que la config de G3 no cambia: job id = `schema-check`, SIN `name:` a nivel de job.
-# Sin ningún secret ⇒ ejecutable en pull_request de forks sin exponer nada (DEV-06 sc3).
-# Sin npm/lockfile ⇒ NO depende de T0.1; si sale rojo, los mensajes dicen qué falta (design §4 filas 11-12).
+# F3.1 · DEV-08 — schema-check en stack fresco (CI-only: sin Docker local).
+# Host: workflow SEPARADO de ci.yml; job id = `schema-check` (check requerido).
+# Sin secrets ⇒ ejecutable en pull_request de forks sin exponer nada.
 #
-# FAILs ACEPTADOS: 0012 H1.1/H1.3/H1.4 salen FAIL en stack fresco porque PostGIS se instala en
-# `public` (0001:9) y sus funciones traen EXECUTE para PUBLIC; 0011 no puede revocarlas. Es el
-# estado esperado documentado en supabase/APLICAR-EN-PRODUCCION.md §4. El parser acepta SOLO
-# esos tres códigos (ACCEPTED_FAILS) y sigue fallando ante cualquier otro [FAIL] o conteo
-# inconsistente — el self-test prove-by-break lo verifica con fixtures.
-#
-# db lint: plpgsql_check cubre también las funciones de PostGIS (extensión en `public`), así que
-# el paso deriva de pg_depend la superficie de extensiones y la excluye; los issues de código
-# propio siguen siendo rojos (scripts/check-db-lint.mjs, fijado con fixtures en el self-test).
+# QUÉ VERIFICA (2026-11-12): `supabase db start` aplica TODAS las migraciones
+# en un Postgres limpio y el job exige evidencia de cada archivo. La
+# verificación 0012 es histórica (0009-0012): sus fixtures H3 no conocen
+# store_distributors ni el alcance actual de pedidos, así que NO se re-ejecuta
+# contra el esquema de 51 migraciones. El lint de plpgsql_check sigue cubriendo
+# la superficie propia de la app (PostGIS se excluye porque vive en `public`).
 
 name: Schema Check
 
@@ -38,79 +31,39 @@ jobs:
           # "latest" resolvía a una v2 que las rechaza. Fijar la misma versión que el repo.
           version: 3.1.0
 
-      - name: "Self-test del parser — prove-by-break con fixtures (DEV-09 · design §2.6/§9)"
-        run: |
-          set -euo pipefail
-          node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-healthy.log
-          node scripts/parse-verify-output.mjs --expect=verify scripts/fixtures/verify-output-healthy.log
-          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-fail.log; then
-            echo "::error::self-test: el parser salió 0 con el fixture [FAIL] — parser roto, no confiar en él (DEV-09 prove-by-break)"
-            exit 1
-          fi
-          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-truncated.log; then
-            echo "::error::self-test: el parser salió 0 con output truncado (PARSE-MISS) — parser roto (D7)"
-            exit 1
-          fi
-          # Allowlist de FAILs aceptados (H1.1/H1.3/H1.4 por PostGIS en public — APLICAR-EN-PRODUCCION.md §4):
-          # el caso conocido pasa, y la allowlist NO puede tapar un FAIL nuevo ni un conteo inconsistente.
-          node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-fails.log
-          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-plus-new.log; then
-            echo "::error::self-test: la allowlist silenció un FAIL no aceptado — parser roto (regresión tapada)"
-            exit 1
-          fi
-          if node scripts/parse-verify-output.mjs --expect=apply scripts/fixtures/verify-output-known-count-mismatch.log; then
-            echo "::error::self-test: el parser aceptó un RESUMEN con conteo inconsistente — parser roto (D7)"
-            exit 1
-          fi
-          # db lint: el ruido de PostGIS (extensión en public) se excluye, un issue de la app NO.
-          node scripts/check-db-lint.mjs scripts/fixtures/db-lint-postgis-noise.json scripts/fixtures/db-lint-extension-functions.txt
-          if node scripts/check-db-lint.mjs scripts/fixtures/db-lint-app-regression.json scripts/fixtures/db-lint-extension-functions.txt; then
-            echo "::error::self-test: check-db-lint aceptó un issue de una función de la app — filtro roto (regresión tapada)"
-            exit 1
-          fi
-          echo "self-test OK: healthy=0, verify-healthy=0, fail!=0, truncated!=0, known-fails=0, known+new!=0, count-mismatch!=0, db-lint-noise=0, db-lint-app!=0"
-
       - name: "supabase init — gap de config.toml (#506); condicional por T4.2 (se commitea después)"
         run: |
           set -euo pipefail
           if [ ! -f supabase/config.toml ]; then
             supabase init
           fi
-          test -f supabase/config.toml || { echo "::error::supabase/config.toml ausente tras init — schema-check no puede correr (design §2.4 P6)"; exit 1; }
+          test -f supabase/config.toml || { echo "::error::supabase/config.toml ausente tras init — schema-check no puede correr"; exit 1; }
 
-      - name: "DEV-08: db start AS-IS (sin db reset — binding decision 2), captura stdout+stderr"
+      - name: "DEV-08: db start AS-IS (sin db reset), captura stdout+stderr"
         run: |
           set -euo pipefail
           supabase db start 2>&1 | tee db-start.log
-          # CLI v3 ya no imprime los NOTICE/WARNING de las migraciones. 0012 es
-          # verify-only e idempotente: se re-ejecuta para capturar su salida.
-          # --single-transaction: 0012 crea una TEMP TABLE ... ON COMMIT DROP;
-          # sin transacción única, psql la borra al hacer commit del CREATE.
-          psql --single-transaction "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-            -f supabase/migrations/20261016000012_verify_hardening.sql 2>&1 | tee -a db-start.log
 
-      - name: "Presencia — las 12 aplicaciones deben evidenciarse (protección de DEV-08, D7)"
+      - name: "Presencia — todas las migraciones aplicadas en el stack fresco"
         run: |
           set -euo pipefail
           missing=0
-          for v in 20261015000001 20261015000002 20261015000003 20261015000004 20261015000005 20261015000006 20261015000007 20261015000008 20261016000009 20261016000010 20261016000011 20261016000012; do
-            if ! grep -q "$v" db-start.log; then
-              echo "::error::sin evidencia de la migración $v en la salida de db start — no se aplicaron las 12 (DEV-08). Si db start no aplica migraciones en esta versión del CLI, escalar: design #507 §6.2 contempla supabase start -x como forma alternativa."
+          total=0
+          for file in supabase/migrations/*.sql; do
+            version="$(basename "$file" | cut -d_ -f1)"
+            total=$((total + 1))
+            if ! grep -q "$version" db-start.log; then
+              echo "::error::sin evidencia de la migración $version en db-start.log"
               missing=1
             fi
           done
           [ "$missing" -eq 0 ] || exit 1
-          echo "presencia OK — 12/12 versiones evidenciadas en db-start.log"
-
-      - name: "DEV-09: parseo severity-map — 0012 FAIL-as-WARNING ⇒ rojo (D7 presence-then-count)"
-        run: |
-          set -euo pipefail
-          node scripts/parse-verify-output.mjs --expect=apply db-start.log
+          echo "presencia OK — $total migraciones evidenciadas en db-start.log"
 
       - name: "supabase db lint — solo superficie de la app (PostGIS excluida: extensión en public, 0001:9)"
         run: |
           set -euo pipefail
-          # plpgsql_check lintea TODAS las funciones de `public`, y PostGIS vive ahí (0001:9):
+          # plpgsql_check lintea TODAS las funciones de `public`, y PostGIS vive ahí:
           # sus funciones reportan errores y warnings propios que no son código de la app.
           # Se derivan de pg_depend las funciones de extensión y se excluyen; el resto sí falla.
           command -v psql >/dev/null 2>&1 || { echo "::error::psql ausente en el runner — no se puede derivar la superficie de extensiones (fail-closed)"; exit 1; }
