@@ -118,6 +118,11 @@ describe("OrderDetailPage · fiado (0023)", () => {
   });
 });
 
+// Confirmar la entrega pide confirmación: por defecto el usuario acepta.
+beforeEach(() => {
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+});
+
 describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -167,6 +172,19 @@ describe("OrderDetailPage · cotización del distribuidor (0024)", () => {
     expect(ordersApi.setOrderPrices).toHaveBeenCalledWith(5, [
       { product_id: 10, distributor_price: 2500 },
     ]);
+  });
+
+  it("si el usuario cancela la confirmación, no entrega el pedido (auditoría S6)", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("in_route"), error: null });
+    vi.mocked(window.confirm).mockReturnValue(false);
+    const user = userEvent.setup();
+
+    renderPage("distribuidor");
+
+    await user.click(await screen.findByRole("button", { name: "Confirmar entrega" }));
+
+    expect(window.confirm).toHaveBeenCalled();
+    expect(ordersApi.confirmDelivery).not.toHaveBeenCalled();
   });
 
   it("al confirmar la entrega persiste la cotización antes de confirmar (0029)", async () => {
