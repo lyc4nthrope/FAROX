@@ -78,7 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: null,
       premium: false,
     });
-    const privileges = await fetchPrivileges();
+    let privileges = await fetchPrivileges();
+    // A0.2 también al iniciar sesión: un fallo pasajero dejaba al usuario "Sin
+    // rol" hasta el próximo refocus. Se reintenta dos veces con espera corta.
+    for (let attempt = 1; attempt <= 2 && privileges.transient === true; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      if (currentUserIdRef.current !== session.userId) return;
+      privileges = await fetchPrivileges();
+    }
     if (currentUserIdRef.current !== session.userId) return;
     setState({
       status: "authenticated",

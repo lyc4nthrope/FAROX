@@ -153,4 +153,21 @@ describe("AuthProvider (SIGNED_IN/USER_UPDATED del mismo usuario ⇒ no destruct
     expect(screen.getByTestId("status")).toHaveTextContent("anon");
     expect(screen.queryByText("contenido de la app")).not.toBeInTheDocument();
   });
+
+  it("login con un fallo pasajero al leer privilegios: reintenta y no deja al usuario sin rol (auditoría F4)", async () => {
+    vi.mocked(authApi.fetchPrivileges)
+      .mockResolvedValueOnce({ role: null, premium: false, transient: true })
+      .mockResolvedValue({ role: "admin", premium: true });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("admin"), {
+      timeout: 3000,
+    });
+    expect(authApi.fetchPrivileges).toHaveBeenCalledTimes(2);
+  });
 });
