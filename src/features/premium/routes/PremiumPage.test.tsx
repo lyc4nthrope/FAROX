@@ -77,6 +77,22 @@ afterEach(() => {
 });
 
 describe("PremiumPage (0033)", () => {
+  it("si el plan no incluye IVA, no lo anuncia como incluido (auditoría S2)", async () => {
+    vi.mocked(premiumApi.fetchPlanQuote).mockImplementation(async (code) => ({
+      quote: { ...(code === "premium_annual" ? ANNUAL : MONTHLY), taxIncluded: false },
+      error: null,
+    }));
+    render(
+      <MemoryRouter>
+        <PremiumPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Premium mensual")).toBeInTheDocument();
+    expect(await screen.findAllByText("IVA (se suma al precio base)")).toHaveLength(2);
+    expect(screen.queryByText("IVA incluido")).not.toBeInTheDocument();
+  });
+
   it("muestra el desglose de precio de los dos planes", async () => {
     render(
       <MemoryRouter>
@@ -86,9 +102,10 @@ describe("PremiumPage (0033)", () => {
 
     expect(await screen.findByText("Premium mensual")).toBeInTheDocument();
     expect(screen.getByText("Premium anual")).toBeInTheDocument();
-    expect(screen.getAllByText(/IVA incluido/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText(/Mercado Pago estimado/).length).toBe(2);
-    expect(screen.getAllByText(/Neto FAROX/).length).toBe(2);
+    expect(screen.getAllByText("IVA incluido").length).toBe(2);
+    // Comisión y neto son datos internos de FAROX: el cliente no los ve.
+    expect(screen.queryByText(/Mercado Pago estimado/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Neto FAROX/)).not.toBeInTheDocument();
     expect(screen.getAllByText("Suscribirme").length).toBe(2);
     expect(screen.queryByText("Pago disponible próximamente")).not.toBeInTheDocument();
     expect(screen.getByText("Gratis vs Premium")).toBeInTheDocument();

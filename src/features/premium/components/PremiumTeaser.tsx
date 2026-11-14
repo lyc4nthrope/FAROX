@@ -60,8 +60,7 @@ export function PremiumTeaser({ to }: { to: string }) {
               : "o 100.000 al año"}
           </p>
           <p className="mt-3 text-xs leading-relaxed text-gray-400">
-            IVA incluido. La comisión de Mercado Pago se descuenta del recaudo; el desglose completo
-            está en la página de planes.
+            El desglose con IVA de cada plan está en la página de planes.
           </p>
           <Link
             to={to}

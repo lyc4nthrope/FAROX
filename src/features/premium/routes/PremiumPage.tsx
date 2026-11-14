@@ -38,8 +38,7 @@ const FAQ: readonly { question: string; answer: string }[] = [
   },
   {
     question: "¿El precio incluye impuestos?",
-    answer:
-      "Sí. El desglose muestra el IVA incluido y la comisión estimada de Mercado Pago, que se descuenta del recaudo.",
+    answer: "Cada plan muestra el IVA en su desglose y el precio final a pagar.",
   },
   {
     question: "¿Puedo pagar con PSE?",
@@ -96,23 +95,14 @@ function QuoteCard({
           </p>
           <dl className="mt-4 space-y-1.5 text-sm">
             <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">IVA incluido</dt>
+              {/* La etiqueta sigue la configuración del plan (tax_included); la comisión
+                  de Mercado Pago y el neto son datos internos y solo los ve el admin. */}
+              <dt className="text-gray-500">
+                {quote.taxIncluded ? "IVA incluido" : "IVA (se suma al precio base)"}
+              </dt>
               <dd className="tabular-nums text-gray-900">{formatCOP(quote.taxCents / 100)}</dd>
             </div>
-            <div className="flex justify-between gap-3">
-              <dt className="text-gray-500">Mercado Pago estimado</dt>
-              <dd className="tabular-nums text-gray-900">{formatCOP(quote.mpFeeCents / 100)}</dd>
-            </div>
-            <div className="flex justify-between gap-3 border-t border-gray-100 pt-1.5">
-              <dt className="font-medium text-gray-700">Neto FAROX</dt>
-              <dd className="tabular-nums font-medium text-gray-900">
-                {formatCOP(quote.netCents / 100)}
-              </dd>
-            </div>
           </dl>
-          <p className="mt-3 text-xs text-gray-500">
-            La comisión de Mercado Pago se descuenta del recaudo; no se suma al precio.
-          </p>
         </>
       )}
       <div className="mt-auto pt-4">
