@@ -18,6 +18,9 @@ permissions:
 
 jobs:
   backup:
+    # Apagado también para ejecución manual: el repo es PÚBLICO y el dump sale sin cifrar
+    # como artifact descargable. Reactivar solo cuando exista el cifrado age de B0.4.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     environment: backup
     env:
