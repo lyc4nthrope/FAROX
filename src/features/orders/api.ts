@@ -41,6 +41,10 @@ export interface Option {
   id: number;
   name: string;
 }
+export interface StoreProductOption extends Option {
+  brand: string | null;
+  quantity: number | null;
+}
 export interface CreditRow {
   id: number;
   order_id: number;
@@ -64,6 +68,13 @@ function relName(value: unknown): string {
     return typeof name === "string" ? name : "";
   }
   return "";
+}
+
+/** Marca embebida en product: { brand: { name } }. */
+function relBrand(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("brand" in value)) return null;
+  const brand = relName((value as { brand: unknown }).brand);
+  return brand === "" ? null : brand;
 }
 
 const ORDER_COLUMNS =
@@ -103,6 +114,18 @@ export async function fetchOrder(orderId: number): Promise<LoadResult<OrderRow>>
     .eq("id", orderId)
     .single();
   return { data: data ? toOrder(data as Record<string, unknown>) : null, error };
+}
+
+/**
+ * 0028: contador de pedidos abiertos para la notificación del nav. La RLS
+ * acota (distribuidor: los suyos; operador: sus tiendas; admin: todos).
+ */
+export async function fetchOpenOrdersCount(): Promise<LoadResult<number>> {
+  const { count, error } = await supabase
+    .from("orders")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["pending", "in_route"]);
+  return { data: count ?? 0, error };
 }
 
 /** get_order_items omite unit_price para no Premium (D40). */
@@ -145,15 +168,19 @@ export async function fetchDistributorOptions(): Promise<LoadResult<Option[]>> {
 }
 
 /** Productos asignados a la tienda (stock) — los únicos que tiene sentido pedir. */
-export async function fetchStoreProducts(storeId: number): Promise<LoadResult<Option[]>> {
+export async function fetchStoreProducts(
+  storeId: number,
+): Promise<LoadResult<StoreProductOption[]>> {
   const { data, error } = await supabase
     .from("stock")
-    .select("product_id,product:products(name)")
+    .select("product_id,quantity,product:products(name, brand:brands(name))")
     .eq("store_id", storeId)
     .limit(500);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.product_id),
     name: relName(r.product),
+    brand: relBrand(r.product),
+    quantity: Number(r.quantity),
   }));
   return { data: rows, error };
 }
@@ -166,7 +193,9 @@ export interface NewOrderInput {
   notes: string | null;
 }
 
-export async function createOrder(input: NewOrderInput): Promise<{ data: number | null; error: Err }> {
+export async function createOrder(
+  input: NewOrderInput,
+): Promise<{ data: number | null; error: Err }> {
   const { data, error } = await supabase.rpc("create_order", {
     p_distributor: input.distributorId,
     p_store: input.storeId,
@@ -177,9 +206,71 @@ export async function createOrder(input: NewOrderInput): Promise<{ data: number 
   return { data: typeof data === "number" ? data : data == null ? null : Number(data), error };
 }
 
+export interface OrderPriceInput {
+  product_id: number;
+  distributor_price: number;
+}
+
+export interface OrderQuoteRow {
+  product_id: number;
+  distributor_price: number | null;
+}
+
+/**
+ * 0024 — cotización del distribuidor. La lectura va por RPC aparte porque
+ * get_order_items nunca expone el precio privado de la tienda (D40/D41).
+ */
+export async function fetchOrderQuotes(orderId: number): Promise<LoadResult<OrderQuoteRow[]>> {
+  const { data, error } = await supabase.rpc("get_order_quotes", { p_order: orderId });
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    product_id: Number(r.product_id),
+    distributor_price: r.distributor_price == null ? null : Number(r.distributor_price),
+  }));
+  return { data: rows, error };
+}
+
+/**
+ * 0030: precio de venta que el distribuidor configuró en su catálogo, para
+ * estimar la cotización del pedido. Solo él puede leer su relación.
+ */
+export async function fetchDistributorSalePrices(
+  productIds: readonly number[],
+): Promise<LoadResult<Map<number, number>>> {
+  if (productIds.length === 0) {
+    return { data: new Map<number, number>(), error: null };
+  }
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select("product_id,sale_price")
+    .in("product_id", productIds)
+    .not("sale_price", "is", null)
+    .limit(500);
+  const prices = new Map<number, number>();
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    if (row.sale_price == null) continue;
+    prices.set(Number(row.product_id), Number(row.sale_price));
+  }
+  return { data: prices, error };
+}
+
+/**
+ * 0024 — el distribuidor del pedido cotiza las líneas mientras sigue
+ * pendiente. El backend valida alcance, estado y pertenencia de cada producto.
+ */
+export async function setOrderPrices(
+  orderId: number,
+  items: OrderPriceInput[],
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("set_order_prices", {
+    p_order: orderId,
+    p_items: items,
+  });
+  return { error };
+}
+
 export async function updateOrderStatus(
   orderId: number,
-  status: "in_route" | "cancelled",
+  status: "pending" | "in_route" | "cancelled",
   reason: string | null,
 ): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("update_order_status", {
@@ -190,12 +281,45 @@ export async function updateOrderStatus(
   return { error };
 }
 
+/**
+ * 0025 — fecha prometida opcional, editable por el distribuidor (o admin)
+ * mientras el pedido siga abierto. null la limpia.
+ */
+export async function setOrderExpectedAt(
+  orderId: number,
+  expectedAt: string | null,
+): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("set_order_expected_at", {
+    p_order: orderId,
+    p_expected_at: expectedAt,
+  });
+  return { error };
+}
+
 export async function confirmDelivery(
   orderId: number,
   items: { product_id: number; received_quantity: number }[],
 ): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("confirm_delivery", { p_order: orderId, p_items: items });
   return { error };
+}
+
+/**
+ * 0028: entrega completa desde la lista de Mis pedidos. Lee las líneas (RPC
+ * get_order_items) y confirma todas con su cantidad pedida; el stock se suma
+ * en confirm_delivery. Para entregas parciales se usa el detalle.
+ */
+export async function confirmFullDelivery(orderId: number): Promise<{ error: Err }> {
+  const items = await fetchOrderItems(orderId);
+  if (items.error !== null) return { error: items.error };
+  const payload = (items.data ?? []).map((item) => ({
+    product_id: item.product_id,
+    received_quantity: item.quantity,
+  }));
+  if (payload.length === 0) {
+    return { error: { message: "El pedido no tiene líneas para entregar." } };
+  }
+  return confirmDelivery(orderId, payload);
 }
 
 // ---------------------------------------------------------------- fiado
@@ -227,7 +351,10 @@ export async function fetchPayments(creditId: number): Promise<LoadResult<Paymen
   return { data: (data ?? []) as PaymentRow[], error };
 }
 
-export async function createCredit(orderId: number, dueDate: string | null): Promise<{ error: Err }> {
+export async function createCredit(
+  orderId: number,
+  dueDate: string | null,
+): Promise<{ error: Err }> {
   const { error } = await supabase.rpc("create_credit", { p_order: orderId, p_due_date: dueDate });
   return { error };
 }

@@ -303,7 +303,7 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(productsApi.createProduct).not.toHaveBeenCalled();
   });
 
-  it("distribuidor en /products/:id: solo lectura — datos visibles, cero controles (§S2)", async () => {
+  it("distribuidor en /products/:id: solo lectura — la ficha es del admin (0030)", async () => {
     vi.mocked(productsApi.fetchProduct).mockResolvedValue({ row: P1, error: null });
     renderRutas("/products/1", "distribuidor");
 
@@ -314,5 +314,6 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
     expect(screen.getByLabelText("Nombre")).toBeDisabled();
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Desactivar producto" })).not.toBeInTheDocument();
+    expect(productsApi.updateProduct).not.toHaveBeenCalled();
   });
 });

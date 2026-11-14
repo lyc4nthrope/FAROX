@@ -28,6 +28,9 @@ export interface ProductListProps {
   // Acción por fila (catálogo propio: quitar/faltante). Sin esto la tabla es de
   // solo lectura.
   renderAction?: (row: ProductRowView) => ReactNode;
+  // 0026: la fila entera ejecuta la acción principal (agregar). El botón de la
+  // celda sigue existiendo como referencia accesible.
+  onRowClick?: (row: ProductRowView) => void;
   emptyTitle?: string;
   emptyHint?: string;
 }
@@ -42,6 +45,7 @@ export function ProductList({
   quantity = false,
   renderQuantity,
   renderAction,
+  onRowClick,
   emptyTitle = "No hay productos todavía",
   emptyHint = "Cuando haya productos, van a aparecer acá.",
 }: ProductListProps) {
@@ -54,51 +58,70 @@ export function ProductList({
       {error === null && loading && <p className="text-sm text-gray-600">Cargando…</p>}
       {error === null && !loading && rows.length > 0 && (
         <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-600">
-              <th className="py-2 font-medium">Nombre</th>
-              <th className="py-2 font-medium">Marca</th>
-              <th className="py-2 font-medium">Unidad</th>
-              <th className="py-2 font-medium">Categoría</th>
-              {quantity && <th className="py-2 font-medium">Cantidad</th>}
-              <th className="py-2 font-medium">Estado</th>
-              {renderAction !== undefined && <th className="py-2 font-medium">Acción</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100">
-                <td className="py-2">
-                  <Link to={`/products/${row.id}`} className="text-gray-900 underline">
-                    {row.name}
-                  </Link>
-                </td>
-                <td className="py-2 text-gray-700">{row.brand?.name ?? "—"}</td>
-                <td className="py-2 text-gray-700">{row.unit?.name ?? "—"}</td>
-                <td className="py-2 text-gray-700">{row.category?.name ?? "—"}</td>
-                {quantity && (
-                  <td className="py-2 text-gray-700">
-                    {renderQuantity !== undefined ? (
-                      renderQuantity(row)
-                    ) : row.quantity === null || row.quantity === undefined ? (
-                      "—"
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-600">
+                <th className="py-2 font-medium">Nombre</th>
+                <th className="py-2 font-medium">Marca</th>
+                <th className="py-2 font-medium">Unidad</th>
+                <th className="py-2 font-medium">Categoría</th>
+                {quantity && <th className="py-2 font-medium">Cantidad</th>}
+                <th className="py-2 font-medium">Estado</th>
+                {renderAction !== undefined && <th className="py-2 font-medium">Acción</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`border-b border-gray-100 ${
+                    onRowClick === undefined
+                      ? ""
+                      : "cursor-pointer transition-colors hover:bg-gray-50"
+                  }`}
+                >
+                  <td className="py-2">
+                    {onRowClick === undefined ? (
+                      <Link to={`/products/${row.id}`} className="text-gray-900 underline">
+                        {row.name}
+                      </Link>
                     ) : (
-                      formatQty(row.quantity)
+                      <span className="text-gray-900">{row.name}</span>
                     )}
                   </td>
-                )}
-                <td className="py-2 text-gray-700">
-                  <div className="flex items-center gap-2">
-                    <span>{row.is_active ? "Activo" : "Inactivo"}</span>
-                    {row.is_shortage === true && <Badge tone="amber">Faltante</Badge>}
-                  </div>
-                </td>
-                {renderAction !== undefined && <td className="py-2">{renderAction(row)}</td>}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="py-2 text-gray-700">{row.brand?.name ?? "—"}</td>
+                  <td className="py-2 text-gray-700">{row.unit?.name ?? "—"}</td>
+                  <td className="py-2 text-gray-700">{row.category?.name ?? "—"}</td>
+                  {quantity && (
+                    <td className="py-2 text-gray-700">
+                      {renderQuantity !== undefined
+                        ? renderQuantity(row)
+                        : row.quantity === null || row.quantity === undefined
+                          ? "—"
+                          : formatQty(row.quantity)}
+                    </td>
+                  )}
+                  <td className="py-2 text-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span>{row.is_active ? "Activo" : "Inactivo"}</span>
+                      {row.is_shortage === true && <Badge tone="amber">Faltante</Badge>}
+                    </div>
+                  </td>
+                  {renderAction !== undefined && (
+                    <td
+                      className="py-2"
+                      onClick={
+                        onRowClick === undefined ? undefined : (event) => event.stopPropagation()
+                      }
+                    >
+                      {renderAction(row)}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

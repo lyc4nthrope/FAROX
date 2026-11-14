@@ -93,7 +93,7 @@ export function AuditPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Control</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Control</p>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Auditoría</h1>

@@ -11,47 +11,59 @@ describe("visibleNavItems — derivación rol→nav, matriz SEC-01 (V0-5)", () =
       "/inventario",
       "/alertas",
       "/pedidos",
-      "/faltantes",
       "/fiado",
       "/rutas",
       "/dashboard",
       "/users",
+      "/planes",
+      "/pagos",
       "/roles",
       "/catalogs",
       "/audit",
     ]);
   });
 
-  it("operador: operación diaria y SIN ninguna entrada solo-admin", () => {
+  it("operador: operación diaria primero y SIN ninguna entrada solo-admin", () => {
     const visibles = visibleNavItems("operador").map((item) => item.to);
     expect(visibles).toEqual([
-      "/distributors",
-      "/products",
-      "/stores",
       "/inventario",
-      "/alertas",
       "/pedidos",
-      "/faltantes",
+      "/alertas",
       "/fiado",
+      "/distributors",
       "/dashboard",
     ]);
-    for (const adminOnly of ["/users", "/roles", "/catalogs", "/audit", "/rutas"]) {
+    for (const adminOnly of [
+      "/users",
+      "/planes",
+      "/pagos",
+      "/roles",
+      "/catalogs",
+      "/audit",
+      "/rutas",
+    ]) {
       expect(visibles).not.toContain(adminOnly);
     }
+    // 0024: Productos se fusionó en Inventario.
+    expect(visibles).not.toContain("/products");
   });
 
-  it("distribuidor: su ruta, sus pedidos, alertas, dashboard y productos (lectura)", () => {
+  it("distribuidor: su ruta, sus pedidos y su catálogo, en orden de uso", () => {
     expect(visibleNavItems("distribuidor").map((item) => item.to)).toEqual([
       "/mi-ruta",
       "/pedidos",
-      "/vincular",
+      "/movimientos",
+      "/products",
       "/alertas",
       "/dashboard",
-      "/products",
     ]);
     // 0023: los faltantes pasaron a ser del operador; el distribuidor se
     // entera por el pedido, no por una vista de faltantes.
     expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/faltantes");
+    // El asistente vive en el widget flotante, no como entrada de nav.
+    expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/asistente");
+    // Vincular tienda es contextual (Perfil + estados vacíos), no nav fijo.
+    expect(visibleNavItems("distribuidor").map((item) => item.to)).not.toContain("/vincular");
   });
 
   it("sin rol (my_role() NULL): cero controles privilegiados (V0-3)", () => {
@@ -69,9 +81,9 @@ describe("roleLabel", () => {
 });
 
 describe("firstAllowedRoute (Home §S2)", () => {
-  it("admin y operador entran por distribuidores; distribuidor por su ruta; sin rol por productos", () => {
+  it("admin entra por distribuidores, operador por inventario, distribuidor por su ruta y sin rol por productos", () => {
     expect(firstAllowedRoute("admin").to).toBe("/distributors");
-    expect(firstAllowedRoute("operador").to).toBe("/distributors");
+    expect(firstAllowedRoute("operador").to).toBe("/inventario");
     expect(firstAllowedRoute("distribuidor").to).toBe("/mi-ruta");
     expect(firstAllowedRoute(null).to).toBe("/products");
   });

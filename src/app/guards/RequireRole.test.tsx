@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -70,7 +70,9 @@ describe("RequireRole (§S2 denegación / V0-3 rol ausente)", () => {
   it("admin: entra a la pantalla", async () => {
     renderConRol("admin");
     expect(await screen.findByText("pantalla de usuarios")).toBeInTheDocument();
-    expect(listUsers).toHaveBeenCalledTimes(1);
+    // El effect pasivo puede resolverse después del paint: bajo carga (suite
+    // completa en paralelo) findByText devuelve antes. Se espera el effect.
+    await waitFor(() => expect(listUsers).toHaveBeenCalledTimes(1));
   });
 
   it("operador: AccessDenied ANTES de cualquier query (§S2)", async () => {

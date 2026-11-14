@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { fetchOpenAlerts } from "../../features/inventory/alertsApi";
+import { fetchOpenOrdersCount } from "../../features/orders/api";
+import { AssistantWidget } from "../../features/assistant";
+import { PremiumDowngradeModal } from "../../features/premium";
+import { useLoad } from "../../shared/hooks/useLoad";
+import { PremiumBadge, SectionIcon } from "../../shared/ui";
 import { useAuth } from "../providers/AuthProvider";
 import { roleLabel, visibleNavItems } from "./navigation";
 
@@ -11,7 +17,26 @@ import { roleLabel, visibleNavItems } from "./navigation";
 export function AppShell() {
   const { role, premium, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
   const items = visibleNavItems(role);
+  // 0027: contador de alertas abiertas en la pestaña «Alertas». Se refresca al
+  // navegar (sin realtime) y respeta el alcance de la RLS.
+  const showAlerts = items.some((item) => item.to === "/alertas");
+  const alerts = useLoad(
+    () => (showAlerts ? fetchOpenAlerts() : Promise.resolve({ data: [], error: null })),
+    [showAlerts, location.pathname],
+  );
+  // El badge cuenta las NO leídas para alinearse con «N abiertas» de la
+  // página de Alertas; se refresca al navegar (sin realtime).
+  const alertCount = alerts.data?.filter((alert) => alert.read_at === null).length ?? 0;
+
+  // 0028: notificación de pedidos abiertos en «Pedidos» / «Mis pedidos».
+  const showOrders = items.some((item) => item.to === "/pedidos");
+  const openOrders = useLoad(
+    () => (showOrders ? fetchOpenOrdersCount() : Promise.resolve({ data: 0, error: null })),
+    [showOrders, location.pathname],
+  );
+  const orderCount = openOrders.data ?? 0;
   // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
   // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
   // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la
@@ -50,10 +75,10 @@ export function AppShell() {
             </span>
           </Link>
 
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-600">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 sm:px-2.5">
             <svg
               aria-hidden="true"
-              className="h-3 w-3 text-gray-400"
+              className="h-3 w-3 shrink-0 text-gray-400"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -63,19 +88,14 @@ export function AppShell() {
             >
               <path d="M12 3 5 6v6c0 4.4 3 7.6 7 9 4-1.4 7-4.6 7-9V6l-7-3Z" />
             </svg>
-            {roleLabel(role)}
+            {/* En móvil el rol queda solo como icono (con nombre accesible) para
+                que el header entre en una sola fila aun con la insignia Premium. */}
+            <span className="sr-only sm:not-sr-only">{roleLabel(role)}</span>
           </span>
 
-          {verInsigniaPremium && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
-              <svg aria-hidden="true" className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.5 14.6 9l6.9.5-5.3 4.5 1.7 6.7-5.9-3.6-5.9 3.6 1.7-6.7L2.5 9.5 9.4 9 12 2.5Z" />
-              </svg>
-              Premium
-            </span>
-          )}
+          {verInsigniaPremium && <PremiumBadge hideLabelOnMobile />}
 
-          <div className="ml-auto flex items-center gap-1 text-sm">
+          <div className="ml-auto flex shrink-0 items-center gap-1 text-sm">
             <Link
               to="/profile"
               aria-label="Perfil"
@@ -136,7 +156,7 @@ export function AppShell() {
               >
                 <path d="M4 7h16M4 12h16M4 17h16" />
               </svg>
-              Menú
+              <span className="sr-only sm:not-sr-only">Menú</span>
             </button>
           </div>
         </div>
@@ -165,7 +185,32 @@ export function AppShell() {
                   }`
                 }
               >
-                {item.label}
+                {({ isActive }) => (
+                  <>
+                    <SectionIcon to={item.to} className="mr-1.5 h-4 w-4" />
+                    {item.label}
+                    {item.to === "/pedidos" && orderCount > 0 && (
+                      <span
+                        aria-label={`${orderCount} pedidos abiertos`}
+                        className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                          isActive ? "bg-white/20 text-white" : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {orderCount > 99 ? "99+" : orderCount}
+                      </span>
+                    )}
+                    {item.to === "/alertas" && alertCount > 0 && (
+                      <span
+                        aria-label={`${alertCount} alertas`}
+                        className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                          isActive ? "bg-white/20 text-white" : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {alertCount > 99 ? "99+" : alertCount}
+                      </span>
+                    )}
+                  </>
+                )}
               </NavLink>
             </li>
           ))}
@@ -175,6 +220,9 @@ export function AppShell() {
       <main id="contenido" className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Outlet />
       </main>
+
+      <AssistantWidget />
+      <PremiumDowngradeModal />
     </div>
   );
 }

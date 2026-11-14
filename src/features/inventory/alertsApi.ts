@@ -29,7 +29,9 @@ export async function fetchOpenAlerts(): Promise<LoadResult<AlertRow[]>> {
   return { data: (data ?? []) as AlertRow[], error };
 }
 
-export async function markAlertRead(alertId: number): Promise<{ error: { message: string } | null }> {
+export async function markAlertRead(
+  alertId: number,
+): Promise<{ error: { message: string } | null }> {
   const { error } = await supabase.rpc("mark_alert_read", { p_alert: alertId });
   return { error };
 }

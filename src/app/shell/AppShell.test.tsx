@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RoleName } from "../../features/auth/types";
 import * as authApi from "../../features/auth/api";
+import * as alertsApi from "../../features/inventory/alertsApi";
+import * as ordersApi from "../../features/orders/api";
 import { AuthProvider } from "../providers/AuthProvider";
 import { AppShell } from "./AppShell";
 
@@ -14,6 +16,15 @@ vi.mock("../../features/auth/api", () => ({
   signInWithPassword: vi.fn(),
   signOut: vi.fn(),
   fetchPrivileges: vi.fn(),
+}));
+vi.mock("../../features/inventory/alertsApi", () => ({
+  fetchOpenAlerts: vi.fn(),
+}));
+vi.mock("../../features/orders/api", () => ({
+  fetchOpenOrdersCount: vi.fn(),
+}));
+vi.mock("../../features/premium", () => ({
+  PremiumDowngradeModal: () => null,
 }));
 
 function renderShell(role: RoleName | null, premium = false) {
@@ -37,18 +48,26 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     vi.clearAllMocks();
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.signOut).mockResolvedValue(undefined);
+    vi.mocked(alertsApi.fetchOpenAlerts).mockResolvedValue({ data: [], error: null });
+    vi.mocked(ordersApi.fetchOpenOrdersCount).mockResolvedValue({ data: 0, error: null });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("operador: distribuidores, productos y tiendas; sin /users", async () => {
+  it("operador: inventario, pedidos y mis distribuidores; sin /users ni /products", async () => {
     renderShell("operador");
-    expect(await screen.findByRole("link", { name: "Distribuidores" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Productos" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Tiendas" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Inventario" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mis distribuidores" })).toBeInTheDocument();
+    // 0024: Productos se fusionó en Inventario.
+    expect(screen.queryByRole("link", { name: "Productos" })).not.toBeInTheDocument();
+    // Tiendas se unificó en Inventario: la operación y los datos de cada
+    // tienda se abren desde la misma lista.
+    expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    // El asistente vive en el widget flotante, no en el nav.
+    expect(screen.queryByRole("link", { name: "Asistente" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Perfil" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Salir" })).toBeInTheDocument();
   });
@@ -59,6 +78,8 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    // Vincular tienda es contextual, no una entrada fija del nav.
+    expect(screen.queryByRole("link", { name: "Vincular tienda" })).not.toBeInTheDocument();
     // Perfil es utilidad de cuenta en el header, no una entrada de entidad.
     expect(screen.getByRole("link", { name: "Perfil" })).toBeInTheDocument();
   });
@@ -69,6 +90,58 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByRole("link", { name: "Distribuidores" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Tiendas" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Usuarios" })).not.toBeInTheDocument();
+    expect(ordersApi.fetchOpenOrdersCount).not.toHaveBeenCalled();
+  });
+
+  it("Mis pedidos muestra la notificación de pedidos abiertos", async () => {
+    vi.mocked(ordersApi.fetchOpenOrdersCount).mockResolvedValue({ data: 2, error: null });
+
+    renderShell("distribuidor");
+
+    const badge = await screen.findByLabelText("2 pedidos abiertos");
+    expect(badge).toHaveTextContent("2");
+  });
+
+  it("Alertas muestra el número de alertas abiertas", async () => {
+    vi.mocked(alertsApi.fetchOpenAlerts).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          type: "stock_low",
+          message: "Arroz bajo",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+        {
+          id: 2,
+          type: "expiry_soon",
+          message: "Leche vence",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+        {
+          id: 3,
+          type: "order_late",
+          message: "Pedido atrasado",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: "2026-10-28T11:00:00Z",
+        },
+        {
+          id: 4,
+          type: "credit_overdue",
+          message: "Fiado vencido",
+          created_at: "2026-10-28T10:00:00Z",
+          read_at: null,
+        },
+      ],
+      error: null,
+    });
+
+    renderShell("operador");
+
+    // Cuenta solo las NO leídas (3 de 4).
+    const badge = await screen.findByLabelText("3 alertas");
+    expect(badge).toHaveTextContent("3");
   });
 
   it("menú móvil: alterna el estado expuesto en aria-expanded", async () => {
@@ -98,7 +171,7 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
   it("ADM-11.2: premium false sin rol admin ⇒ sin insignia", async () => {
     renderShell("operador", false);
 
-    expect(await screen.findByRole("link", { name: "Productos" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Inventario" })).toBeInTheDocument();
     expect(screen.queryByText("Premium")).not.toBeInTheDocument();
   });
 

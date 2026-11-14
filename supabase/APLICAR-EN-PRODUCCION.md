@@ -1,6 +1,6 @@
 # Aplicar las migraciones en producción (proyecto FAROX `tzyqstnxbzyfmdxeuyvz`)
 
-Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
+Verificado el **2026-10-24**: los 17 archivos entonces vigentes (0001–0015, 0017, 0018; la 0016 está reservada para el chatbot y aún no existe) se aplican **de cero, en orden y sin errores** en un Supabase local, y `scripts/smoke-local.mjs` pasa **45/45** flujos. La 0019 y la 0020 se agregaron después: la 0020 solo reemplaza un helper y **no se pudo ejecutar en local** (el gate no tiene Supabase CLI/Postgres), así que su comportamiento se valida al aplicarla en el SQL editor. La **0021** agrega una RPC y reemplaza `create_order`; tampoco se ejecutó contra una base real en local. La **0022** agrega `stock.is_shortage` y 4 RPCs del catálogo del operador: **no se ejecutó contra una base real** y su comportamiento queda sin verificar hasta aplicarla. La **0023** acota el tablero de faltantes a la tienda (el distribuidor deja de verlo) y permite al operador crear el fiado de un pedido entregado: tampoco se ejecutó contra una base real. La **0024** hace nullable `order_items.unit_price` para que el operador solicite sin precio y agrega `set_order_prices` / `set_stock_threshold`: **no se ejecutó contra una base real**. La **0025** traslada «marcar en ruta» y «confirmar entrega» al distribuidor y agrega `set_order_expected_at`: tampoco se ejecutó contra una base real. La **0026** agrega `update_store_product` / `add_store_product` para editar y dar de alta un producto de la tienda en una sola llamada: tampoco se ejecutó contra una base real. La **0027** permite a Premium publicar precios, agrega el precio opcional al alta y a los movimientos: tampoco se ejecutó contra una base real. La **0028** hace reversible in_route → pending y deja que el operador de la tienda lea la cotización sin Premium: tampoco se ejecutó contra una base real. La **0029** extiende la cotización a in_route, agrega la venta directa del distribuidor y el contacto entre partes vinculadas: tampoco se ejecutó contra una base real. La **0030** corrige el alcance de edición (la ficha de `products` es solo del admin; cada parte edita su relación) y agrega precios de compra/venta por relación con prellenado de movimientos y cotizaciones: tampoco se ejecutó contra una base real. La **0031** agrega alertas notificables del distribuidor (stock bajo opt-in y caducidad) con su job diario: tampoco se ejecutó contra una base real. La **0032** agrega el estado Premium con vencimiento, planes versionados, desglose de precio y el modelo de suscripciones/pagos para Mercado Pago: tampoco se ejecutó contra una base real. La **0033** agrega el downgrade de tiendas al vencer Premium, el modal de elección y la reactivación: tampoco se ejecutó contra una base real. La **0034** agrega desactivar/reactivar tiendas y transferir propiedad (admin): tampoco se ejecutó contra una base real. La **0035** agrega la referencia externa y el init_point de Mercado Pago a las suscripciones (F4): tampoco se ejecutó contra una base real. La **0036** agrega el outbox de avisos, el preview de precios y el encolado diario de F5: tampoco se ejecutó contra una base real. El `supabase/demo-catalog.sql` es opcional (datos de demostración), idempotente y va **después** de las migraciones.
 
 > ⚠️ Es la base de producción. Hacerlo **una sola persona** (Daniel, gate H1), en **una sola ventana**, y avisar en el canal antes y después.
 
@@ -91,6 +91,125 @@ UNION ALL SELECT '0023 fiado del operador',
             WHERE proname = 'create_credit'
               AND pronamespace = 'public'::regnamespace
             LIMIT 1), false)::text
+UNION ALL SELECT '0024 solicitud sin precio',
+  COALESCE((SELECT is_nullable = 'YES'
+                   AND EXISTS (SELECT 1 FROM information_schema.columns c
+                               WHERE c.table_schema = 'public' AND c.table_name = 'order_items'
+                                 AND c.column_name = 'distributor_price')
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'order_items'
+              AND column_name = 'unit_price'), false)::text
+UNION ALL SELECT '0024 cotización y umbral',
+  (to_regprocedure('public.set_order_prices(bigint,jsonb)') IS NOT NULL
+   AND to_regprocedure('public.get_order_quotes(bigint)') IS NOT NULL
+   AND to_regprocedure('public.set_stock_threshold(bigint,bigint,numeric)') IS NOT NULL)::text
+UNION ALL SELECT '0025 ciclo del distribuidor',
+  (to_regprocedure('public.set_order_expected_at(bigint,timestamptz)') IS NOT NULL
+   AND COALESCE((SELECT position('distribuidor' in prosrc) > 0
+                 AND position('operador' in prosrc) = 0
+                 FROM pg_proc
+                 WHERE proname = 'update_order_status'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false)
+   AND COALESCE((SELECT position('distribuidor' in prosrc) > 0
+                 AND position('operador' in prosrc) = 0
+                 FROM pg_proc
+                 WHERE proname = 'confirm_delivery'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false))::text
+UNION ALL SELECT '0026 edición y alta de stock',
+  (to_regprocedure('public.update_store_product(bigint,bigint,numeric,numeric,boolean)') IS NOT NULL
+   AND (to_regprocedure('public.add_store_product(bigint,bigint,numeric,numeric)') IS NOT NULL
+        OR to_regprocedure('public.add_store_product(bigint,bigint,numeric,numeric,numeric)') IS NOT NULL))::text
+UNION ALL SELECT '0027 precios premium y movimientos',
+  (COALESCE((SELECT position('publicar precios requiere Premium' in prosrc) > 0
+             FROM pg_proc
+             WHERE proname = 'set_price'
+               AND pronamespace = 'public'::regnamespace
+             LIMIT 1), false)
+   AND to_regprocedure('public.register_entry(bigint,bigint,numeric,bigint,bigint,date,numeric)') IS NOT NULL
+   AND to_regprocedure('public.register_exit(bigint,bigint,numeric,bigint,bigint,numeric)') IS NOT NULL
+   AND to_regprocedure('public.add_store_product(bigint,bigint,numeric,numeric,numeric)') IS NOT NULL)::text
+UNION ALL SELECT '0028 pedidos reversibles',
+  (COALESCE((SELECT position('o.status = ''in_route'' AND p_status = ''pending''' in prosrc) > 0
+             FROM pg_proc
+             WHERE proname = 'update_order_status'
+               AND pronamespace = 'public'::regnamespace
+             LIMIT 1), false)
+   AND COALESCE((SELECT position('o.store_id = ANY (public.my_store_ids())' in prosrc) > 0
+                 FROM pg_proc
+                 WHERE proname = 'get_order_quotes'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false))::text
+UNION ALL SELECT '0029 ventas y contacto',
+  (to_regprocedure('public.register_distributor_sale(bigint,bigint,numeric,numeric,date)') IS NOT NULL
+   AND to_regprocedure('public.get_counterpart_contact(text,bigint)') IS NOT NULL
+   AND COALESCE((SELECT position('in_route' in prosrc) > 0
+                 FROM pg_proc
+                 WHERE proname = 'set_order_prices'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false))::text
+UNION ALL SELECT '0030 relaciones y precios',
+  (EXISTS (SELECT 1 FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_name = 'store_product_prices')
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'distributor_products'
+                 AND column_name = 'sale_price')
+   AND to_regprocedure('public.update_store_product_full(bigint,bigint,numeric,numeric,boolean,date,numeric,numeric)') IS NOT NULL
+   AND to_regprocedure('public.update_distributor_product_relation(bigint,numeric,numeric,date,numeric,numeric)') IS NOT NULL)::text
+UNION ALL SELECT '0031 alertas distribuidor',
+  (to_regprocedure('public.internal_eval_distributor_alert(bigint,bigint)') IS NOT NULL
+   AND to_regprocedure('public.job_scan_distributor_expiry()') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM pg_indexes
+               WHERE schemaname = 'public' AND indexname = 'uq_alert_open'
+                 AND indexdef LIKE '%distributor_id%')
+   AND COALESCE((SELECT position('is_active' in prosrc) > 0
+                 FROM pg_proc
+                 WHERE proname = 'internal_eval_distributor_alert'
+                   AND pronamespace = 'public'::regnamespace
+                 LIMIT 1), false))::text
+UNION ALL SELECT '0032 premium y planes',
+  (EXISTS (SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'users'
+             AND column_name = 'premium_until')
+   AND to_regprocedure('public.quote_plan(text)') IS NOT NULL
+   AND to_regprocedure('public.update_plan_pricing(text,integer,integer,boolean,integer,integer,integer,boolean,boolean)') IS NOT NULL
+   AND to_regclass('public.plans') IS NOT NULL)::text
+UNION ALL SELECT '0033 downgrade tiendas',
+  (to_regprocedure('public.choose_store_for_free_plan(bigint)') IS NOT NULL
+   AND to_regprocedure('public.reactivate_premium_stores(bigint[])') IS NOT NULL
+   AND to_regprocedure('public.my_owned_stores()') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'stores'
+                 AND column_name = 'deactivated_reason'))::text
+UNION ALL SELECT '0034 gestión tiendas',
+  (to_regprocedure('public.deactivate_store(bigint,boolean)') IS NOT NULL
+   AND to_regprocedure('public.reactivate_store(bigint)') IS NOT NULL
+   AND to_regprocedure('public.transfer_store(bigint,uuid)') IS NOT NULL
+   AND to_regprocedure('public.user_is_premium(uuid)') IS NOT NULL)::text
+UNION ALL SELECT '0035 F4 Mercado Pago',
+  (EXISTS (SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'subscriptions'
+             AND column_name = 'external_reference')
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'subscriptions'
+                 AND column_name = 'provider_init_point')
+   AND to_regclass('public.uq_subscriptions_external_reference') IS NOT NULL
+   AND to_regclass('public.uq_subscriptions_one_active_per_user') IS NOT NULL
+   AND to_regprocedure('public.merge_subscription_period(bigint,timestamptz,timestamptz)') IS NOT NULL
+   AND to_regprocedure('public.activate_premium_until(uuid,timestamptz,bigint)') IS NOT NULL)::text
+UNION ALL SELECT '0036 F5 avisos admin',
+  (to_regclass('public.premium_notices') IS NOT NULL
+   AND to_regprocedure('public.preview_plan_quote(integer,integer,boolean,integer,integer,integer)') IS NOT NULL
+   AND to_regprocedure('public.enqueue_premium_notices()') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'payments'
+                 AND column_name = 'last_reconciled_at')
+   AND to_regclass('public.idx_payments_pending_reconcile') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'subscriptions'
+                 AND column_name = 'last_reconciled_at')
+   AND to_regclass('public.idx_subscriptions_active_reconcile') IS NOT NULL)::text
 UNION ALL SELECT 'admins activos',
   (SELECT count(*) FROM public.users u JOIN public.roles r ON r.id = u.role_id
    WHERE r.name = 'admin' AND u.is_active)::text;
@@ -103,23 +222,38 @@ Si `pgcrypto en extensions` sale `false`, **detenerse**: 0017 falla al crear el 
 
 Aplicar **cada archivo completo**, en este orden, saltando solo los que el diagnóstico marque como `true`:
 
-| # | Archivo | Se nota en el diagnóstico | ¿Re-ejecutable? |
-|---|---|---|---|
-| 0001–0010 | `20261015000001_…` a `20261016000010_perf.sql` | `tablas public` > 0 y `helpers 0009 = true` | ⚠️ solo si falta; no re-aplicar a ciegas |
-| 0011 | `20261016000011_seguridad.sql` (**versión corregida**: `session_user` sin paréntesis) | `0011 assert_admin` + `0011 corregido` | ⛔ **no re-ejecutar** (ver §6) |
-| 0012 | `20261016000012_verify_hardening.sql` (solo verifica) | — | ✅ siempre |
-| 0013 | `20261019000013_registration_hardening.sql` | `0013 … = true` | ✅ `CREATE OR REPLACE` + `GRANT` |
-| 0014 | `20261020000014_user_stores_read.sql` | `0014 … = true` | ✅ |
-| 0015 | `20261023000015_registration_guards.sql` | `0015 … = true` (los dos) | ✅ |
-| 0016 | *(no existe — reservada para el chatbot)* | — | — |
-| 0017 | `20261024000017_store_links.sql` | `0017 … = true` (los tres) | ✅ |
-| 0018 | `20261024000018_fix_routes_rls_recursion.sql` | `0018 … = true` — **sin esta, inventario y rutas fallan para no-admin** | ✅ |
-| 0019 | `20261025000019_catalogo_por_rol.sql` | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla** | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`) |
-| 0020 | `20261025000020_store_link_store_users.sql` | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo** | ✅ (`CREATE OR REPLACE`) |
-| 0021 | `20261025000021_store_distributor_requests.sql` | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto** | ✅ (`CREATE OR REPLACE`) |
-| 0022 | `20261025000022_catalogo_operador.sql` | `0022 … = true` — **sin esta, el operador no puede editar cantidades, marcar faltantes ni ver la vista `/faltantes`** | ✅ (`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE`) |
-| 0023 | `20261026000023_faltantes_operador_y_fiado.sql` | `0023 … = true` (los dos) — **sin esta, el distribuidor sigue viendo los faltantes de la tienda y el operador no puede crear el fiado** | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`) |
-| seed | `supabase/demo-catalog.sql` (opcional) | — | ✅ (idempotente: `ON CONFLICT DO NOTHING`) |
+| #         | Archivo                                                                               | Se nota en el diagnóstico                                                                                                                                                 | ¿Re-ejecutable?                                                        |
+| --------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 0001–0010 | `20261015000001_…` a `20261016000010_perf.sql`                                        | `tablas public` > 0 y `helpers 0009 = true`                                                                                                                               | ⚠️ solo si falta; no re-aplicar a ciegas                               |
+| 0011      | `20261016000011_seguridad.sql` (**versión corregida**: `session_user` sin paréntesis) | `0011 assert_admin` + `0011 corregido`                                                                                                                                    | ⛔ **no re-ejecutar** (ver §6)                                         |
+| 0012      | `20261016000012_verify_hardening.sql` (solo verifica)                                 | —                                                                                                                                                                         | ✅ siempre                                                             |
+| 0013      | `20261019000013_registration_hardening.sql`                                           | `0013 … = true`                                                                                                                                                           | ✅ `CREATE OR REPLACE` + `GRANT`                                       |
+| 0014      | `20261020000014_user_stores_read.sql`                                                 | `0014 … = true`                                                                                                                                                           | ✅                                                                     |
+| 0015      | `20261023000015_registration_guards.sql`                                              | `0015 … = true` (los dos)                                                                                                                                                 | ✅                                                                     |
+| 0016      | _(no existe — reservada para el chatbot)_                                             | —                                                                                                                                                                         | —                                                                      |
+| 0017      | `20261024000017_store_links.sql`                                                      | `0017 … = true` (los tres)                                                                                                                                                | ✅                                                                     |
+| 0018      | `20261024000018_fix_routes_rls_recursion.sql`                                         | `0018 … = true` — **sin esta, inventario y rutas fallan para no-admin**                                                                                                   | ✅                                                                     |
+| 0019      | `20261025000019_catalogo_por_rol.sql`                                                 | `0019 … = true` (los dos) — **sin esta, el catálogo de tienda/distribuidor falla**                                                                                        | ✅ (`CREATE TABLE IF NOT EXISTS` + `CREATE OR REPLACE`)                |
+| 0020      | `20261025000020_store_link_store_users.sql`                                           | `0020 … = true` — **sin esta, un operador asignado a la tienda no puede generar el QR de vínculo**                                                                        | ✅ (`CREATE OR REPLACE`)                                               |
+| 0021      | `20261025000021_store_distributor_requests.sql`                                       | `0021 … = true` — **sin esta, el operador puede pedir a cualquier distribuidor/producto**                                                                                 | ✅ (`CREATE OR REPLACE`)                                               |
+| 0022      | `20261025000022_catalogo_operador.sql`                                                | `0022 … = true` — **sin esta, el operador no puede editar cantidades, marcar faltantes ni ver la vista `/faltantes`**                                                     | ✅ (`ADD COLUMN IF NOT EXISTS` + `CREATE OR REPLACE`)                  |
+| 0023      | `20261026000023_faltantes_operador_y_fiado.sql`                                       | `0023 … = true` (los dos) — **sin esta, el distribuidor sigue viendo los faltantes de la tienda y el operador no puede crear el fiado**                                   | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0024      | `20261026000024_solicitudes_sin_precio_y_cotizacion.sql`                              | `0024 … = true` (los dos) — **sin esta, el operador sigue sin poder solicitar sin precio y el inventario no puede limpiar umbrales**                                      | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`; el `ALTER` es idempotente) |
+| 0025      | `20261026000025_ciclo_pedido_distribuidor.sql`                                        | `0025 … = true` — **sin esta, el operador que pidió puede marcar en ruta/confirmar la entrega y no hay fecha editable**                                                   | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0026      | `20261027000026_inventario_edicion_y_alta.sql`                                        | `0026 … = true` — **sin esta, el inventario no puede editar cantidad+umbral en un solo guardado ni dar de alta con cantidad inicial**                                     | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0027      | `20261028000027_precios_premium_y_movimientos.sql`                                    | `0027 … = true` — **sin esta, Premium no puede publicar precios y los movimientos no guardan el precio de compra/venta**                                                  | ✅ (`CREATE OR REPLACE` + `DROP`/`CREATE` de las firmas con precio)    |
+| 0028      | `20261028000028_pedidos_reversibles_y_precio_operador.sql`                            | `0028 … = true` — **sin esta, el distribuidor no puede devolver un pedido a pendiente y el operador no ve la cotización sin Premium**                                     | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0029      | `20261029000029_entregas_ventas_y_contacto.sql`                                       | `0029 … = true` — **sin esta, no hay venta directa, la cotización no se ajusta en ruta y no hay botón de contacto**                                                       | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0030      | `20261029000030_relaciones_precios.sql`                                               | `0030 … = true` — **sin esta, el distribuidor no puede ajustar su cantidad/precios, la ficha global quedaría editable por su creador y no hay prellenado de movimientos** | ✅ (`ALTER TABLE` + `CREATE OR REPLACE` + policies)                    |
+| 0031      | `20261029000031_alertas_distribuidor.sql`                                             | `0031 … = true` — **sin esta, el umbral/vencimiento del distribuidor solo se ve como badge y no llega a `/alertas`**                                                      | ✅ (`DROP/CREATE INDEX` + `CREATE OR REPLACE` + cron)                  |
+| 0032      | `20261029000032_premium_estado_planes.sql`                                            | `0032 … = true` — **sin esta, no hay vencimiento de Premium, planes versionados ni desglose de precio**                                                                   | ✅ (`ALTER TABLE` + `CREATE TABLE` + `CREATE OR REPLACE`)              |
+| 0033      | `20261029000033_downgrade_tiendas.sql`                                                | `0033 … = true` — **sin esta, al vencer Premium no se puede elegir tienda principal ni reactivar las pausadas**                                                           | ✅ (`ALTER TABLE` + `CREATE OR REPLACE` + cron)                        |
+| 0034      | `20261029000034_gestion_tiendas.sql`                                                  | `0034 … = true` — **sin esta, el dueño no puede desactivar su tienda ni el admin transferir propiedad**                                                                   | ✅ (`CREATE OR REPLACE` + `REVOKE`/`GRANT`)                            |
+| 0035      | `20261029000035_f4_mercado_pago.sql`                                                  | `0035 … = true` — **sin esta, el checkout de Mercado Pago no puede guardar la referencia externa ni reutilizar el init_point**                                            | ✅ (`ALTER TABLE` + índice único parcial)                              |
+| 0036      | `20261029000036_f5_avisos_admin.sql`                                                  | `0036 … = true` — **sin esta, no hay preview de precios ni outbox de avisos**                                                                                             | ✅ (`CREATE TABLE` + `CREATE OR REPLACE` + `REVOKE`/`GRANT`)           |
+| seed      | `supabase/demo-catalog.sql` (opcional)                                                | —                                                                                                                                                                         | ✅ (idempotente: `ON CONFLICT DO NOTHING`)                             |
+
+> **F6 — el checkout sigue apagado después de migrar.** `PREMIUM_CHECKOUT_ENABLED` debe quedar en `false` hasta el canary; el frontend usa `VITE_PREMIUM_CHECKOUT_ENABLED`. Seguir `docs/runbooks/premium-lanzamiento.md` para secrets, deploy, allowlist, salud, canary y rollback.
 
 - **Opción A, SQL editor:** pegar un archivo a la vez (cada pegado es una transacción: si falla, no queda a medias).
 - **Opción B, CLI:** `supabase link --project-ref tzyqstnxbzyfmdxeuyvz` → si el historial no tiene las versiones ya aplicadas a mano, marcarlas con `supabase migration repair --status applied <versión>` → `supabase db push`.
@@ -140,15 +274,15 @@ Correr `20261015000008_verify.sql` y `20261016000012_verify_hardening.sql`.
 
 > **`0012` NO va a salir limpio, y no es un error de aplicación.** Estos FAIL son el estado correcto:
 
-| Check | Resultado esperado | Motivo |
-|---|---|---|
-| **H1.1** | **FAIL** | `anon` conserva EXECUTE sobre las funciones de la **extensión PostGIS**, instalada en `public` por `0001:9` (`CREATE EXTENSION postgis` sin schema). 0011 no puede revocarlas: el rol del SQL editor no es su owner ni su grantor. No son superficie de la app |
-| **H1.3** | **FAIL**, con **43** funciones y **9** extras | `v_n = 34` está hardcodeado y `v_expected` no incluye: `register_distributor` (0015) + 5 de 0017 (`internal_can_manage_store`, `get_store_link_code`, `regenerate_store_link_code`, `link_distributor_to_store`, `unlink_distributor`) + 3 de 0018 (`my_route_ids`, `routes_with_my_stores`, `stores_on_my_routes`) |
-| **H1.4** | **FAIL** | mitad `anon`/PostGIS del mismo origen que H1.1 |
-| **H1.2** | **OK** | las 17 funciones de la deny-list siguen sin grant |
-| **H2.1 / H2.2** | **OK (31/31)** | la whitelist de 0011 tiene EXECUTE |
-| **H3.1–H3.5** | **OK** | guards de `assert_admin` intactos |
-| H4.x | **WARNING** | informativo |
+| Check           | Resultado esperado                            | Motivo                                                                                                                                                                                                                                                                                                              |
+| --------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **H1.1**        | **FAIL**                                      | `anon` conserva EXECUTE sobre las funciones de la **extensión PostGIS**, instalada en `public` por `0001:9` (`CREATE EXTENSION postgis` sin schema). 0011 no puede revocarlas: el rol del SQL editor no es su owner ni su grantor. No son superficie de la app                                                      |
+| **H1.3**        | **FAIL**, con **43** funciones y **9** extras | `v_n = 34` está hardcodeado y `v_expected` no incluye: `register_distributor` (0015) + 5 de 0017 (`internal_can_manage_store`, `get_store_link_code`, `regenerate_store_link_code`, `link_distributor_to_store`, `unlink_distributor`) + 3 de 0018 (`my_route_ids`, `routes_with_my_stores`, `stores_on_my_routes`) |
+| **H1.4**        | **FAIL**                                      | mitad `anon`/PostGIS del mismo origen que H1.1                                                                                                                                                                                                                                                                      |
+| **H1.2**        | **OK**                                        | las 17 funciones de la deny-list siguen sin grant                                                                                                                                                                                                                                                                   |
+| **H2.1 / H2.2** | **OK (31/31)**                                | la whitelist de 0011 tiene EXECUTE                                                                                                                                                                                                                                                                                  |
+| **H3.1–H3.5**   | **OK**                                        | guards de `assert_admin` intactos                                                                                                                                                                                                                                                                                   |
+| H4.x            | **WARNING**                                   | informativo                                                                                                                                                                                                                                                                                                         |
 
 Para que H1.3 vuelva a verde hace falta una migración de verificación nueva que extienda la lista esperada (B3/pgTAP). **No editar 0012**: ya se aplicó y el PLAN §3.3 solo permite tocar 0011.
 
@@ -176,6 +310,82 @@ SELECT has_function_privilege('authenticated','public.set_store_shortage(bigint,
 SELECT has_function_privilege('authenticated','public.list_shortage_products()','EXECUTE');                                -- true
 -- 0023: alcance del tablero y fiado del operador
 SELECT has_function_privilege('authenticated','public.create_credit(bigint,date)','EXECUTE');                                              -- true
+-- 0024: solicitud sin precio, cotización del distribuidor y umbral editable
+SELECT is_nullable FROM information_schema.columns
+  WHERE table_schema='public' AND table_name='order_items' AND column_name='unit_price';                                                   -- YES
+SELECT has_function_privilege('authenticated','public.set_order_prices(bigint,jsonb)','EXECUTE');                                          -- true
+SELECT has_function_privilege('authenticated','public.set_stock_threshold(bigint,bigint,numeric)','EXECUTE');                             -- true
+-- 0025: ciclo del pedido y fecha en manos del distribuidor
+SELECT has_function_privilege('authenticated','public.set_order_expected_at(bigint,timestamptz)','EXECUTE');                                   -- true
+SELECT has_function_privilege('authenticated','public.update_order_status(bigint,public.order_status,text)','EXECUTE');                        -- true
+-- 0026: edición y alta de stock en una sola llamada
+SELECT has_function_privilege('authenticated','public.update_store_product(bigint,bigint,numeric,numeric,boolean)','EXECUTE');                -- true
+SELECT has_function_privilege('authenticated','public.add_store_product(bigint,bigint,numeric,numeric,numeric)','EXECUTE');                   -- true
+-- 0027: precios Premium y precio en movimientos
+SELECT has_function_privilege('authenticated','public.set_price(bigint,bigint,numeric(12,2),char(3))','EXECUTE');                              -- true
+SELECT has_function_privilege('authenticated','public.register_entry(bigint,bigint,numeric,bigint,bigint,date,numeric)','EXECUTE');           -- true
+SELECT has_function_privilege('authenticated','public.register_exit(bigint,bigint,numeric,bigint,bigint,numeric)','EXECUTE');                  -- true
+SELECT has_function_privilege('authenticated','public.add_store_product(bigint,bigint,numeric,numeric,numeric)','EXECUTE');                    -- true
+-- 0028: pedido reversible y cotización visible al operador
+SELECT has_function_privilege('authenticated','public.update_order_status(bigint,public.order_status,text)','EXECUTE');                        -- true
+SELECT has_function_privilege('authenticated','public.get_order_quotes(bigint)','EXECUTE');                                                    -- true
+-- 0029: venta directa y contacto entre partes
+SELECT has_function_privilege('authenticated','public.register_distributor_sale(bigint,bigint,numeric,numeric,date)','EXECUTE');               -- true
+SELECT has_function_privilege('authenticated','public.get_counterpart_contact(text,bigint)','EXECUTE');                                          -- true
+-- 0030: relaciones y precios
+SELECT has_function_privilege('authenticated','public.update_store_product_full(bigint,bigint,numeric,numeric,boolean,date,numeric,numeric)','EXECUTE'); -- true
+SELECT has_function_privilege('authenticated','public.update_distributor_product_relation(bigint,numeric,numeric,date,numeric,numeric)','EXECUTE');          -- true
+-- 0032: Premium, planes y desglose
+SELECT has_function_privilege('anon','public.quote_plan(text)','EXECUTE');                                                                     -- true
+SELECT has_function_privilege('authenticated','public.quote_plan(text)','EXECUTE');                                                            -- true
+SELECT has_function_privilege('authenticated','public.my_premium_status()','EXECUTE');                                                         -- true
+SELECT has_function_privilege('service_role','public.activate_premium(uuid,integer,bigint)','EXECUTE');                                        -- true
+-- 0032: los dos planes deben existir y estar activos
+SELECT code, active, amount_cents FROM public.plans
+WHERE code IN ('premium_monthly', 'premium_annual') ORDER BY code;                                                                             -- 2 filas
+-- 0033: downgrade y reactivación
+SELECT has_function_privilege('authenticated','public.my_owned_stores()','EXECUTE');                                                           -- true
+SELECT has_function_privilege('authenticated','public.choose_store_for_free_plan(bigint)','EXECUTE');                                          -- true
+SELECT has_function_privilege('authenticated','public.reactivate_premium_stores(bigint[])','EXECUTE');                                         -- true
+-- 0034: gestión de tiendas
+SELECT has_function_privilege('authenticated','public.deactivate_store(bigint,boolean)','EXECUTE');                                            -- true
+SELECT has_function_privilege('authenticated','public.reactivate_store(bigint)','EXECUTE');                                                    -- true
+SELECT has_function_privilege('authenticated','public.transfer_store(bigint,uuid)','EXECUTE');                                                 -- true
+SELECT has_function_privilege('anon','public.deactivate_store(bigint,boolean)','EXECUTE');                                                     -- false
+SELECT has_function_privilege('anon','public.reactivate_store(bigint)','EXECUTE');                                                             -- false
+SELECT has_function_privilege('anon','public.transfer_store(bigint,uuid)','EXECUTE');                                                          -- false
+SELECT has_function_privilege('authenticated','public.user_is_premium(uuid)','EXECUTE');                                                       -- false (interna)
+SELECT has_column_privilege('authenticated','public.stores','name','UPDATE');                                                                  -- true
+SELECT has_column_privilege('authenticated','public.stores','is_active','UPDATE');                                                             -- false
+SELECT has_column_privilege('authenticated','public.stores','created_by','UPDATE');                                                            -- false
+SELECT has_column_privilege('authenticated','public.stores','deactivated_reason','UPDATE');                                                    -- false
+SELECT has_column_privilege('authenticated','public.stores','deactivated_at','UPDATE');                                                        -- false
+SELECT has_column_privilege('authenticated','public.stores','link_code','UPDATE');                                                             -- false
+-- 0035: soporte de Mercado Pago
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = 'subscriptions'
+  AND column_name IN ('external_reference', 'provider_init_point')
+ORDER BY column_name;                                                                                                                            -- 2 filas
+SELECT indexname FROM pg_indexes
+WHERE schemaname = 'public' AND tablename = 'subscriptions'
+ORDER BY indexname;                                                                                                                              -- incluye uq_subscriptions_external_reference y uq_subscriptions_one_active_per_user
+SELECT has_table_privilege('authenticated','public.subscriptions','INSERT');                                                                     -- false
+SELECT has_table_privilege('authenticated','public.subscriptions','UPDATE');                                                                     -- false
+SELECT has_function_privilege('authenticated','public.merge_subscription_period(bigint,timestamptz,timestamptz)','EXECUTE');                    -- false
+SELECT has_function_privilege('service_role','public.merge_subscription_period(bigint,timestamptz,timestamptz)','EXECUTE');                     -- true
+SELECT has_function_privilege('authenticated','public.activate_premium_until(uuid,timestamptz,bigint)','EXECUTE');                              -- false
+SELECT has_function_privilege('service_role','public.activate_premium_until(uuid,timestamptz,bigint)','EXECUTE');                               -- true
+-- 0036: outbox de avisos y preview de precios
+SELECT has_table_privilege('authenticated','public.premium_notices','SELECT');                                                                   -- true (policy admin)
+SELECT has_table_privilege('authenticated','public.premium_notices','INSERT');                                                                  -- false
+SELECT has_table_privilege('authenticated','public.premium_notices','UPDATE');                                                                  -- false
+SELECT has_function_privilege('authenticated','public.preview_plan_quote(integer,integer,boolean,integer,integer,integer)','EXECUTE');          -- true (assert_admin)
+SELECT has_function_privilege('authenticated','public.enqueue_premium_notices()','EXECUTE');                                                    -- false
+SELECT has_function_privilege('service_role','public.enqueue_premium_notices()','EXECUTE');                                                     -- true
+SELECT table_name, column_name FROM information_schema.columns
+WHERE table_schema = 'public' AND column_name = 'last_reconciled_at'
+  AND table_name IN ('payments', 'subscriptions')
+ORDER BY table_name;                                                                                                                             -- 2 filas
 ```
 
 Y después:
@@ -185,7 +395,19 @@ Y después:
 3. Supabase → Authentication → Email Templates → **Reset Password**: mantener el link de confirmación (`{{ .ConfirmationURL }}`, el template por defecto). Ese link es el que verifica el token y redirige a `/restablecer`; si se reemplaza por un link propio, el flujo de recuperación deja de funcionar.
 4. Probar el flujo de recuperación con un usuario real: `/login` → “¿Olvidaste tu contraseña?” → email → abrir el link → elegir una nueva contraseña.
 5. Probar en la app con un **operador** (no admin): inventario, rutas y stock deben cargar (esto valida 0018).
-6. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
+6. Probar la **gestión de tiendas** (0034) con datos reales de prueba:
+   - **Dueño sin pedidos abiertos:** en `/stores/:id`, «Desactivar tienda» debe pedir confirmación, dejar `is_active=false` con `deactivated_reason='user_removed'` y volver a la lista. El stock, pedidos, rutas y créditos se conservan.
+   - **Dueño con pedido `pending` o `in_route`:** la desactivación debe fallar con un mensaje que pida entregar o cancelar primero; la tienda sigue activa.
+   - **Dueño reactiva:** una tienda `user_removed` se puede reactivar mientras no supere el tope de su plan (1 free, 3 Premium).
+   - **Admin transfiere:** en la ficha de la tienda, «Transferir propiedad» solo lista operadores/admin activos distintos del dueño. Tras transferir, `stores.created_by` y `user_stores` apuntan al nuevo dueño y el dueño anterior deja de verla. Si el nuevo dueño ya está en su tope, la RPC debe rechazar.
+   - **Operador ajeno:** no debe ver las acciones de desactivar/transferir; si fuerza la RPC, la base la rechaza.
+   - **UPDATE directo acotado:** un PATCH directo a `stores.is_active` o `stores.created_by` debe fallar por privilegios; solo las columnas de edición (`name`, `address`, etc.) se actualizan sin RPC.
+7. Probar la **operación F5**:
+   - `/planes` (admin): editar un precio, previsualizar el desglose, guardar y confirmar que se creó una versión nueva. `quote_plan` usa el precio nuevo; una suscripción existente conserva `price_cents_at_signup`.
+   - `/pagos` (admin): cancelar una suscripción y reembolsar un pago aprobado en sandbox. Confirmar el estado local y la fila en `audit_log`.
+   - Avisos: ejecutar `send-premium-notices` con `RESEND_API_KEY`, `EMAIL_FROM` y `APP_URL`; sin esos secrets debe devolver 503 y dejar el outbox pendiente. Repetir el enqueue no duplica avisos.
+   - Conciliación: ejecutar `reconcile-subscriptions` con un pago pendiente sandbox y confirmar que activa/extiende una sola vez.
+8. **Nunca** correr `scripts/smoke-local.mjs` contra producción: crea usuarios y datos (además se niega si la URL no es local).
 
 ## 5. Opción C — que lo haga un agente con MCP
 
@@ -196,7 +418,7 @@ Y después:
    (sin `read_only=true`, que impide aplicar migraciones).
 2. Reiniciar la sesión → `/mcp` → `supabase` → iniciar sesión con una cuenta con acceso al proyecto.
 3. Instrucción **cerrada**, nunca "aplica las migraciones":
-   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
+   > Aplica exactamente estos archivos, en este orden: 0013, 0014, 0015, 0017, 0018, 0019, 0020, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0028, 0029, 0030, 0031, 0032, 0033, 0034, 0035, 0036. Uno por transacción. Detente al primer error y muéstrame el mensaje; no improvises correcciones ni apliques nada más.
 4. **Quitar el MCP al terminar**: `claude mcp remove supabase`. Un agente con escritura sobre producción no se deja instalado.
 
 ## 6. Trampas conocidas

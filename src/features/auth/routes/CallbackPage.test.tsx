@@ -91,9 +91,7 @@ describe("CallbackPage (D2 · ruta pública /auth/callback)", () => {
       "El link de confirmación expiró. Iniciá sesión y pedí uno nuevo.",
     );
     expect(screen.queryByText(/oauth code/)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Iniciá sesión" }),
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Iniciá sesión" })).toHaveAttribute("href", "/login");
   });
 
   it("code ya usado (sin sesión): mensaje propio de link duplicado", async () => {
@@ -117,10 +115,7 @@ describe("CallbackPage (D2 · ruta pública /auth/callback)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "El link de confirmación es inválido o está incompleto. Pedí uno nuevo desde el login.",
     );
-    expect(screen.getByRole("link", { name: "Iniciá sesión" })).toHaveAttribute(
-      "href",
-      "/login",
-    );
+    expect(screen.getByRole("link", { name: "Iniciá sesión" })).toHaveAttribute("href", "/login");
   });
 
   it("error de red: mensaje de mapError (HARD-1), sin texto crudo", async () => {

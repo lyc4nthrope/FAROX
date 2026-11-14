@@ -54,9 +54,7 @@ function normalizeRow(raw: Record<string, unknown>): DistributorRow {
 // 'exact' + .range para paginar (Base:695, contrato useList D4). El error
 // sale CRUDO acá: useList lo mapea con mapError() — el texto del backend
 // jamás llega al DOM (HARD-1).
-export async function fetchDistributors(
-  query: ListQuery,
-): Promise<ListResult<DistributorListRow>> {
+export async function fetchDistributors(query: ListQuery): Promise<ListResult<DistributorListRow>> {
   const { from, to } = pageRange(query);
   const { data, count, error } = await supabase
     .from("distributors")
@@ -103,11 +101,7 @@ export async function fetchDistributorUserCounts(): Promise<{
 export async function fetchDistributor(
   id: number,
 ): Promise<{ row: DistributorRow | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("distributors")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("distributors").select("*").eq("id", id).single();
   if (error !== null) {
     return { row: null, error };
   }
@@ -180,11 +174,7 @@ export async function deactivateDistributor(
 export async function deleteDistributor(
   id: number,
 ): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("distributors")
-    .delete()
-    .eq("id", id)
-    .select("id");
+  const { data, error } = await supabase.from("distributors").delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }

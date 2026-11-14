@@ -1,4 +1,7 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+import { PremiumBadge } from "./PremiumBadge";
 
 export interface PremiumLockProps {
   title: string;
@@ -45,8 +48,8 @@ export function PremiumLock({ title, benefits, preview, children }: PremiumLockP
               Función Premium
             </p>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-800 shadow-sm before:h-1.5 before:w-1.5 before:rounded-full before:bg-amber-500 before:content-['']">
-            Premium
+          <span className="ml-auto">
+            <PremiumBadge tone="outline" />
           </span>
         </div>
 
@@ -98,6 +101,24 @@ export function PremiumLock({ title, benefits, preview, children }: PremiumLockP
           </span>
           Un administrador activa Premium desde Usuarios → detalle del usuario.
         </p>
+        <Link
+          to="/premium"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-gray-900 underline-offset-4 hover:underline"
+        >
+          Ver planes
+          <svg
+            aria-hidden="true"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+          >
+            <path d="M5 12h14m-6-6 6 6-6 6" />
+          </svg>
+        </Link>
       </div>
     </section>
   );

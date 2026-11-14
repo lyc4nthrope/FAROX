@@ -3,5 +3,8 @@ import { afterEach } from "vitest";
 
 // Aislamiento entre pruebas: nada de sessionStorage/localStorage compartido.
 afterEach(() => {
-  window.sessionStorage.clear();
+  // Los tests de Edge Functions corren en entorno node (sin DOM).
+  if (typeof window !== "undefined") {
+    window.sessionStorage.clear();
+  }
 });

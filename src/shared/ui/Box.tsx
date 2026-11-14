@@ -3,9 +3,18 @@ import type { ReactNode } from "react";
 import { mapError } from "../lib/errors/mapError";
 
 /** Caja simple para agrupar una sección de la pantalla. */
-export function Box({ title, children }: { title: string; children: ReactNode }) {
+export function Box({
+  title,
+  children,
+  className = "mt-4",
+}: {
+  title: string;
+  children: ReactNode;
+  /** Espaciado exterior; por defecto `mt-4`. */
+  className?: string;
+}) {
   return (
-    <section className="mt-4 rounded-2xl border border-gray-200/80 bg-white shadow-sm">
+    <section className={`${className} rounded-2xl border border-gray-200/80 bg-white shadow-sm`}>
       <h2 className="border-b border-gray-100 px-5 py-3 text-sm font-semibold tracking-tight text-gray-900">
         {title}
       </h2>

@@ -69,8 +69,7 @@ beforeAll(async () => {
   cp = (await import(["node", "child_process"].join(":"))) as CpModule;
   proc = (globalThis as unknown as { process: ProcModule }).process;
 
-  const tmpBase =
-    proc.env.TEMP ?? proc.env.TMP ?? proc.env.TMPDIR ?? `${REPO_ROOT}/.tmp`;
+  const tmpBase = proc.env.TEMP ?? proc.env.TMP ?? proc.env.TMPDIR ?? `${REPO_ROOT}/.tmp`;
   fs.mkdirSync(tmpBase, { recursive: true });
   tmpRoot = fs.mkdtempSync(`${tmpBase.replace(/\\/g, "/")}/farox-d2-`);
 });
@@ -100,14 +99,7 @@ describe("T-A1 · migración D2a (user_stores read)", () => {
     // cualquier sentencia extra (aunque sea una continuación de bloque) rompe
     // la igualdad. Redundancia explícita del AC:
     expect(statementLines).toEqual([GRANT_LINE]);
-    for (const forbidden of [
-      "INSERT ",
-      "UPDATE ",
-      "DELETE ",
-      "CREATE TABLE",
-      "DROP ",
-      "ALTER ",
-    ]) {
+    for (const forbidden of ["INSERT ", "UPDATE ", "DELETE ", "CREATE TABLE", "DROP ", "ALTER "]) {
       expect(
         statementLines.some((line) => line.includes(forbidden)),
         `la migración no debe contener la sentencia ${forbidden.trim()}`,
@@ -134,38 +126,28 @@ describe("T-A1 · migración D2a (user_stores read)", () => {
 });
 
 const extractQuotedNames = (blockName: string): string[] => {
-  const match = readGateSource().match(
-    new RegExp(`const ${blockName} = \\[([\\s\\S]*?)\\];`),
-  );
+  const match = readGateSource().match(new RegExp(`const ${blockName} = \\[([\\s\\S]*?)\\];`));
   expect(match, `bloque ${blockName} no encontrado en check-scope.mjs`).not.toBeNull();
-  return [...(match as RegExpMatchArray)[1].matchAll(/"([^"]+)"/g)].map(
-    (entry) => entry[1],
-  );
+  return [...(match as RegExpMatchArray)[1].matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
 };
 
 describe("T-A2 · gate de alcance: solo lo que aún no tiene slice sigue diferido", () => {
-  it("DEFERRED_TABLES queda con las 4 tablas pendientes (chat y agregados internos)", () => {
-    expect(extractQuotedNames("DEFERRED_TABLES")).toEqual([
-      "order_items",
-      "dashboard_daily",
-      "chat_conversations",
-      "chat_messages",
-    ]);
+  it("DEFERRED_TABLES queda con las tablas pendientes (sin chat: 0039)", () => {
+    expect(extractQuotedNames("DEFERRED_TABLES")).toEqual(["order_items", "dashboard_daily"]);
   });
 
   it("el nombre de la tabla de auditoría ya no está en DEFERRED_TABLES", () => {
     expect(extractQuotedNames("DEFERRED_TABLES")).not.toContain(auditTableName);
   });
 
-  it("DEFERRED_RPCS queda con las 3 RPC del chatbot aún sin slice", () => {
-    expect(extractQuotedNames("DEFERRED_RPCS")).toEqual(["get_stock", "create_chat", "send_message"]);
+  it("DEFERRED_RPCS deja solo get_stock: chat activado en 0039", () => {
+    expect(extractQuotedNames("DEFERRED_RPCS")).toEqual(["get_stock"]);
   });
 });
 
 // Probes armados en RUNTIME: la salida contiene los patrones que la gate debe
 // detectar, pero este archivo fuente no los contiene de forma contigua.
-const probeFrom = (table: string): string =>
-  [".from(", '"', table, '"', ")"].join("");
+const probeFrom = (table: string): string => [".from(", '"', table, '"', ")"].join("");
 const probeRpc = (name: string): string => [".rpc(", '"', name, '"', ")"].join("");
 const probeStoreInsert = (): string =>
   [".from(", '"', "stores", '"', ").", "insert", "({"].join("");
@@ -185,13 +167,13 @@ const runGateOn = (
 
 // [descripción, clave única, contenido del probe, subcadena de la regla]
 const forbiddenProbes: ReadonlyArray<[string, string, string, string]> = [
-  ["la tabla diferida order_items", "tabla-order-items", probeFrom("order_items"), "tabla diferida: order_items"],
   [
-    "la RPC diferida send_message",
-    "rpc-send-message",
-    probeRpc("send_message"),
-    "RPC diferido: send_message",
+    "la tabla diferida order_items",
+    "tabla-order-items",
+    probeFrom("order_items"),
+    "tabla diferida: order_items",
   ],
+  ["la RPC diferida get_stock", "rpc-get-stock", probeRpc("get_stock"), "RPC diferido: get_stock"],
   [
     "la cadena " + serviceRoleName,
     "service-role",
@@ -213,6 +195,18 @@ describe("T-A3 · la gate sigue atrapando las reglas restantes (ADM-2.2/2.3)", (
     const result = runGateOn("audit-ok", probeFrom(auditTableName));
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("§S8 OK");
+  });
+
+  it("0039: ya acepta chat_* y create_chat/send_message (asistente)", () => {
+    const probe =
+      probeFrom("chat_conversations") +
+      "\n" +
+      probeRpc("create_chat") +
+      "\n" +
+      probeRpc("send_message");
+    const result = runGateOn("chat-ok", probe);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("S8 OK");
   });
 
   it.each(forbiddenProbes)(

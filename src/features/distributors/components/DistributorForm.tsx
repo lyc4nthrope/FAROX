@@ -1,3 +1,4 @@
+import { LIMITS } from "../../../shared/lib/limits";
 import type { DistributorFormValues } from "../schemas";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../types";
 
@@ -83,6 +84,7 @@ export function DistributorForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.name}
+          maxLength={LIMITS.distributorName}
           aria-invalid={errors.name !== undefined}
           aria-describedby={errors.name === undefined ? undefined : "distributor-name-error"}
           onChange={(event) => onChange({ ...values, name: event.target.value })}
@@ -103,6 +105,7 @@ export function DistributorForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.nit}
+          maxLength={LIMITS.distributorNit}
           aria-invalid={errors.nit !== undefined}
           aria-describedby={errors.nit === undefined ? undefined : "distributor-nit-error"}
           onChange={(event) => onChange({ ...values, nit: event.target.value })}
@@ -126,6 +129,7 @@ export function DistributorForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.contact_name}
+          maxLength={LIMITS.distributorContactName}
           onChange={(event) => onChange({ ...values, contact_name: event.target.value })}
         />
       </div>
@@ -139,6 +143,7 @@ export function DistributorForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.phone}
+          maxLength={LIMITS.distributorPhone}
           onChange={(event) => onChange({ ...values, phone: event.target.value })}
         />
       </div>
@@ -152,6 +157,7 @@ export function DistributorForm({
           disabled={readOnly}
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           value={values.email}
+          maxLength={LIMITS.distributorEmail}
           aria-invalid={errors.email !== undefined}
           aria-describedby={errors.email === undefined ? undefined : "distributor-email-error"}
           onChange={(event) => onChange({ ...values, email: event.target.value })}
@@ -163,10 +169,7 @@ export function DistributorForm({
         )}
       </div>
       <div>
-        <label
-          htmlFor="distributor-preference"
-          className="block text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="distributor-preference" className="block text-sm font-medium text-gray-700">
           Preferencia de contacto
         </label>
         <select

@@ -1,27 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
+import { formatQty } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
-import {
-  Status,
-  buttonClass,
-  inputClass,
-  runAction,
-} from "../../../shared/ui/Box";
+import { Badge, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
+import { EmptyState, ErrorBanner, QuantityStepper } from "../../../shared/ui";
 import { Pager } from "../../../shared/ui/Pager";
 import {
   addDistributorCatalogProduct,
-  addStoreCatalogProduct,
+  addStoreProduct,
   createProduct,
   fetchActiveProductsForCatalog,
   fetchBrands,
+  fetchDistributorProductIds,
   fetchProductCategories,
+  fetchStoreStock,
   fetchUnitTypes,
 } from "../api";
 import { ProductForm, type ProductFormErrors } from "./ProductForm";
-import { ProductList } from "./ProductList";
 import { productSchema, type ProductFormValues } from "../schemas";
 import type { CatalogQuery, CatalogRef, CatalogTarget, ProductListRow } from "../types";
 
@@ -122,7 +120,7 @@ function QuickCreateProduct({
         }
         const added = await runAction(() =>
           target.kind === "store"
-            ? addStoreCatalogProduct(target.id, productId)
+            ? addStoreProduct(target.id, productId, 0)
             : addDistributorCatalogProduct(productId),
         );
         onCreated();
@@ -175,17 +173,60 @@ export function AddProductsPanel({
   target,
   categories,
   onAdded,
+  canSetPrice = false,
 }: {
   target: CatalogTarget;
   categories: CatalogRef[];
   onAdded: () => void;
+  /** 0027: Premium/admin puede fijar el precio de venta al dar de alta. */
+  canSetPrice?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(NO_MSG);
+  // 0026: cantidad inicial por producto del registro (solo catálogo de tienda).
+  const [quantities, setQuantities] = useState<Record<number, string>>({});
+  // 0027: precio de venta opcional por producto (solo Premium/admin).
+  const [prices, setPrices] = useState<Record<number, string>>({});
+  // 0027: mostrar solo los productos que todavía no están en la tienda/catálogo.
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
 
-  const list = useList<ProductListRow, CatalogQuery>(fetchActiveProductsForCatalog, INITIAL_QUERY);
+  // 0026/0027: estado real de la entidad para reemplazar la columna «Estado»
+  // (que solo decía Activo) por algo útil: qué ya está asignado y con cuánto
+  // stock. También alimenta el filtro «solo no añadidos».
+  const storeStock = useLoad(
+    () =>
+      target.kind === "store"
+        ? fetchStoreStock(target.id)
+        : Promise.resolve({ data: [] as { product_id: number; quantity: number }[], error: null }),
+    [target.kind, target.id],
+  );
+  const distributorIds = useLoad(
+    () =>
+      target.kind === "distribuidor"
+        ? fetchDistributorProductIds()
+        : Promise.resolve({ data: [] as number[], error: null }),
+    [target.kind],
+  );
+  const stockByProduct = useMemo(
+    () => new Map((storeStock.data ?? []).map((row) => [row.product_id, row.quantity])),
+    [storeStock.data],
+  );
+  const distributorSet = useMemo(() => new Set(distributorIds.data ?? []), [distributorIds.data]);
+  const assignedError = storeStock.error ?? distributorIds.error;
+  const assignedIds = useMemo(
+    () => (target.kind === "store" ? [...stockByProduct.keys()] : [...distributorSet]),
+    [target.kind, stockByProduct, distributorSet],
+  );
+
+  const list = useList<ProductListRow, CatalogQuery>(
+    (query) =>
+      onlyUnassigned
+        ? fetchActiveProductsForCatalog(query, assignedIds)
+        : fetchActiveProductsForCatalog(query),
+    INITIAL_QUERY,
+  );
 
   const activeSearch = list.query.q;
   const setQuery = list.setQuery;
@@ -195,22 +236,63 @@ export function AddProductsPanel({
     return () => clearTimeout(timer);
   }, [search, activeSearch, setQuery]);
 
+  // El filtro cambia el WHERE del servidor: se refetchea al activarlo y cuando
+  // termina de cargar el estado real de la tienda. Se vuelve a la página 0
+  // (con el filtro puesto, la página actual puede quedar vacía).
+  const setPageZero = list.setQuery;
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    setPageZero({ page: 0 });
+  }, [onlyUnassigned, assignedIds, setPageZero]);
+
+  function isAssigned(productId: number): boolean {
+    return target.kind === "store" ? stockByProduct.has(productId) : distributorSet.has(productId);
+  }
+
+  function quantityOf(productId: number): string {
+    return quantities[productId] ?? "0";
+  }
+
+  function priceOf(productId: number): string {
+    return prices[productId] ?? "";
+  }
+
   async function agregar(product: ProductListRow): Promise<void> {
+    if (busyId === product.id || isAssigned(product.id)) return;
     setBusyId(product.id);
+    const raw = Number(quantityOf(product.id));
+    const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+    const rawPrice = priceOf(product.id).trim();
+    const price = rawPrice === "" ? null : Number(rawPrice);
+    if (price !== null && (!Number.isFinite(price) || price <= 0)) {
+      setMsg({ error: "El precio debe ser mayor a 0.", ok: null });
+      setBusyId(null);
+      return;
+    }
     const error = await runAction(() =>
       target.kind === "store"
-        ? addStoreCatalogProduct(target.id, product.id)
+        ? addStoreProduct(target.id, product.id, quantity, null, price)
         : addDistributorCatalogProduct(product.id),
     );
     setMsg({ error, ok: error === null ? "Producto agregado al catálogo." : null });
-    if (error === null) onAdded();
+    if (error === null) {
+      setQuantities((current) => ({ ...current, [product.id]: "0" }));
+      setPrices((current) => ({ ...current, [product.id]: "" }));
+      if (target.kind === "store") storeStock.reload();
+      else distributorIds.reload();
+      onAdded();
+    }
     setBusyId(null);
   }
 
   // Sin marco propio: lo envuelve el <Modal> de la pantalla.
   return (
     <>
-      <Status error={msg.error} ok={msg.ok} />
+      <Status error={msg.error ?? assignedError} ok={msg.ok} />
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <div className="w-full max-w-xs">
@@ -249,11 +331,15 @@ export function AddProductsPanel({
             ))}
           </select>
         </div>
-        <button
-          className={buttonClass}
-          type="button"
-          onClick={() => setCreating((open) => !open)}
-        >
+        <label className="flex items-center gap-2 self-end pb-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={onlyUnassigned}
+            onChange={(event) => setOnlyUnassigned(event.target.checked)}
+          />
+          Solo no añadidos
+        </label>
+        <button className={buttonClass} type="button" onClick={() => setCreating((open) => !open)}>
           {creating ? "Cerrar producto nuevo" : "Crear producto nuevo"}
         </button>
       </div>
@@ -271,23 +357,147 @@ export function AddProductsPanel({
         />
       )}
 
-      <ProductList
-        rows={list.rows}
-        loading={list.loading}
-        error={list.error}
-        emptyTitle="No hay productos que coincidan con la búsqueda"
-        emptyHint="Probá con otro nombre, otra categoría o pasá a la página siguiente."
-        renderAction={(row) => (
-          <button
-            className={buttonClass}
-            type="button"
-            disabled={busyId === row.id}
-            onClick={() => void agregar(row)}
-          >
-            Agregar
-          </button>
-        )}
-      />
+      {list.error !== null && <ErrorBanner message={list.error} />}
+      {list.error === null && list.loading && (
+        <p className="mt-4 text-sm text-gray-600">Cargando…</p>
+      )}
+      {list.error === null && !list.loading && list.rows.length === 0 && (
+        <div className="mt-4">
+          <EmptyState
+            title="No hay productos que coincidan con la búsqueda"
+            hint="Probá con otro nombre, otra categoría o pasá a la página siguiente."
+          />
+        </div>
+      )}
+      {list.error === null && !list.loading && list.rows.length > 0 && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="responsive-table w-full table-fixed border-collapse text-left text-sm sm:min-w-[720px]">
+            <colgroup>
+              {target.kind === "store" && canSetPrice ? (
+                <>
+                  <col className="w-[34%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[26%]" />
+                </>
+              ) : (
+                <>
+                  <col className="w-[46%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[32%]" />
+                </>
+              )}
+            </colgroup>
+            <thead>
+              <tr className="border-b border-gray-200 text-gray-600">
+                <th className="py-2 pr-3 font-medium">Producto</th>
+                <th className="py-2 pr-3 font-medium">
+                  {target.kind === "store" ? "En la tienda" : "En el catálogo"}
+                </th>
+                {target.kind === "store" && canSetPrice && (
+                  <th className="py-2 pr-3 font-medium">Precio de venta</th>
+                )}
+                <th className="py-2 text-right font-medium">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.rows.map((row) => {
+                const assigned = isAssigned(row.id);
+                const quantity = stockByProduct.get(row.id) ?? 0;
+                const meta = [row.brand?.name, row.unit?.name, row.category?.name]
+                  .filter((value): value is string => value !== null && value !== undefined)
+                  .join(" · ");
+                return (
+                  <tr
+                    key={row.id}
+                    onClick={() => {
+                      if (!assigned) void agregar(row);
+                    }}
+                    className={`border-b border-gray-100 align-top ${
+                      assigned ? "" : "cursor-pointer transition-colors hover:bg-gray-50"
+                    }`}
+                  >
+                    <td
+                      className="responsive-primary min-w-0 py-2 pr-3 align-top"
+                      data-label="Producto"
+                    >
+                      <p className="break-words font-medium text-gray-900">{row.name}</p>
+                      {meta !== "" && <p className="break-words text-xs text-gray-500">{meta}</p>}
+                    </td>
+                    <td
+                      className="py-2 pr-3 align-top"
+                      data-label={target.kind === "store" ? "En la tienda" : "En el catálogo"}
+                    >
+                      {assigned ? (
+                        <Badge tone="green">
+                          {target.kind === "store"
+                            ? `En tienda · ${formatQty(quantity)}`
+                            : "En catálogo"}
+                        </Badge>
+                      ) : (
+                        <Badge tone="gray">Sin asignar</Badge>
+                      )}
+                    </td>
+                    {target.kind === "store" && canSetPrice && (
+                      <td
+                        className="py-2 pr-3 align-top"
+                        data-label="Precio de venta"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {assigned ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <input
+                            aria-label={`Precio de venta de ${row.name}`}
+                            className={`${inputClass} w-full min-w-0 px-2 py-1 text-xs`}
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            placeholder="Opcional"
+                            value={priceOf(row.id)}
+                            onChange={(event) =>
+                              setPrices((current) => ({
+                                ...current,
+                                [row.id]: event.target.value,
+                              }))
+                            }
+                          />
+                        )}
+                      </td>
+                    )}
+                    <td
+                      className="py-2 align-top"
+                      data-label="Acción"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <span className="flex flex-wrap items-center justify-end gap-2">
+                        {target.kind === "store" && !assigned && (
+                          <QuantityStepper
+                            label={row.name}
+                            value={quantityOf(row.id)}
+                            onChange={(value) =>
+                              setQuantities((current) => ({ ...current, [row.id]: value }))
+                            }
+                          />
+                        )}
+                        <button
+                          className={`${buttonClass} whitespace-nowrap px-2.5 py-1.5 text-center text-xs leading-tight`}
+                          type="button"
+                          disabled={assigned || busyId === row.id}
+                          title={assigned ? "Ya está asignado; editalo desde la tabla" : undefined}
+                          onClick={() => void agregar(row)}
+                        >
+                          {assigned ? "Ya está" : busyId === row.id ? "Agregando…" : "Agregar"}
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <Pager list={list} />
     </>
   );

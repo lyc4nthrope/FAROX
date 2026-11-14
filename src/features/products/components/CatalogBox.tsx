@@ -3,13 +3,7 @@ import { useEffect, useState } from "react";
 import { useList } from "../../../shared/hooks/useList";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { formatQty } from "../../../shared/lib/format";
-import {
-  Box,
-  Status,
-  buttonClass,
-  inputClass,
-  runAction,
-} from "../../../shared/ui/Box";
+import { Box, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
 import { Pager } from "../../../shared/ui/Pager";
 import {
   fetchDistributorCatalog,
@@ -150,7 +144,9 @@ export function CatalogBox({
 
   return (
     <Box
-      title={target.kind === "store" ? `Catálogo de ${target.name}` : "Catálogo de mi distribuidora"}
+      title={
+        target.kind === "store" ? `Catálogo de ${target.name}` : "Catálogo de mi distribuidora"
+      }
     >
       <Status error={msg.error} ok={msg.ok} />
 

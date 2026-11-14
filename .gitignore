@@ -12,3 +12,5 @@ dist/
 .env.*
 !.env.example
 
+
+.atl/.skill-registry.cache.json

@@ -40,7 +40,7 @@ export function RolesPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Administración
       </p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">

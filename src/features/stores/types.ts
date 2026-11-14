@@ -27,6 +27,8 @@ export interface StoreRow {
   address: string | null;
   city: string | null;
   phone: string | null;
+  /** 0034: dueño actual; el formulario lo usa para mostrar acciones de dueño. */
+  created_by?: string | null;
 }
 
 // Coordenadas de la fila (stores_geo) para re-binddear los inputs numéricos

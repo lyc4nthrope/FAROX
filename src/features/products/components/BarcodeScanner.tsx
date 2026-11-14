@@ -20,16 +20,27 @@ const PRODUCT_FORMATS = [
 // Cámara bajo demanda, mismo patrón que QrScanner (store-links): el permiso
 // solo se pide al tocar el botón y el resultado se entrega crudo; el
 // formulario decide qué hacer con él.
+//
+// `continuous` mantiene la cámara viva después de cada lectura (ticket de
+// venta rápida): el mismo código dentro de la ventana de enfriamiento se
+// ignora para no sumar decenas de unidades por tener el producto enfrente.
+const REPEAT_COOLDOWN_MS = 1500;
+
 export function BarcodeScanner({
   onCode,
   disabled = false,
+  continuous = false,
 }: {
   onCode: (raw: string) => void;
   disabled?: boolean;
+  continuous?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const controls = useRef<IScannerControls | null>(null);
   const finished = useRef(false);
+  const lastRead = useRef<{ code: string; at: number } | null>(null);
+  const onCodeRef = useRef(onCode);
+  onCodeRef.current = onCode;
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +55,7 @@ export function BarcodeScanner({
     setError(null);
     setStarting(true);
     finished.current = false;
+    lastRead.current = null;
     try {
       const reader = new BrowserMultiFormatReader();
       reader.possibleFormats = PRODUCT_FORMATS;
@@ -52,11 +64,21 @@ export function BarcodeScanner({
         video.current ?? undefined,
         (result, _error, scannerControls) => {
           if (!result) return;
+          const code = result.getText().trim();
+          if (continuous) {
+            const now = Date.now();
+            if (lastRead.current?.code === code && now - lastRead.current.at < REPEAT_COOLDOWN_MS) {
+              return;
+            }
+            lastRead.current = { code, at: now };
+            onCodeRef.current(code);
+            return;
+          }
           finished.current = true;
           scannerControls.stop();
           controls.current = null;
           setActive(false);
-          onCode(result.getText().trim());
+          onCodeRef.current(code);
         },
       );
       if (finished.current) {
@@ -66,9 +88,7 @@ export function BarcodeScanner({
       controls.current = scanner;
       setActive(true);
     } catch {
-      setError(
-        "No pudimos abrir la cámara. Revisá los permisos o escribí el código a mano.",
-      );
+      setError("No pudimos abrir la cámara. Revisá los permisos o escribí el código a mano.");
     } finally {
       setStarting(false);
     }

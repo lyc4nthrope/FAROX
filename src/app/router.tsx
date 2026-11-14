@@ -1,10 +1,22 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { CallbackPage, ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage } from "../features/auth";
+import {
+  CallbackPage,
+  ForgotPasswordPage,
+  LoginPage,
+  RegisterPage,
+  ResetPasswordPage,
+} from "../features/auth";
+import { AssistantPage } from "../features/assistant";
 import { AuditPage } from "../features/audit";
 import { CatalogCrudPage, CatalogsPage } from "../features/catalogs";
 import { DistributorFormPage, DistributorsPage } from "../features/distributors";
-import { AlertsPage, InventoryPage, InventoryStoresPage } from "../features/inventory";
+import {
+  AlertsPage,
+  DistributorMovementsPage,
+  InventoryPage,
+  InventoryStoresPage,
+} from "../features/inventory";
 import { LandingPage } from "../features/landing";
 import { DashboardPage, MyRoutePage, RouteDetailPage, RoutesPage } from "../features/logistics";
 import { CreditsPage, NewOrderPage, OrderDetailPage, OrdersPage } from "../features/orders";
@@ -13,6 +25,13 @@ import { PrivacyPage } from "../features/legal";
 import { ProductFormPage, ProductsPage, ShortagePage } from "../features/products";
 import { OnboardingGate, OnboardingPage } from "../features/onboarding";
 import { ProfilePage } from "../features/profile";
+import {
+  PremiumPage,
+  PremiumPaymentsAdminPage,
+  PremiumPlansAdminPage,
+  PremiumResultPage,
+  PremiumStoresPage,
+} from "../features/premium";
 import { RoleFormPage, RolesPage } from "../features/roles";
 import { StoreFormPage, StoresPage } from "../features/stores";
 import { UserDetailPage, UsersPage } from "../features/users";
@@ -124,9 +143,9 @@ export function AppRoutes() {
               }
             />
             <Route path="/products" element={<ProductsPage />} />
-            {/* Alta del catálogo GLOBAL: solo admin (0019/S7). Operador y
-                distribuidor ya no crean productos globales: eligen del
-                registro existente en su propio catálogo. */}
+            {/* Alta del catálogo GLOBAL por esta ruta: solo admin. Operador y
+                distribuidor crean desde el alta rápida de su catálogo (0030)
+                y después solo ajustan su relación; no modifican la ficha. */}
             <Route
               path="/products/new"
               element={
@@ -183,6 +202,23 @@ export function AppRoutes() {
               element={
                 <RequireRole roles={ADMIN_ONLY}>
                   <UsersPage />
+                </RequireRole>
+              }
+            />
+            {/* F5: administración de planes/precios y pagos/suscripciones. */}
+            <Route
+              path="/planes"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <PremiumPlansAdminPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/pagos"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <PremiumPaymentsAdminPage />
                 </RequireRole>
               }
             />
@@ -259,21 +295,103 @@ export function AppRoutes() {
                 </RequireRole>
               }
             />
-            <Route path="/inventario" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryStoresPage /></RequireRole>} />
-            <Route path="/inventario/:storeId" element={<RequireRole roles={ADMIN_OR_OPERATOR}><InventoryPage /></RequireRole>} />
+            <Route
+              path="/inventario"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <InventoryStoresPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/inventario/:storeId"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <InventoryPage />
+                </RequireRole>
+              }
+            />
             <Route path="/alertas" element={<AlertsPage />} />
             <Route path="/pedidos" element={<OrdersPage />} />
-            <Route path="/pedidos/nuevo" element={<RequireRole roles={ADMIN_OR_OPERATOR}><NewOrderPage /></RequireRole>} />
+            <Route
+              path="/pedidos/nuevo"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <NewOrderPage />
+                </RequireRole>
+              }
+            />
             <Route path="/pedidos/:orderId" element={<OrderDetailPage />} />
-            <Route path="/fiado" element={<RequireRole roles={ADMIN_OR_OPERATOR}><CreditsPage /></RequireRole>} />
-            <Route path="/rutas" element={<RequireRole roles={ADMIN_ONLY}><RoutesPage /></RequireRole>} />
-            <Route path="/rutas/:routeId" element={<RequireRole roles={ADMIN_ONLY}><RouteDetailPage /></RequireRole>} />
-            <Route path="/mi-ruta" element={<RequireRole roles={DISTRIBUTOR_ONLY}><MyRoutePage /></RequireRole>} />
+            <Route
+              path="/fiado"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <CreditsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/rutas"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RoutesPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/rutas/:routeId"
+              element={
+                <RequireRole roles={ADMIN_ONLY}>
+                  <RouteDetailPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/mi-ruta"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <MyRoutePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/movimientos"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <DistributorMovementsPage />
+                </RequireRole>
+              }
+            />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/tiendas/:storeId/qr" element={<RequireRole roles={ADMIN_OR_OPERATOR}><StoreQrPage /></RequireRole>} />
-            <Route path="/vincular" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
-            <Route path="/vincular/:code" element={<RequireRole roles={DISTRIBUTOR_ONLY}><LinkStorePage /></RequireRole>} />
+            <Route path="/asistente" element={<AssistantPage />} />
+            <Route
+              path="/tiendas/:storeId/qr"
+              element={
+                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                  <StoreQrPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vincular"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <LinkStorePage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/vincular/:code"
+              element={
+                <RequireRole roles={DISTRIBUTOR_ONLY}>
+                  <LinkStorePage />
+                </RequireRole>
+              }
+            />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/premium" element={<PremiumPage />} />
+            <Route path="/premium/resultado" element={<PremiumResultPage />} />
+            <Route path="/premium/tiendas" element={<PremiumStoresPage />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Route>

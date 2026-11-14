@@ -51,7 +51,9 @@ describe("0022 · catálogo del operador", () => {
     );
     expect(sql).toContain("SELECT id INTO v_motive FROM public.motives WHERE name = 'ajuste'");
     expect(sql).toContain("PERFORM public.internal_stock_entry( 'exit'");
-    expect(sql).toContain("DELETE FROM public.stock WHERE product_id = p_product AND store_id = p_store");
+    expect(sql).toContain(
+      "DELETE FROM public.stock WHERE product_id = p_product AND store_id = p_store",
+    );
     expect(sql).toContain("SET resolved_at = now()");
   });
 

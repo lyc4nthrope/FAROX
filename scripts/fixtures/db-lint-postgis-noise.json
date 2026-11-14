@@ -51,7 +51,11 @@
       { "level": "warning extra", "message": "unreachable code", "sqlState": "00000" },
       { "level": "warning", "message": "unused variable \"rec\"", "sqlState": "00000" },
       { "level": "warning extra", "message": "never read variable \"sr\"", "sqlState": "00000" },
-      { "level": "warning extra", "message": "unused parameter \"catalog_name\"", "sqlState": "00000" }
+      {
+        "level": "warning extra",
+        "message": "unused parameter \"catalog_name\"",
+        "sqlState": "00000"
+      }
     ]
   },
   {
@@ -59,20 +63,32 @@
     "issues": [
       { "level": "warning extra", "message": "unreachable code", "sqlState": "00000" },
       { "level": "warning extra", "message": "never read variable \"myrec\"", "sqlState": "00000" },
-      { "level": "warning extra", "message": "unused parameter \"catalog_name\"", "sqlState": "00000" }
+      {
+        "level": "warning extra",
+        "message": "unused parameter \"catalog_name\"",
+        "sqlState": "00000"
+      }
     ]
   },
   {
     "function": "public.dropgeometrytable",
     "issues": [
-      { "level": "warning extra", "message": "unused parameter \"catalog_name\"", "sqlState": "00000" }
+      {
+        "level": "warning extra",
+        "message": "unused parameter \"catalog_name\"",
+        "sqlState": "00000"
+      }
     ]
   },
   {
     "function": "public.updategeometrysrid",
     "issues": [
       { "level": "warning extra", "message": "unreachable code", "sqlState": "00000" },
-      { "level": "warning extra", "message": "unused parameter \"catalogn_name\"", "sqlState": "00000" }
+      {
+        "level": "warning extra",
+        "message": "unused parameter \"catalogn_name\"",
+        "sqlState": "00000"
+      }
     ]
   },
   {
@@ -82,7 +98,10 @@
         "level": "error",
         "message": "relation \"authorization_table\" does not exist",
         "statement": { "lineNumber": "18", "text": "EXECUTE" },
-        "query": { "position": "13", "text": "DELETE FROM authorization_table WHERE expires < now()" },
+        "query": {
+          "position": "13",
+          "text": "DELETE FROM authorization_table WHERE expires < now()"
+        },
         "sqlState": "42P01"
       }
     ]
@@ -94,7 +113,10 @@
         "level": "error",
         "message": "relation \"temp_lock_have_table\" does not exist",
         "statement": { "lineNumber": "24", "text": "SQL statement" },
-        "query": { "position": "13", "text": "INSERT INTO temp_lock_have_table VALUES (getTransactionID(), lockid)" },
+        "query": {
+          "position": "13",
+          "text": "INSERT INTO temp_lock_have_table VALUES (getTransactionID(), lockid)"
+        },
         "sqlState": "42P01"
       }
     ]

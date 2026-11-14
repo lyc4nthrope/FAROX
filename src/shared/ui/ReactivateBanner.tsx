@@ -15,15 +15,29 @@ type ReactivatableTable = "products" | "stores" | "distributors";
 export function ReactivateBanner({ table, id }: { table: ReactivatableTable; id: number }) {
   const { role } = useAuth();
   const state = useLoad(async () => {
-    const { data, error } = await supabase.from(table).select("is_active").eq("id", id).maybeSingle();
+    const { data, error } = await supabase
+      .from(table)
+      .select("is_active")
+      .eq("id", id)
+      .maybeSingle();
     return { data: data === null ? null : (data as { is_active: boolean }).is_active, error };
   }, [table, id]);
-  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({ error: null, ok: null });
+  const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
+    error: null,
+    ok: null,
+  });
 
   if (state.data !== false) return msg.ok ? <Status ok={msg.ok} /> : null;
 
   async function onReactivate() {
     const error = await runAction(async () => {
+      // 0034: en tiendas la reactivación pasa por RPC (limpia la razón de
+      // pausa y respeta el tope); el UPDATE directo quedó acotado a columnas
+      // de edición. Productos/distribuidores conservan el UPDATE de siempre.
+      if (table === "stores") {
+        const { error: rpcError } = await supabase.rpc("reactivate_store", { p_store: id });
+        return { error: rpcError };
+      }
       const { data, error: updateError } = await supabase
         .from(table)
         .update({ is_active: true })

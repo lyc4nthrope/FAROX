@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { LIMITS } from "../../shared/lib/limits";
 import { ROLE_NAMES } from "../auth/types";
 
 // sdd/admin-console T-C1 (design #599 §2.5, mitigación R3). Zod valida ANTES
@@ -14,12 +15,14 @@ import { ROLE_NAMES } from "../auth/types";
 // 23505 amigable vía mapError).
 export const roleSchema = z.object({
   name: z.enum(ROLE_NAMES, {
-    message:
-      "Elegí un nombre de rol del catálogo de la app (admin, operador o distribuidor).",
+    message: "Elegí un nombre de rol del catálogo de la app (admin, operador o distribuidor).",
   }),
   // roles.description es nullable (0002:44): "" viaja como NULL (convención
   // profile/api → users/api updateUserProfile).
-  description: z.string().trim(),
+  description: z
+    .string()
+    .trim()
+    .max(LIMITS.catalogDescription, `Máximo ${LIMITS.catalogDescription} caracteres`),
 });
 
 export type RoleFormValues = z.infer<typeof roleSchema>;

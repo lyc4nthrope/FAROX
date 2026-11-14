@@ -15,10 +15,9 @@ import type {
 
 // products tiene CRUD DIRECTO por tabla (T6.1 / PROD-1, spec #483 S5): la
 // tabla NO está en el REVOKE RPC-only (0006:351-357) y no existe RPC propio.
-// Políticas verificadas a mano en 0006:144-158: SELECT de todos los roles
-// (USING true) · INSERT admin u operador con has_scope (D37) · UPDATE admin o
-// creador con has_scope (D36, WITH CHECK impide transferir la propiedad) ·
-// DELETE admin SOLO sobre filas ya inactivas (soft → purge).
+// 0030: SELECT de todos los roles (USING true) · INSERT admin/operador/
+// distribuidor con has_scope (crear sí) · UPDATE SOLO admin (la ficha global
+// no la modifica quien la creó) · DELETE admin SOLO sobre filas ya inactivas.
 
 // PostgREST NO rinde error cuando RLS filtra TODAS las filas de un
 // UPDATE/DELETE: responde 0 filas afectadas. Sin esta guarda, una operación
@@ -104,9 +103,7 @@ function normalizeRow(raw: Record<string, unknown>): ProductRow {
   };
 }
 
-export async function fetchProducts(
-  query: ListQuery,
-): Promise<ListResult<ProductListRow>> {
+export async function fetchProducts(query: ListQuery): Promise<ListResult<ProductListRow>> {
   const { from, to } = pageRange(query);
   const { data, count, error } = await supabase
     .from("products")
@@ -125,11 +122,7 @@ export async function fetchProducts(
 export async function fetchProduct(
   id: number,
 ): Promise<{ row: ProductRow | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("products")
-    .select(FORM_SELECT)
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("products").select(FORM_SELECT).eq("id", id).single();
   if (error !== null) {
     return { row: null, error };
   }
@@ -153,9 +146,7 @@ async function fetchCatalog(
     return { rows: [], error };
   }
   const rows = Array.isArray(data)
-    ? data
-        .map(normalizeCatalogRef)
-        .filter((ref): ref is CatalogRef => ref !== null)
+    ? data.map(normalizeCatalogRef).filter((ref): ref is CatalogRef => ref !== null)
     : [];
   return { rows, error: null };
 }
@@ -207,9 +198,8 @@ export async function createProduct(
   return { error: null, id: normalizeId(created.id) };
 }
 
-// created_by NUNCA viaja en el update: el WITH CHECK de products_update
-// (0006:154-155) exige que la propiedad siga siendo del operador (D36 — un
-// operador no puede transferirse el registro). Un update denegado por RLS
+// created_by NUNCA viaja en el update. 0030: products_update es SOLO admin;
+// la ficha global no la modifica ni su creador. Un update denegado por RLS
 // responde 0 filas ⇒ guarda RLS_NO_ROWS (nunca un falso éxito).
 export async function updateProduct(
   id: number,
@@ -237,6 +227,28 @@ export async function updateProduct(
   return { error: null };
 }
 
+// 0030: el distribuidor edita SOLO su relación con el producto (cantidad que
+// posee, umbral/vencimiento y precios de compra/venta). La ficha global es del
+// admin; la RLS de products_update ya no permite al creador modificarla.
+export async function updateDistributorProductRelation(
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  expiryDate: string | null,
+  purchasePrice: number | null,
+  salePrice: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_distributor_product_relation", {
+    p_product: productId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_expiry_date: expiryDate,
+    p_purchase_price: purchasePrice,
+    p_sale_price: salePrice,
+  });
+  return { error };
+}
+
 // Paso 1 del borrado en dos pasos (PROD-2 "delete is admin soft-delete"): la
 // policy products_delete exige is_active = false (0006:156-158, "soft →
 // purge"), así que SIEMPRE se desactiva ANTES de borrar.
@@ -260,14 +272,8 @@ export async function deactivateProduct(
 // Paso 2: DELETE sobre la fila YA desactivada (0006:156-158). Un operador que
 // lo fuerce recibe 0 filas ⇒ RLS_NO_ROWS amigable; el control ni se ofrece
 // (SEC-01 idea:113 "✘ eliminar", idea:134 — ocultar es UX, la DB manda).
-export async function deleteProduct(
-  id: number,
-): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", id)
-    .select("id");
+export async function deleteProduct(id: number): Promise<{ error: { message: string } | null }> {
+  const { data, error } = await supabase.from("products").delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }
@@ -281,8 +287,8 @@ export async function deleteProduct(
 // Catálogo por rol (0019) — la vista general es SOLO del admin.
 //
 // · Tienda (operador): su catálogo es la asignación stock (producto ↔ tienda).
-//   El alta usa assign_product_to_store (0011:361-381); la baja usa
-//   unassign_product_from_store (0019), que solo borra con quantity = 0.
+//   El alta usa add_store_product (0026, cantidad inicial en una llamada); la
+//   baja usa unassign_product_from_store (0019), que solo borra con quantity = 0.
 // · Distribuidor: catálogo propio en distributor_products + RPCs de 0019; el
 //   alcance sale del JWT en la DB, nunca de un parámetro del cliente.
 // · El registro global sigue siendo legible por todos (products_select USING
@@ -307,6 +313,11 @@ function normalizeCatalogEntry(
   raw: Record<string, unknown>,
   quantity: number | null,
   is_shortage: boolean,
+  threshold: number | null = null,
+  expiryDate: string | null = null,
+  purchasePrice: number | null = null,
+  salePrice: number | null = null,
+  marginPct: number | null = null,
 ): CatalogEntry {
   const embedded = raw.product;
   const product =
@@ -320,7 +331,29 @@ function normalizeCatalogEntry(
           unit: null,
           category: null,
         };
-  return { ...product, quantity, is_shortage };
+  return {
+    ...product,
+    quantity,
+    is_shortage,
+    threshold,
+    expiry_date: expiryDate,
+    purchase_price: purchasePrice,
+    sale_price: salePrice,
+    margin_pct: marginPct,
+  };
+}
+
+function normalizeOptionalPrice(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const price = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(price) && price > 0 ? price : null;
+}
+
+/** 0046: porcentaje 0–1000; 0 es válido (no sugerir) y no debe perderse. */
+function normalizeOptionalPercent(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const percent = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(percent) && percent >= 0 ? percent : null;
 }
 
 function normalizeShortageRow(raw: Record<string, unknown>): ShortageRow {
@@ -386,9 +419,12 @@ export async function fetchStoreCatalog(
   const { from, to } = pageRange(query);
   let request = supabase
     .from("stock")
-    .select(`product_id, quantity, is_shortage, ${CATALOG_PRODUCT_SELECT}`, {
-      count: "planned",
-    })
+    .select(
+      `product_id, quantity, threshold, expiry_date, is_shortage, ${CATALOG_PRODUCT_SELECT}`,
+      {
+        count: "planned",
+      },
+    )
     .eq("store_id", storeId);
   if (query.q.trim() !== "") {
     request = request.ilike("product.name", likePattern(query.q));
@@ -408,6 +444,12 @@ export async function fetchStoreCatalog(
       raw,
       normalizeQuantity(raw.quantity),
       raw.is_shortage === true,
+      raw.threshold === null || raw.threshold === undefined
+        ? null
+        : normalizeQuantity(raw.threshold),
+      typeof raw.expiry_date === "string" ? raw.expiry_date : null,
+      null,
+      null,
     ),
   );
   return { rows, count, error: null };
@@ -416,21 +458,106 @@ export async function fetchStoreCatalog(
 // Productos del catálogo del distribuidor autenticado (RLS por
 // my_distributor_id()). Paginado por el mismo motivo que el de tienda.
 export async function fetchDistributorCatalog(
-  query: ListQuery,
+  query: CatalogQuery,
 ): Promise<ListResult<CatalogEntry>> {
   const { from, to } = pageRange(query);
-  const { data, count, error } = await supabase
+  let request = supabase
     .from("distributor_products")
-    .select(`product_id, ${CATALOG_PRODUCT_SELECT}`, { count: "planned" })
-    .order("product_id")
-    .range(from, to);
+    .select(
+      `product_id, quantity, threshold, expiry_date, purchase_price, sale_price, margin_pct, ${CATALOG_PRODUCT_SELECT}`,
+      {
+        count: "planned",
+      },
+    );
+  if (query.q.trim() !== "") {
+    request = request.ilike("product.name", likePattern(query.q));
+  }
+  if (query.categoryId !== null) {
+    request = request.eq("product.category_id", query.categoryId);
+  }
+  const { data, count, error } = await request.order("product_id").range(from, to);
   if (error !== null) {
     return { rows: [], count: null, error };
   }
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) =>
-    normalizeCatalogEntry(raw, null, false),
+    normalizeCatalogEntry(
+      raw,
+      normalizeQuantity(raw.quantity),
+      false,
+      raw.threshold === null || raw.threshold === undefined
+        ? null
+        : normalizeQuantity(raw.threshold),
+      typeof raw.expiry_date === "string" ? raw.expiry_date : null,
+      normalizeOptionalPrice(raw.purchase_price),
+      normalizeOptionalPrice(raw.sale_price),
+      normalizeOptionalPercent(raw.margin_pct),
+    ),
   );
   return { rows, count, error: null };
+}
+
+/** 0047: catálogo completo del distribuidor para la carga masiva de precios. */
+export interface DistributorPriceOption {
+  id: number;
+  name: string;
+  brand: string | null;
+  purchasePrice: number | null;
+  salePrice: number | null;
+  marginPct: number | null;
+}
+
+export async function fetchDistributorPriceOptions(): Promise<
+  LoadResult<DistributorPriceOption[]>
+> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select(
+      "product_id,purchase_price,sale_price,margin_pct,product:products!inner(name,brand:brands(name))",
+    )
+    .order("product_id")
+    .limit(500);
+  if (error !== null) return { data: null, error };
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) => {
+    const product = normalizeListRow(
+      typeof raw.product === "object" && raw.product !== null
+        ? (raw.product as Record<string, unknown>)
+        : { id: raw.product_id },
+    );
+    return {
+      id: normalizeId(raw.product_id),
+      name: product.name,
+      brand: product.brand?.name ?? null,
+      purchasePrice: normalizeOptionalPrice(raw.purchase_price),
+      salePrice: normalizeOptionalPrice(raw.sale_price),
+      marginPct: normalizeOptionalPercent(raw.margin_pct),
+    };
+  });
+  return { data: rows, error: null };
+}
+
+/** 0047: línea de la carga masiva del distribuidor. */
+export interface DistributorPriceLineInput {
+  productId: number;
+  purchasePrice: number | null;
+  salePrice: number | null;
+  writePurchase: boolean;
+  writeSale: boolean;
+}
+
+/** 0047: guarda el lote del distribuidor en UNA transacción. */
+export async function setDistributorPricesBulk(
+  lines: readonly DistributorPriceLineInput[],
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_distributor_prices_bulk", {
+    p_lines: lines.map((line) => ({
+      product_id: line.productId,
+      purchase_price: line.purchasePrice,
+      sale_price: line.salePrice,
+      set_purchase: line.writePurchase,
+      set_sale: line.writeSale,
+    })),
+  });
+  return { error };
 }
 
 // Registro global para elegir qué agregar. Solo productos activos, paginado:
@@ -439,6 +566,7 @@ export async function fetchDistributorCatalog(
 // también se resuelven en el servidor (S2/S8).
 export async function fetchActiveProductsForCatalog(
   query: CatalogQuery,
+  excludeIds: readonly number[] = [],
 ): Promise<ListResult<ProductListRow>> {
   const { from, to } = pageRange(query);
   let request = supabase
@@ -451,6 +579,12 @@ export async function fetchActiveProductsForCatalog(
   if (query.categoryId !== null) {
     request = request.eq("category_id", query.categoryId);
   }
+  if (excludeIds.length > 0) {
+    const ids = excludeIds.map((id) => Math.trunc(id)).filter((id) => id > 0);
+    if (ids.length > 0) {
+      request = request.not("id", "in", `(${ids.join(",")})`);
+    }
+  }
   const { data, count, error } = await request.order("name").range(from, to);
   if (error !== null) {
     return { rows: [], count: null, error };
@@ -459,16 +593,235 @@ export async function fetchActiveProductsForCatalog(
   return { rows, count, error: null };
 }
 
-export async function addStoreCatalogProduct(
+// 0026 — stock actual por producto para el alta: permite mostrar «En tienda»
+// y no ofrecer otra vez un producto ya asignado.
+export interface StoreStockRow {
+  product_id: number;
+  quantity: number;
+}
+
+export async function fetchStoreStock(storeId: number): Promise<LoadResult<StoreStockRow[]>> {
+  const { data, error } = await supabase
+    .from("stock")
+    .select("product_id,quantity")
+    .eq("store_id", storeId)
+    .limit(1000);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) => ({
+    product_id: normalizeId(raw.product_id),
+    quantity: normalizeQuantity(raw.quantity),
+  }));
+  return { data: rows, error };
+}
+
+// 0026 — ids del catálogo del distribuidor autenticado (RLS por
+// my_distributor_id) para marcar «En catálogo» en el alta.
+export async function fetchDistributorProductIds(): Promise<LoadResult<number[]>> {
+  const { data, error } = await supabase
+    .from("distributor_products")
+    .select("product_id")
+    .limit(1000);
+  const ids = ((data ?? []) as Record<string, unknown>[]).map((raw) => normalizeId(raw.product_id));
+  return { data: ids, error };
+}
+
+// 0026 — alta de un producto en la tienda con cantidad inicial en UNA llamada.
+// Si ya estaba asignado, la RPC no pisa la cantidad existente.
+export async function addStoreProduct(
   storeId: number,
   productId: number,
+  quantity: number,
+  threshold: number | null = null,
+  price: number | null = null,
 ): Promise<{ error: { message: string } | null }> {
-  const { error } = await supabase.rpc("assign_product_to_store", {
+  const { error } = await supabase.rpc("add_store_product", {
     p_product: productId,
     p_store: storeId,
-    p_threshold: null,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_price: price,
   });
   return { error };
+}
+
+// 0026 — edición del producto de la tienda en UNA llamada: cantidad, umbral y
+// faltante. Reemplaza la edición inline con un «Guardar» por celda.
+export async function updateStoreProduct(
+  storeId: number,
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  shortage: boolean | null = null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_store_product", {
+    p_product: productId,
+    p_store: storeId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_shortage: shortage,
+  });
+  return { error };
+}
+
+// 0030 — relación de la tienda completa: cantidad, umbral, vencimiento,
+// faltante y precios (solo Premium). Una sola RPC para no dejar el modal a
+// medias si falla una segunda llamada.
+export async function updateStoreProductFull(
+  storeId: number,
+  productId: number,
+  quantity: number,
+  threshold: number | null,
+  shortage: boolean | null,
+  expiryDate: string | null,
+  purchasePrice: number | null,
+  salePrice: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("update_store_product_full", {
+    p_product: productId,
+    p_store: storeId,
+    p_quantity: quantity,
+    p_threshold: threshold,
+    p_shortage: shortage,
+    p_expiry_date: expiryDate,
+    p_purchase_price: purchasePrice,
+    p_sale_price: salePrice,
+  });
+  return { error };
+}
+
+export interface StoreRelationPriceRow {
+  product_id: number;
+  sale_price: number | null;
+  purchase_price: number | null;
+  /** 0046: excepción de margen por producto (null = usar el general; 0 = no sugerir). */
+  margin_pct: number | null;
+}
+
+/**
+ * 0030/0046: relación tienda↔producto. Venta (price_publications activa),
+ * compra (store_product_prices) y margen propio (store_product_margins). Se
+ * piden juntos para el modal; cualquier fila de cualquiera de las tres aparece.
+ */
+export async function fetchStoreRelationPrices(
+  storeId: number,
+): Promise<LoadResult<StoreRelationPriceRow[]>> {
+  const [sales, purchases, margins] = await Promise.all([
+    supabase
+      .from("price_publications")
+      .select("product_id,price")
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .order("product_id")
+      .limit(500),
+    supabase
+      .from("store_product_prices")
+      .select("product_id,purchase_price")
+      .eq("store_id", storeId)
+      .order("product_id")
+      .limit(500),
+    supabase
+      .from("store_product_margins")
+      .select("product_id,margin_pct")
+      .eq("store_id", storeId)
+      .order("product_id")
+      .limit(500),
+  ]);
+  const error = sales.error ?? purchases.error ?? margins.error;
+  if (error !== null) {
+    return { data: null, error };
+  }
+  const rows = new Map<number, StoreRelationPriceRow>();
+  for (const raw of (sales.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: normalizeOptionalPrice(raw.price),
+      purchase_price: null,
+      margin_pct: null,
+    });
+  }
+  for (const raw of (purchases.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    const current = rows.get(productId);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: current?.sale_price ?? null,
+      purchase_price: normalizeOptionalPrice(raw.purchase_price),
+      margin_pct: current?.margin_pct ?? null,
+    });
+  }
+  for (const raw of (margins.data ?? []) as Record<string, unknown>[]) {
+    const productId = normalizeId(raw.product_id);
+    const current = rows.get(productId);
+    rows.set(productId, {
+      product_id: productId,
+      sale_price: current?.sale_price ?? null,
+      purchase_price: current?.purchase_price ?? null,
+      margin_pct: normalizeOptionalPercent(raw.margin_pct),
+    });
+  }
+  return { data: [...rows.values()], error: null };
+}
+
+/** 0046: excepción de margen de la tienda por producto para la carga masiva. */
+export async function fetchStoreProductMargins(
+  storeId: number,
+): Promise<LoadResult<Map<number, number>>> {
+  const { data, error } = await supabase
+    .from("store_product_margins")
+    .select("product_id,margin_pct")
+    .eq("store_id", storeId)
+    .order("product_id")
+    .limit(500);
+  const margins = new Map<number, number>();
+  for (const raw of (data ?? []) as Record<string, unknown>[]) {
+    const margin = normalizeOptionalPercent(raw.margin_pct);
+    if (margin !== null) margins.set(normalizeId(raw.product_id), margin);
+  }
+  return { data: margins, error };
+}
+
+/** 0046: margen propio de un producto de la tienda. null lo borra. */
+export async function setStoreProductMargin(
+  storeId: number,
+  productId: number,
+  margin: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_store_product_margin", {
+    p_product: productId,
+    p_store: storeId,
+    p_margin: margin,
+  });
+  return { error };
+}
+
+/** 0046: margen propio de un producto del catálogo del distribuidor. */
+export async function setDistributorProductMargin(
+  productId: number,
+  margin: number | null,
+): Promise<{ error: { message: string } | null }> {
+  const { error } = await supabase.rpc("set_distributor_product_margin", {
+    p_product: productId,
+    p_margin: margin,
+  });
+  return { error };
+}
+
+/** 0030: precio de compra de la tienda por producto (para estimar entradas). */
+export async function fetchStorePurchasePrices(
+  storeId: number,
+): Promise<LoadResult<Map<number, number>>> {
+  const { data, error } = await supabase
+    .from("store_product_prices")
+    .select("product_id,purchase_price")
+    .eq("store_id", storeId)
+    .order("product_id")
+    .limit(500);
+  const prices = new Map<number, number>();
+  for (const raw of (data ?? []) as Record<string, unknown>[]) {
+    const price = normalizeOptionalPrice(raw.purchase_price);
+    if (price !== null) prices.set(normalizeId(raw.product_id), price);
+  }
+  return { data: prices, error };
 }
 
 export async function removeStoreCatalogProduct(

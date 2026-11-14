@@ -171,9 +171,7 @@ describe("UsersPage (ADM-3 · lista admin de /users)", () => {
     });
     renderPagina();
 
-    expect(
-      await screen.findByText("Todavía no hay usuarios registrados."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Todavía no hay usuarios registrados.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 

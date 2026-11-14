@@ -35,6 +35,18 @@ export interface StoreOption {
 // (null para el distribuidor, que no maneja inventario).
 export interface CatalogEntry extends ProductListRow {
   quantity: number | null;
+  // stock.threshold / stock.expiry_date: solo el catálogo de tienda los trae
+  // (el distribuidor no maneja inventario ⇒ ausentes/null).
+  threshold?: number | null;
+  expiry_date?: string | null;
+  // 0030: precios privados de la relación (nunca de la ficha global).
+  // Tienda: purchase_price en stock + precio de venta activo en
+  // price_publications (se carga aparte para el modal).
+  purchase_price?: number | null;
+  sale_price?: number | null;
+  // 0046: excepción de margen del producto (0 = no sugerir). Solo el catálogo
+  // del distribuidor la trae; la tienda la lee de store_product_margins.
+  margin_pct?: number | null;
   // stock.is_shortage (0022): el operador marcó que le falta este producto.
   // El catálogo del distribuidor no maneja inventario ⇒ siempre false.
   is_shortage: boolean;
