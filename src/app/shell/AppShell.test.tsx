@@ -175,10 +175,12 @@ describe("AppShell (V0-5: nav mobile-first por rol)", () => {
     expect(screen.queryByText("Premium")).not.toBeInTheDocument();
   });
 
-  it("ADM-11.3: admin con premium false ⇒ la insignia SÍ se ve (exención D7)", async () => {
-    renderShell("admin", false);
+  // is_premium() es true para todo admin (exención D7 del gate), pero el admin
+  // administra Premium: no es cliente y no lleva la insignia.
+  it("ADM-11.3: admin (premium true por la exención D7) ⇒ sin insignia", async () => {
+    renderShell("admin", true);
 
-    expect(await screen.findByText("Premium")).toBeInTheDocument();
-    expect(screen.getByText("Administrador")).toBeInTheDocument();
+    expect(await screen.findByText("Administrador")).toBeInTheDocument();
+    expect(screen.queryByText("Premium")).not.toBeInTheDocument();
   });
 });

@@ -134,11 +134,14 @@ export function ProfilePage() {
           </p>
         </div>
       </div>
-      <div className="mt-6">
-        <Box title="Plan">
-          <PremiumStatusCard />
-        </Box>
-      </div>
+      {/* El admin administra Premium; no tiene plan propio que mostrar. */}
+      {role !== "admin" && (
+        <div className="mt-6">
+          <Box title="Plan">
+            <PremiumStatusCard />
+          </Box>
+        </div>
+      )}
       <div className="mt-6">
         <Box title="Datos de contacto">
           <ProfileForm
