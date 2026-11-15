@@ -7,7 +7,7 @@
 
 ---
 
-> **Estado al 2026-11-12:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0052**; el índice de cambios y los pendientes vigentes están en §10.
+> **Estado al 2026-11-15:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0053**; el índice de cambios y los pendientes vigentes están en §10.
 
 ## 0. Contexto y origen
 
@@ -993,26 +993,26 @@ _(agente revisor; corregir al alinear el .md — son nombres/semántica, este do
 
 ---
 
-## 10. Estado de migraciones 0013-0051 (2026-11-12)
+## 10. Estado de migraciones 0013-0053 (2026-11-15)
 
 > Esta sección es el índice de lo que se agregó después del baseline §2-§4. El SQL autoritativo es `supabase/migrations/`; acá se resume el contrato y se registran los pendientes vigentes.
 
 ### 10.1 Índice por área
 
-| Rango     | Área                          | Objetos principales                                                                                                                                                                                                           |
-| --------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0013-0015 | Registro y alcance            | `register_distributor`, guards del último admin, `create_store` con ubicación, `user_stores` SELECT                                                                                                                           |
-| 0017-0018 | QR y RLS                      | `stores.link_code`, `store_distributors`, `get_store_link_code`, `regenerate_store_link_code`, `unlink_distributor`, `link_distributor_to_store`; helpers `my_route_ids`, `routes_with_my_stores`, `stores_on_my_routes`      |
-| 0019-0022 | Catálogo por rol              | Catálogo de tienda/distribuidor/admin; `store_distributor_requests`; vínculo gestionado por operador                                                                                                                          |
-| 0023-0030 | Pedidos, inventario y precios | Faltantes y fiado del operador; cotización; ciclo del pedido; `add_store_product` / `update_store_product_full`; precios Premium; `store_product_prices` / `distributor_products`; ventas y entregas                          |
-| 0031-0036 | Alertas y Premium             | Alertas del distribuidor; planes con vencimiento; downgrade de tiendas; gestión de tiendas; Mercado Pago; avisos admin                                                                                                        |
-| 0037-0038 | Tickets                       | `register_movements_bulk`, `register_distributor_sales_bulk`, `register_distributor_purchases`; descuentos y tickets recurrentes                                                                                              |
-| 0039      | Asistente fase 1              | `create_chat(p_title, p_store)`; `agent_search_products`, `agent_stock`, `agent_last_order`; `chat_conversations.store_id`                                                                                                    |
-| 0040-0041 | Límites                       | Topes de longitud en texto y jsonb; `enforce_chat_conversation_rate`, `send_message` con rate limit; `movement_product_ranking`                                                                                               |
-| 0042      | Teléfono                      | `users.phone_verified_at`, `phone_verifications`, `normalize_phone_e164`, `phone_verification_start`, `phone_verification_confirm_whatsapp`                                                                                   |
-| 0043-0047 | Precios                       | `set_store_prices_bulk`, `set_distributor_prices_bulk`, autollenado desde movimientos, `set_my_margin`, `store_product_margins`, `set_store_product_margin`, costo manual                                                     |
-| 0048      | Pulido                        | Normalización de teléfono, rate limit por hora, `internal_dashboard_upsert`, batching de movimientos                                                                                                                          |
-| 0049-0052 | Asistente fase 2              | `agent_actions`, `agent_prepare_action`, `agent_execute_action`, `agent_cancel_action`, `internal_set_actor`, `internal_assert_wa_identity`, wrappers `*_for_user`, `whatsapp_inbound`; 0052 marca los wrappers como VOLATILE |
+| Rango     | Área                          | Objetos principales                                                                                                                                                                                                                                                                                                               |
+| --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0013-0015 | Registro y alcance            | `register_distributor`, guards del último admin, `create_store` con ubicación, `user_stores` SELECT                                                                                                                                                                                                                               |
+| 0017-0018 | QR y RLS                      | `stores.link_code`, `store_distributors`, `get_store_link_code`, `regenerate_store_link_code`, `unlink_distributor`, `link_distributor_to_store`; helpers `my_route_ids`, `routes_with_my_stores`, `stores_on_my_routes`                                                                                                          |
+| 0019-0022 | Catálogo por rol              | Catálogo de tienda/distribuidor/admin; `store_distributor_requests`; vínculo gestionado por operador                                                                                                                                                                                                                              |
+| 0023-0030 | Pedidos, inventario y precios | Faltantes y fiado del operador; cotización; ciclo del pedido; `add_store_product` / `update_store_product_full`; precios Premium; `store_product_prices` / `distributor_products`; ventas y entregas                                                                                                                              |
+| 0031-0036 | Alertas y Premium             | Alertas del distribuidor; planes con vencimiento; downgrade de tiendas; gestión de tiendas; Mercado Pago; avisos admin                                                                                                                                                                                                            |
+| 0037-0038 | Tickets                       | `register_movements_bulk`, `register_distributor_sales_bulk`, `register_distributor_purchases`; descuentos y tickets recurrentes                                                                                                                                                                                                  |
+| 0039      | Asistente fase 1              | `create_chat(p_title, p_store)`; `agent_search_products`, `agent_stock`, `agent_last_order`; `chat_conversations.store_id`                                                                                                                                                                                                        |
+| 0040-0041 | Límites                       | Topes de longitud en texto y jsonb; `enforce_chat_conversation_rate`, `send_message` con rate limit; `movement_product_ranking`                                                                                                                                                                                                   |
+| 0042      | Teléfono                      | `users.phone_verified_at`, `phone_verifications`, `normalize_phone_e164`, `phone_verification_start`, `phone_verification_confirm_whatsapp`                                                                                                                                                                                       |
+| 0043-0047 | Precios                       | `set_store_prices_bulk`, `set_distributor_prices_bulk`, autollenado desde movimientos, `set_my_margin`, `store_product_margins`, `set_store_product_margin`, costo manual                                                                                                                                                         |
+| 0048      | Pulido                        | Normalización de teléfono, rate limit por hora, `internal_dashboard_upsert`, batching de movimientos                                                                                                                                                                                                                              |
+| 0049-0053 | Asistente fase 2              | `agent_actions`, `agent_prepare_action`, `agent_execute_action`, `agent_cancel_action`, `internal_set_actor`, `internal_assert_wa_identity`, wrappers `*_for_user`, `whatsapp_inbound`; 0052 marca los wrappers como VOLATILE; 0053 (`review_fixes`) bloquea `send_message`, normaliza `wa_id` con `+` y purga `whatsapp_inbound` |
 
 ### 10.2 Asistente: contrato de seguridad
 
@@ -1025,14 +1025,14 @@ _(agente revisor; corregir al alinear el .md — son nombres/semántica, este do
 ### 10.3 Pendientes vigentes
 
 - [ ] **pgTAP**: no existe `supabase/tests/`; la cobertura de BD es `scripts/smoke-local.mjs`.
-- [ ] **Backup**: `backup-weekly.yml` sigue solo con `workflow_dispatch`, sin cifrado `age` y sin `schedule`.
+- [ ] **Backup**: `backup-weekly.yml` está **desactivado** (`if: false`, PR #17): ni el `schedule` ni el `workflow_dispatch` ejecutan. Falta el cifrado `age` para reactivarlo (B0.4).
 - [ ] **Privacidad (C0.6)**: quitar "interés legítimo", alinear la eliminación de cuenta y subir `PRIVACY_VERSION` (hoy 1.1).
 - [ ] **Realtime de alertas**: el dashboard ya se suscribe a `dashboard_daily`; `/alertas` no.
 - [ ] **A0.4/F11**: los inputs de lat/lng solo aparecen si falla Leaflet.
 - [ ] **Playwright H1-H4**: no hay `playwright.config.ts`, ni `e2e/`, ni dependencia.
 - [ ] **Tests de `api.ts`**: faltan `stores`, `catalogs` y `profile`; `products` solo tiene paginación.
 - [ ] **Manual e informe**: `docs/manual/USO-POR-ROL.md` es una guía rápida; el informe tiene corte al 26 oct.
-- [ ] **0052 pendiente en el remoto**: los wrappers VOLATILE están en el repo, pero el proyecto sigue en 0051.
+- [ ] **0052 y 0053 pendientes en el remoto**: los wrappers VOLATILE (0052) y `review_fixes` (0053) están en el repo, pero el proyecto sigue en 0051.
 
 ### 10.4 Convenciones que cambiaron
 
