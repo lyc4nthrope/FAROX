@@ -1,5 +1,6 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { supabase } from "../../shared/lib/supabase/client";
+import { fetchAllRows } from "../../shared/lib/supabase/fetchAllRows";
 
 // Inventario por tienda: movimientos (register_entry/exit, register_reverse),
 // precios (set_price) y selectores de productos asignados. El catálogo y la
@@ -433,13 +434,15 @@ export async function fetchMotives(): Promise<LoadResult<MotiveOption[]>> {
 }
 
 export async function fetchPrices(storeId: number): Promise<LoadResult<PriceRow[]>> {
-  const { data, error } = await supabase
-    .from("price_publications")
-    .select("product_id,price,currency,product:products(name)")
-    .eq("store_id", storeId)
-    .eq("is_active", true)
-    .order("product_id")
-    .limit(500);
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("price_publications")
+      .select("product_id,price,currency,product:products(name)")
+      .eq("store_id", storeId)
+      .eq("is_active", true)
+      .order("product_id")
+      .range(from, to),
+  );
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     product_id: Number(r.product_id),
     product_name: relName(r.product),
