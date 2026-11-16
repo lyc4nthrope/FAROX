@@ -1,3 +1,4 @@
+import { LIMITS } from "../../../shared/lib/limits";
 import { ErrorBanner } from "../../../shared/ui";
 import type { DistributorRegistrationValues } from "../schemas";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../types";
@@ -64,6 +65,7 @@ export function DistributorRegistrationForm({
           type="text"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.name}
+          maxLength={LIMITS.distributorName}
           aria-invalid={errors.name !== undefined}
           aria-describedby={
             errors.name === undefined ? undefined : "onboarding-distributor-name-error"
@@ -88,6 +90,7 @@ export function DistributorRegistrationForm({
           type="text"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.nit}
+          maxLength={LIMITS.distributorNit}
           aria-invalid={errors.nit !== undefined}
           aria-describedby={
             errors.nit === undefined ? undefined : "onboarding-distributor-nit-error"
@@ -112,6 +115,7 @@ export function DistributorRegistrationForm({
           type="text"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.contact_name}
+          maxLength={LIMITS.distributorContactName}
           onChange={(event) => onChange({ ...values, contact_name: event.target.value })}
         />
       </div>
@@ -127,6 +131,7 @@ export function DistributorRegistrationForm({
           type="tel"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.phone}
+          maxLength={LIMITS.distributorPhone}
           onChange={(event) => onChange({ ...values, phone: event.target.value })}
         />
       </div>
@@ -142,6 +147,7 @@ export function DistributorRegistrationForm({
           type="email"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
           value={values.email}
+          maxLength={LIMITS.distributorEmail}
           aria-invalid={errors.email !== undefined}
           aria-describedby={
             errors.email === undefined ? undefined : "onboarding-distributor-email-error"

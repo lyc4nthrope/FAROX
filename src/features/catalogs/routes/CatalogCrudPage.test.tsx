@@ -46,7 +46,8 @@ function filaBase(key: CatalogKey): CatalogRow {
     parent_id: null,
     parent_name: null,
   };
-  if (key === "unit_types") return { ...comun, name: "Kilogramo", abbreviation: "kg", category: "peso" };
+  if (key === "unit_types")
+    return { ...comun, name: "Kilogramo", abbreviation: "kg", category: "peso" };
   if (key === "store_types") return { ...comun, name: "Tienda" };
   if (key === "brands") return { ...comun, name: "Zarpa" };
   return { ...comun, name: "Refrescos", description: "Gaseosas" };
@@ -117,9 +118,7 @@ function tabla(): Promise<HTMLElement> {
 async function filaPorNombre(nombre: string): Promise<HTMLElement> {
   const tablaEl = await tabla();
   const filas = within(tablaEl).getAllByRole("row").slice(1); // sin el header
-  const fila = filas.find(
-    (f) => within(f).getAllByRole("cell")[0]?.textContent === nombre,
-  );
+  const fila = filas.find((f) => within(f).getAllByRole("cell")[0]?.textContent === nombre);
   if (fila === undefined) {
     throw new Error(`No hay fila con nombre «${nombre}» en la tabla`);
   }

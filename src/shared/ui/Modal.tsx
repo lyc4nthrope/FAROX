@@ -8,13 +8,20 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 export function Modal({
   title,
   onClose,
+  blocking = false,
+  size = "lg",
   children,
 }: {
   title: string;
   onClose: () => void;
+  /** 0033: un modal bloqueante no se cierra con ESC, fondo ni botón. */
+  blocking?: boolean;
+  /** 0037: ancho del diálogo; los formularios angostos usan "sm". */
+  size?: "sm" | "md" | "lg";
   children: ReactNode;
 }) {
   const titleId = useId();
+  const canClose = !blocking;
   const dialogRef = useRef<HTMLDivElement | null>(null);
   // Se captura en el render (no en un efecto): autoFocus del contenido ya
   // movió el foco cuando corre el efecto y perderíamos el disparador.
@@ -49,6 +56,7 @@ export function Modal({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
+      if (!canClose) return;
       if (event.key === "Escape") {
         event.preventDefault();
         onCloseRef.current();
@@ -56,14 +64,48 @@ export function Modal({
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [canClose]);
+
+  useEffect(() => {
+    if (!blocking) return;
+    function onTab(event: KeyboardEvent): void {
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (dialog === null) return;
+      const focusables = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+      if (focusables.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      const onDialog = active === dialog;
+      if (event.shiftKey) {
+        if (onDialog || active === first || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (onDialog || active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, [blocking]);
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/50 p-4 backdrop-blur-sm sm:p-8"
       // El fondo cierra; el contenido detiene la propagación.
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (canClose && event.target === event.currentTarget) onClose();
       }}
       role="presentation"
     >
@@ -73,30 +115,34 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="my-auto w-full max-w-3xl rounded-2xl border border-gray-200/80 bg-white p-5 shadow-2xl shadow-gray-900/10 outline-none sm:p-6"
+        className={`my-auto w-full rounded-2xl border border-gray-200/80 bg-white p-5 shadow-2xl shadow-gray-900/10 outline-none sm:p-6 ${
+          size === "sm" ? "max-w-lg" : size === "md" ? "max-w-2xl" : "max-w-3xl"
+        }`}
       >
         <div className="mb-4 flex items-start justify-between gap-4 border-b border-gray-100 pb-3">
           <h2 id={titleId} className="text-base font-semibold tracking-tight text-gray-900">
             {title}
           </h2>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
-            onClick={onClose}
-          >
-            <svg
-              aria-hidden="true"
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              viewBox="0 0 24 24"
+          {canClose && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+              onClick={onClose}
             >
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-            Cerrar
-          </button>
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                viewBox="0 0 24 24"
+              >
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+              Cerrar
+            </button>
+          )}
         </div>
         {children}
       </div>

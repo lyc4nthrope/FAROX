@@ -49,9 +49,7 @@ describe("resetPasswordSchema · elegir la nueva contraseña", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.flatten().fieldErrors.confirm_password?.[0]).toBe(
-        "Repetí tu contraseña",
-      );
+      expect(result.error.flatten().fieldErrors.confirm_password?.[0]).toBe("Repetí tu contraseña");
     }
   });
 

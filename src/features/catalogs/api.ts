@@ -76,11 +76,7 @@ export async function updateCatalogRow(
   id: number,
   payload: Record<string, unknown>,
 ): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from(key)
-    .update(payload)
-    .eq("id", id)
-    .select("id");
+  const { data, error } = await supabase.from(key).update(payload).eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }
@@ -119,11 +115,7 @@ export async function deleteCatalogRow(
   key: CatalogKey,
   id: number,
 ): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from(key)
-    .delete()
-    .eq("id", id)
-    .select("id");
+  const { data, error } = await supabase.from(key).delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }

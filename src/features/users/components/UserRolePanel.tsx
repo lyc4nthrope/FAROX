@@ -95,10 +95,7 @@ export function UserRolePanel({
         </div>
         {role === "distribuidor" && (
           <div>
-            <label
-              htmlFor="user-distributor"
-              className="block text-sm font-medium text-gray-700"
-            >
+            <label htmlFor="user-distributor" className="block text-sm font-medium text-gray-700">
               Distribuidor
             </label>
             <select
@@ -107,13 +104,9 @@ export function UserRolePanel({
               value={distributorId}
               aria-invalid={errors.distributor_id !== undefined}
               aria-describedby={
-                errors.distributor_id === undefined
-                  ? undefined
-                  : "user-distributor-error"
+                errors.distributor_id === undefined ? undefined : "user-distributor-error"
               }
-              onChange={(event) =>
-                onChange({ role, distributorId: event.target.value })
-              }
+              onChange={(event) => onChange({ role, distributorId: event.target.value })}
             >
               <option value="">Elegí un distribuidor</option>
               {distributorOptions.map((option) => (

@@ -15,9 +15,9 @@ vi.mock("../../features/auth/api", () => ({
   fetchPrivileges: vi.fn(),
 }));
 
-function renderHome(role: RoleName | null) {
+function renderHome(role: RoleName | null, premium = false) {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
-  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium: false });
+  vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role, premium });
   return render(
     <MemoryRouter>
       <AuthProvider>
@@ -38,25 +38,29 @@ describe("HomePage · vista de ejemplo del distribuidor", () => {
     cleanup();
   });
 
-  it("distribuidor: muestra pedidos, paradas y ruta de hoy, marcado como ejemplo", async () => {
+  it("distribuidor: no muestra la vista de ejemplo en el inicio", async () => {
     renderHome("distribuidor");
 
-    expect(await screen.findByText("Tu día, de un vistazo")).toBeInTheDocument();
-    expect(screen.getByText("Vista de ejemplo")).toBeInTheDocument();
-    expect(screen.getByText("Pedidos")).toBeInTheDocument();
-    expect(screen.getByText("Paradas")).toBeInTheDocument();
-    expect(screen.getByText("Ruta de hoy")).toBeInTheDocument();
-    expect(screen.getByText("Tienda Central")).toBeInTheDocument();
-    expect(screen.queryByText("Stock bajo")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
+    expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Tienda Central")).not.toBeInTheDocument();
+    // Las secciones reales siguen disponibles.
+    expect(screen.getByText("Mi ruta")).toBeInTheDocument();
   });
 
   it("operador: conserva el inicio actual sin la vista del distribuidor", async () => {
     renderHome("operador");
 
-    expect(
-      await screen.findByRole("heading", { name: "Bienvenido a FARØX" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
     expect(screen.queryByText("Tu día, de un vistazo")).not.toBeInTheDocument();
     expect(screen.queryByText("Vista de ejemplo")).not.toBeInTheDocument();
+  });
+
+  it("ADM-11.1: con Premium la cabecera muestra la insignia y el título sigue solo", async () => {
+    renderHome("operador", true);
+
+    expect(await screen.findByText("Premium")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bienvenido a FARØX" })).toBeInTheDocument();
   });
 });

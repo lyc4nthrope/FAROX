@@ -75,7 +75,9 @@ describe("LinkStorePage", () => {
     const stop = vi.fn();
     decodeMock.mockImplementation(async (_device, _video, callback) => {
       queueMicrotask(() =>
-        callback({ getText: () => `${window.location.origin}/vincular/${CODE}` }, undefined, { stop }),
+        callback({ getText: () => `${window.location.origin}/vincular/${CODE}` }, undefined, {
+          stop,
+        }),
       );
       return { stop };
     });
@@ -92,11 +94,9 @@ describe("LinkStorePage", () => {
   it("rechaza un QR de otro origen sin vincular", async () => {
     decodeMock.mockImplementation(async (_device, _video, callback) => {
       queueMicrotask(() =>
-        callback(
-          { getText: () => `https://evil.example/vincular/${CODE}` },
-          undefined,
-          { stop: vi.fn() },
-        ),
+        callback({ getText: () => `https://evil.example/vincular/${CODE}` }, undefined, {
+          stop: vi.fn(),
+        }),
       );
       return { stop: vi.fn() };
     });
@@ -124,8 +124,14 @@ describe("LinkStorePage", () => {
     expect(screen.queryByText(RAW_ERROR)).not.toBeInTheDocument();
   });
 
-  it("desde el QR en /vincular/:code vincula una sola vez", async () => {
+  it("abrir /vincular/:code no vincula solo: prellena el código y espera la confirmación", async () => {
+    const user = userEvent.setup();
     renderPage(`/vincular/${CODE}`);
+
+    expect(await screen.findByLabelText("Código")).toHaveValue(CODE);
+    expect(api.linkToStore).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Vincular" }));
 
     await waitFor(() => expect(api.linkToStore).toHaveBeenCalledWith(CODE));
     expect(api.linkToStore).toHaveBeenCalledTimes(1);

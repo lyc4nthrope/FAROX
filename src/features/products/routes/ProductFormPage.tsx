@@ -51,12 +51,11 @@ export function ProductFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { role } = useAuth();
-  // 0019/S7: el catálogo GLOBAL lo administra solo el admin. Tienda y
-  // distribuidor ya no crean ni editan productos: eligen del registro
-  // existente en su propio catálogo. La DB mantiene sus policies (el
-  // enforcement real no vive en la UI — idea:134).
-  const canWrite = role === "admin";
+  // 0019/S7 + 0030: la ficha GLOBAL de products la edita solo el admin. Tienda
+  // y distribuidor crean productos y después ajustan su RELACIÓN (stock o
+  // catálogo); no modifican la ficha compartida.
   const isEdit = id !== undefined;
+  const canWrite = role === "admin";
   const productId = id === undefined ? null : Number(id);
 
   const [values, setValues] = useState<ProductFormValues>(EMPTY_VALUES);
@@ -90,8 +89,7 @@ export function ProductFormPage() {
           fetchProductCategories(),
         ]);
         if (cancelled) return;
-        const catalogError =
-          brandsResult.error ?? unitsResult.error ?? categoriesResult.error;
+        const catalogError = brandsResult.error ?? unitsResult.error ?? categoriesResult.error;
         if (catalogError !== null) {
           setFormError(mapError(catalogError));
         }
@@ -200,7 +198,9 @@ export function ProductFormPage() {
 
   return (
     <section className="mx-auto max-w-lg">
-      <h1 className="text-2xl font-semibold tracking-tight">{isEdit ? "Producto" : "Nuevo producto"}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        {isEdit ? "Producto" : "Nuevo producto"}
+      </h1>
       {loading ? (
         <p className="mt-4 text-sm text-gray-600">Cargando…</p>
       ) : (

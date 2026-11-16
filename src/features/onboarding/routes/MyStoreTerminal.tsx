@@ -117,8 +117,8 @@ export function MyStoreTerminal({ onBack }: { onBack: () => void }) {
     <section className="mx-auto max-w-lg">
       <h1 className="text-2xl font-semibold tracking-tight">Creá tu tienda</h1>
       <p className="mt-2 text-sm text-gray-600">
-        Empezá con lo mínimo: nombre, tipo y ubicación. Un administrador puede auditar o
-        revertir esta alta después.
+        Empezá con lo mínimo: nombre, tipo y ubicación. Un administrador puede auditar o revertir
+        esta alta después.
       </p>
       <div className="mt-6">
         {loading ? (

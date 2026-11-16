@@ -100,7 +100,7 @@ describe("audit api · fetchAuditPage (keyset id DESC · ADM-10.2)", () => {
     expect(rows.map((row) => row.id)).toEqual([31, 30]);
   });
 
-  it("2ª llamada con cursor: .lt(\"id\", <último id>) — estrictamente por debajo", async () => {
+  it('2ª llamada con cursor: .lt("id", <último id>) — estrictamente por debajo', async () => {
     tabla.resolver({ data: [fila(29)], error: null });
 
     await fetchAuditPage(30);
@@ -109,9 +109,7 @@ describe("audit api · fetchAuditPage (keyset id DESC · ADM-10.2)", () => {
   });
 
   it("lookahead: 26 filas ⇒ hasMore true y SOLO 25 rows (la extra no se muestra)", async () => {
-    const crudas = Array.from({ length: AUDIT_PAGE_SIZE + 1 }, (_, i) =>
-      fila(100 - i),
-    );
+    const crudas = Array.from({ length: AUDIT_PAGE_SIZE + 1 }, (_, i) => fila(100 - i));
     tabla.resolver({ data: crudas, error: null });
 
     const { rows, hasMore } = await fetchAuditPage(null);
@@ -133,7 +131,7 @@ describe("audit api · fetchAuditPage (keyset id DESC · ADM-10.2)", () => {
     expect(Object.keys(tabla.stub.select.mock.calls[0])).toEqual(["0"]);
   });
 
-  it("filtro por tabla: encadena .eq(\"table_name\", …)", async () => {
+  it('filtro por tabla: encadena .eq("table_name", …)', async () => {
     tabla.resolver({ data: [], error: null });
 
     await fetchAuditPage(null, "stores");

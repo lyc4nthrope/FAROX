@@ -1,5 +1,6 @@
 import type { ProfileFormValues } from "../schemas";
 import { CONTACT_PREFERENCES, type ContactPreference } from "../types";
+import { LIMITS } from "../../../shared/lib/limits";
 import { buttonClass, inputClass } from "../../../shared/ui/Box";
 
 export interface ProfileFormErrors {
@@ -73,6 +74,7 @@ export function ProfileForm({
           autoComplete="name"
           className={`${inputClass} mt-1 w-full`}
           value={values.full_name}
+          maxLength={LIMITS.userName}
           aria-invalid={errors.full_name !== undefined}
           aria-describedby={errors.full_name === undefined ? undefined : "profile-full-name-error"}
           onChange={(event) => onChange({ ...values, full_name: event.target.value })}
@@ -88,7 +90,7 @@ export function ProfileForm({
           htmlFor="profile-phone"
           className="block text-xs font-semibold tracking-wide text-gray-600"
         >
-          Teléfono
+          Teléfono / WhatsApp
         </label>
         <input
           id="profile-phone"
@@ -96,6 +98,7 @@ export function ProfileForm({
           autoComplete="tel"
           className={`${inputClass} mt-1 w-full`}
           value={values.phone_number}
+          maxLength={LIMITS.userPhone}
           aria-invalid={errors.phone_number !== undefined}
           aria-describedby={errors.phone_number === undefined ? undefined : "profile-phone-error"}
           onChange={(event) => onChange({ ...values, phone_number: event.target.value })}
@@ -130,6 +133,10 @@ export function ProfileForm({
             </option>
           ))}
         </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Este es el medio con el que la tienda o el distribuidor te van a contactar. Completá el
+          teléfono para WhatsApp/Teléfono; si elegís Email se usa el email de tu cuenta.
+        </p>
       </div>
       <button type="submit" disabled={saving} className={buttonClass}>
         {saving ? "Guardando…" : "Guardar cambios"}

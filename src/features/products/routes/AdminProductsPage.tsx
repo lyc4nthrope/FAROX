@@ -15,7 +15,7 @@ export function AdminProductsPage() {
 
   return (
     <section>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Catálogo</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Catálogo</p>
       <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">

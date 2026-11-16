@@ -54,9 +54,7 @@ const tilesEnvSchema = z.object({
  * Resuelve la lista de proveedores de tiles (primario primero) según el env.
  * Fuente pura y testeable: la app la llama con `import.meta.env`.
  */
-export function resolveTileProviders(
-  source: Record<string, unknown>,
-): readonly TileProvider[] {
+export function resolveTileProviders(source: Record<string, unknown>): readonly TileProvider[] {
   const parsed = tilesEnvSchema.safeParse(source);
   const key = parsed.success ? parsed.data.VITE_CARTO_KEY?.trim() : undefined;
   if (key === undefined || key === "") return [OSM_TILE_PROVIDER];
@@ -68,6 +66,4 @@ export function resolveTileProviders(
 
 // Resolución única para la app (se lee al importar el módulo, igual que el
 // resto del env de Vite).
-export const TILE_PROVIDERS: readonly TileProvider[] = resolveTileProviders(
-  import.meta.env,
-);
+export const TILE_PROVIDERS: readonly TileProvider[] = resolveTileProviders(import.meta.env);

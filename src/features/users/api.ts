@@ -48,9 +48,7 @@ function normalizeRoleName(raw: unknown): string | null {
   return null;
 }
 
-function normalizeRole(
-  raw: unknown,
-): { id: number; name: string } | null {
+function normalizeRole(raw: unknown): { id: number; name: string } | null {
   if (typeof raw === "object" && raw !== null && "id" in raw && "name" in raw) {
     const { id, name } = raw as { id: unknown; name: unknown };
     if (typeof id === "number" && typeof name === "string") {
@@ -104,9 +102,7 @@ function normalizeStoreRow(raw: Record<string, unknown>): UserStoreRow {
 // Lista paginada de /users: count 'planned' NUNCA 'exact' + .range (Base:695,
 // contrato useList D4). SIN RPC: la policy users_select ya le da al admin
 // todas las filas (0006:202-204).
-export async function fetchUsers(
-  query: ListQuery,
-): Promise<ListResult<UserListRow>> {
+export async function fetchUsers(query: ListQuery): Promise<ListResult<UserListRow>> {
   const { from, to } = pageRange(query);
   const { data, count, error } = await supabase
     .from("users")
@@ -250,10 +246,7 @@ export async function fetchDistributorOptions(): Promise<{
   options: DistributorOption[];
   error: { message: string } | null;
 }> {
-  const { data, error } = await supabase
-    .from("distributors")
-    .select("id,name")
-    .order("name");
+  const { data, error } = await supabase.from("distributors").select("id,name").order("name");
   if (error !== null) {
     return { options: [], error };
   }

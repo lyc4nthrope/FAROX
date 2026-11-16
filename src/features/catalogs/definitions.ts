@@ -136,8 +136,6 @@ export const CATALOG_DEFINITIONS: readonly CatalogDefinition[] = [
 ];
 
 /** Resuelve una key de URL (/:catalogKey) — inválida ⇒ undefined ⇒ <NotFound/>. */
-export function getCatalogDefinition(
-  key: string,
-): CatalogDefinition | undefined {
+export function getCatalogDefinition(key: string): CatalogDefinition | undefined {
   return CATALOG_DEFINITIONS.find((definition) => definition.key === key);
 }

@@ -46,10 +46,7 @@ export async function fetchRoles(): Promise<{
   rows: RoleListRow[];
   error: { message: string } | null;
 }> {
-  const { data, error } = await supabase
-    .from("roles")
-    .select(SELECT_COLS)
-    .order("name");
+  const { data, error } = await supabase.from("roles").select(SELECT_COLS).order("name");
   if (error !== null) {
     return { rows: [], error };
   }
@@ -62,11 +59,7 @@ export async function fetchRoles(): Promise<{
 export async function fetchRole(
   id: number,
 ): Promise<{ row: RoleDetailRow | null; error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("roles")
-    .select(SELECT_COLS)
-    .eq("id", id)
-    .single();
+  const { data, error } = await supabase.from("roles").select(SELECT_COLS).eq("id", id).single();
   if (error !== null) {
     return { row: null, error };
   }
@@ -111,14 +104,8 @@ export async function updateRole(
 // ADM-8.4: DELETE directo — un rol en uso revienta con 23503 REAL del server
 // (FK RESTRICT 0002:73) que mapError traduce a «en uso» (T-B1). 0 filas
 // (RLS o fila fantasma) ⇒ 42501 sintetizado.
-export async function deleteRole(
-  id: number,
-): Promise<{ error: { message: string } | null }> {
-  const { data, error } = await supabase
-    .from("roles")
-    .delete()
-    .eq("id", id)
-    .select("id");
+export async function deleteRole(id: number): Promise<{ error: { message: string } | null }> {
+  const { data, error } = await supabase.from("roles").delete().eq("id", id).select("id");
   if (error !== null) {
     return { error };
   }

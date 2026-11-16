@@ -10,4 +10,8 @@ export interface ProfileRow {
   full_name: string;
   phone_number: string | null;
   contact_preference: ContactPreference;
+  // 0042: solo lo escribe la RPC de verificación; el perfil lo muestra.
+  phone_verified_at: string | null;
+  // 0045: margen de ganancia sobre el costo (0–1000). Se escribe por RPC.
+  default_margin_pct: number | null;
 }

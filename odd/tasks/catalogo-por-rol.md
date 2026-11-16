@@ -14,13 +14,13 @@ Branch: `feat/catalogo-por-rol` · Delivery: `ask-on-risk` · Test runner: `npm 
 
 ## Tasks
 
-| ID | Specs | Route | Status | Evidence |
-|----|-------|-------|--------|----------|
-| T1 | S2,S3,S5 | inline | done | `supabase/migrations/20261025000019_catalogo_por_rol.sql` (tabla + 3 RPCs + RLS/grants) |
-| T2 | S4,S5 | inline | done | `api.ts` (fetch/add/remove catálogo) + `MyCatalogPage.tsx` |
-| T3 | S1,S2,S3,S4,S6 | inline | done | `ProductsPage.tsx` dispatcher, `AdminProductsPage.tsx`, `MyCatalogPage.tsx`; 25 tests de products en verde |
-| T4 | S7 | inline | done | `router.tsx` `/products/new` = ADMIN_ONLY; `ProductFormPage` `canWrite` admin-only |
-| T5 | S1-S7 | inline | done | `npm test` 460/460 · `npm run lint` · `npm run typecheck` · `npm run check-scope` |
+| ID  | Specs          | Route  | Status | Evidence                                                                                                   |
+| --- | -------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------- |
+| T1  | S2,S3,S5       | inline | done   | `supabase/migrations/20261025000019_catalogo_por_rol.sql` (tabla + 3 RPCs + RLS/grants)                    |
+| T2  | S4,S5          | inline | done   | `api.ts` (fetch/add/remove catálogo) + `MyCatalogPage.tsx`                                                 |
+| T3  | S1,S2,S3,S4,S6 | inline | done   | `ProductsPage.tsx` dispatcher, `AdminProductsPage.tsx`, `MyCatalogPage.tsx`; 25 tests de products en verde |
+| T4  | S7             | inline | done   | `router.tsx` `/products/new` = ADMIN_ONLY; `ProductFormPage` `canWrite` admin-only                         |
+| T5  | S1-S7          | inline | done   | `npm test` 460/460 · `npm run lint` · `npm run typecheck` · `npm run check-scope`                          |
 
 ## Log
 
@@ -60,8 +60,6 @@ El verificador independiente devolvió **BLOCKED** con 2 bloqueadores:
 Advisories aceptadas sin cambio de alcance: (A1) la DB todavía permite insert/update de `products` a operador (S7 es de UI; la policy es preexistente y cambiarla excede este pedido), (A2) el FAIL esperado de 0012 por +3 firmas, (A3) los textos de RAISE nuevos caen en el mensaje genérico de `mapError`.
 
 Verificación tras la corrección: `npm test -- --run` → 53 archivos, 460/460 · `lint` · `typecheck` · `check-scope` (§S8 OK). Recheck independiente acotado a B1/B2: **PASS WITH ADVISORIES** — ambos FIXED; los tests nuevos fallan contra la implementación anterior (RED observado), así que no son tautologías. Advisories menores aceptadas: "Agregar" sigue visible para un producto ya presente (upsert idempotente), el buscador filtra la página cargada (el label lo dice), y un alta resetea el catálogo a la página 1.
-
-
 
 ### L6 — Revisión nativa (RDD) bloqueada (2026-10-25)
 

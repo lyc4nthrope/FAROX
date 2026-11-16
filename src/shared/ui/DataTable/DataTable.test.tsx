@@ -66,9 +66,7 @@ describe("DataTable (sdd/admin-console T-B2 · D-M1)", () => {
   it("error: ErrorBanner con el mensaje YA mapeado — sin tabla ni vacío (HARD-1)", () => {
     renderTabla({ error: "No tenés permisos para esta operación." });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "No tenés permisos para esta operación.",
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent("No tenés permisos para esta operación.");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     expect(screen.queryByText("No hay nada todavía")).not.toBeInTheDocument();
   });

@@ -32,8 +32,7 @@ import { Pager } from "../../../shared/ui/Pager";
 //   (0006:73-74 / 83-84 / 119-120); FK RESTRICT ⇒ 23503 amigable (ADM-9.4).
 export function CatalogCrudPage() {
   const { catalogKey } = useParams<{ catalogKey: string }>();
-  const definition =
-    catalogKey === undefined ? undefined : getCatalogDefinition(catalogKey);
+  const definition = catalogKey === undefined ? undefined : getCatalogDefinition(catalogKey);
   if (definition === undefined) {
     // Los hooks viven en el screen interno: esta rama no los invoca.
     return <NotFound />;
@@ -52,16 +51,12 @@ function valoresVacios(definition: CatalogDefinition): CatalogFormValues {
 // Fila → valores del form: SOLO las keys de los fields de la definition
 // (config-driven); null/undefined ⇒ "". is_active NUNCA es campo del form
 // (muta solo por «Desactivar», ADM-9.2) e id tampoco.
-function filaAValores(
-  definition: CatalogDefinition,
-  row: CatalogRow,
-): CatalogFormValues {
+function filaAValores(definition: CatalogDefinition, row: CatalogRow): CatalogFormValues {
   const raw = row as unknown as Record<string, unknown>;
   const valores: CatalogFormValues = {};
   for (const field of definition.fields) {
     const value = raw[field.key];
-    valores[field.key] =
-      value === null || value === undefined ? "" : String(value);
+    valores[field.key] = value === null || value === undefined ? "" : String(value);
   }
   return valores;
 }
@@ -76,9 +71,7 @@ function CatalogCrudScreen({ definition }: { definition: CatalogDefinition }) {
   );
   const list = useList<CatalogRow>(fetcher);
 
-  const [values, setValues] = useState<CatalogFormValues>(() =>
-    valoresVacios(definition),
-  );
+  const [values, setValues] = useState<CatalogFormValues>(() => valoresVacios(definition));
   const [editId, setEditId] = useState<number | null>(null);
   const [errors, setErrors] = useState<CatalogFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -169,9 +162,7 @@ function CatalogCrudScreen({ definition }: { definition: CatalogDefinition }) {
   // false y la fila SIGUE listada como «Inactivo» — el DELETE recién se
   // ofrece sobre filas ya desactivadas (visibility en CatalogTable).
   function handleDeactivate(row: CatalogRow): void {
-    const confirmed = window.confirm(
-      "¿Desactivar este registro? Sigue listado como inactivo.",
-    );
+    const confirmed = window.confirm("¿Desactivar este registro? Sigue listado como inactivo.");
     if (!confirmed) return;
     setFormError(null);
     setSaving(true);

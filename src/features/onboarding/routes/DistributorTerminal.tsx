@@ -5,7 +5,10 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { registerDistributor } from "../api";
 import { useOnboarding } from "../context";
-import { DistributorRegistrationForm, type DistributorFormErrors } from "../components/DistributorRegistrationForm";
+import {
+  DistributorRegistrationForm,
+  type DistributorFormErrors,
+} from "../components/DistributorRegistrationForm";
 import { distributorSchema, type DistributorRegistrationValues } from "../schemas";
 
 const EMPTY_VALUES: DistributorRegistrationValues = {
@@ -78,8 +81,8 @@ export function DistributorTerminal({ onBack }: { onBack: () => void }) {
     <section className="mx-auto max-w-lg">
       <h1 className="text-2xl font-semibold tracking-tight">Registro de distribuidor</h1>
       <p className="mt-2 text-sm text-gray-600">
-        Creá tu distribuidor con el NIT del negocio. Un administrador puede auditar o revertir
-        esta alta después.
+        Creá tu distribuidor con el NIT del negocio. Un administrador puede auditar o revertir esta
+        alta después.
       </p>
       <div className="mt-6">
         <DistributorRegistrationForm

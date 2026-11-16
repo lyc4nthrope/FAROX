@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
-import { EmptyState, ErrorBanner } from "../../../shared/ui";
+import { EmptyState, ErrorBanner, ResponsiveTable } from "../../../shared/ui";
+import type { ResponsiveTableColumn } from "../../../shared/ui";
 import type { DistributorListRow, DistributorUserCounts } from "../types";
 
 export interface DistributorListProps {
@@ -27,6 +28,32 @@ export function DistributorList({
   canWrite,
   userCounts,
 }: DistributorListProps) {
+  const columns: ResponsiveTableColumn<DistributorListRow>[] = [
+    {
+      key: "name",
+      header: "Nombre",
+      primary: true,
+      render: (row) => (
+        <Link to={`/distributors/${row.id}`} className="text-gray-900 underline">
+          {row.name}
+        </Link>
+      ),
+    },
+    { key: "nit", header: "NIT", render: (row) => row.nit },
+    {
+      key: "status",
+      header: "Estado",
+      render: (row) => (row.is_active ? "Activo" : "Inactivo"),
+    },
+  ];
+  if (userCounts !== undefined) {
+    columns.push({
+      key: "users",
+      header: "Usuarios asignados",
+      render: (row) => (userCounts === null ? "—" : String(userCounts[row.id] ?? 0)),
+    });
+  }
+
   return (
     <div className="mt-4">
       {canWrite && (
@@ -52,37 +79,13 @@ export function DistributorList({
       )}
       {error === null && loading && <p className="mt-4 text-sm text-gray-600">Cargando…</p>}
       {error === null && !loading && rows.length > 0 && (
-        <div className="overflow-x-auto">
-        <table className="mt-4 w-full border-collapse text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-600">
-              <th className="py-2 font-medium">Nombre</th>
-              <th className="py-2 font-medium">NIT</th>
-              <th className="py-2 font-medium">Estado</th>
-              {userCounts !== undefined && (
-                <th className="py-2 font-medium">Usuarios asignados</th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100">
-                <td className="py-2">
-                  <Link to={`/distributors/${row.id}`} className="text-gray-900 underline">
-                    {row.name}
-                  </Link>
-                </td>
-                <td className="py-2 text-gray-700">{row.nit}</td>
-                <td className="py-2 text-gray-700">{row.is_active ? "Activo" : "Inactivo"}</td>
-                {userCounts !== undefined && (
-                  <td className="py-2 text-gray-700">
-                    {userCounts === null ? "—" : String(userCounts[row.id] ?? 0)}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mt-4">
+          <ResponsiveTable
+            caption="Distribuidores"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => String(row.id)}
+          />
         </div>
       )}
     </div>

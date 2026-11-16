@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { LIMITS } from "../../shared/lib/limits";
+
 // Validación Zod ANTES de cualquier request (idea:198 "validación Zod en cada
 // formulario" — PROD-3 lo exige para productos). Los FK y la cantidad viajan
 // como strings (son valores crudos de <select>/<input>); la capa api los
@@ -14,8 +16,15 @@ function esIdDeCatalogo(value: string): boolean {
 }
 
 export const productSchema = z.object({
-  name: z.string().trim().min(1, "Ingresá el nombre del producto"),
-  description: z.string().trim(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Ingresá el nombre del producto")
+    .max(LIMITS.productName, `Máximo ${LIMITS.productName} caracteres`),
+  description: z
+    .string()
+    .trim()
+    .max(LIMITS.productDescription, `Máximo ${LIMITS.productDescription} caracteres`),
   brand_id: z.string().trim().refine(esIdDeCatalogo, "Elegí una marca"),
   unit_type_id: z.string().trim().refine(esIdDeCatalogo, "Elegí la unidad de medida"),
   category_id: z.string().trim().refine(esIdDeCatalogo, "Elegí una categoría"),

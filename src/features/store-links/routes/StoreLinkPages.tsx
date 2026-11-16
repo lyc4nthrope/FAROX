@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -22,6 +22,7 @@ import {
   unlinkDistributor,
 } from "../api";
 import { QrScanner } from "../components/QrScanner";
+import { ContactButton } from "../components/ContactButton";
 import { parseLinkCode } from "../scan";
 
 /** Código + QR + distribuidores vinculados de UNA tienda. */
@@ -92,6 +93,7 @@ export function StoreLinkPanel({ storeId }: { storeId: number }) {
                     desde {new Date(l.created_at).toLocaleDateString("es-CO")}
                   </span>
                 </span>
+                <ContactButton kind="distribuidor" id={l.distributor_id} name={l.name} />
                 <Link
                   className="rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
                   to={`/pedidos/nuevo?storeId=${storeId}&distributorId=${l.distributor_id}`}
@@ -241,7 +243,7 @@ export function StoreQrPage() {
         </svg>
         Inventario de la tienda
       </Link>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+      <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
         Vínculos
       </p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">
@@ -266,7 +268,6 @@ export function LinkStorePage() {
     ok: null,
   });
   const [busy, setBusy] = useState(false);
-  const autoTried = useRef(false);
 
   async function link(value: string) {
     const parsed = parseLinkCode(value);
@@ -284,13 +285,9 @@ export function LinkStorePage() {
     setMsg({ error, ok: error === null ? "¡Listo! Quedaste vinculado a la tienda." : null });
   }
 
-  // Llegó desde el QR: vincula automáticamente una sola vez.
-  useEffect(() => {
-    if (codeParam && !autoTried.current) {
-      autoTried.current = true;
-      void link(codeParam);
-    }
-  }, [codeParam]);
+  // Llegó por enlace (/vincular/:code): el código queda prellenado y el
+  // vínculo espera el clic en «Vincular». Antes vinculaba solo al abrir el
+  // enlace, así que cualquier link podía crear un vínculo sin consentimiento.
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -299,11 +296,16 @@ export function LinkStorePage() {
 
   return (
     <section className="mx-auto max-w-xl">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">Vínculos</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Vínculos</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Vincular tienda</h1>
       <p className="mt-1 text-sm text-gray-500">
         Escaneá el QR que te compartió la tienda o escribí el código para quedar vinculado.
       </p>
+      {codeParam && msg.ok === null && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Abriste un enlace de vínculo. Revisá el código y tocá «Vincular» para confirmar.
+        </p>
+      )}
       <Status loading={busy} error={msg.error} ok={msg.ok} />
       <Box title="Código de la tienda">
         <p className="text-sm text-gray-600">

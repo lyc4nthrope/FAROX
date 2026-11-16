@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { PremiumLock } from "./PremiumLock";
@@ -8,10 +9,12 @@ describe("PremiumLock", () => {
 
   it("muestra el candado, la etiqueta Premium y lo que desbloquea", () => {
     render(
-      <PremiumLock
-        title="Dashboard analítico"
-        benefits={["Entradas por día.", "Totales del rango."]}
-      />,
+      <MemoryRouter>
+        <PremiumLock
+          title="Dashboard analítico"
+          benefits={["Entradas por día.", "Totales del rango."]}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole("img", { name: "Bloqueado" })).toBeInTheDocument();
@@ -20,17 +23,20 @@ describe("PremiumLock", () => {
     expect(screen.getByText("Entradas por día.")).toBeInTheDocument();
     expect(screen.getByText("Totales del rango.")).toBeInTheDocument();
     expect(screen.getByText(/Un administrador activa Premium/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver planes" })).toHaveAttribute("href", "/premium");
   });
 
   it("deja ver la UI real pero la inutiliza", () => {
     render(
-      <PremiumLock title="Registrar entrada o salida" benefits={["Movimientos manuales."]}>
-        <label>
-          Cantidad
-          <input defaultValue="3" />
-        </label>
-        <button type="button">Registrar</button>
-      </PremiumLock>,
+      <MemoryRouter>
+        <PremiumLock title="Registrar entrada o salida" benefits={["Movimientos manuales."]}>
+          <label>
+            Cantidad
+            <input defaultValue="3" />
+          </label>
+          <button type="button">Registrar</button>
+        </PremiumLock>
+      </MemoryRouter>,
     );
 
     expect(screen.getByLabelText("Cantidad")).toBeDisabled();
@@ -39,14 +45,16 @@ describe("PremiumLock", () => {
 
   it("la vista previa es decorativa y queda fuera del árbol accesible", () => {
     const { container } = render(
-      <PremiumLock
-        title="QR masivo"
-        benefits={["Varios códigos a la vez."]}
-        preview={<p>Vista de ejemplo</p>}
-      />,
+      <MemoryRouter>
+        <PremiumLock
+          title="QR masivo"
+          benefits={["Varios códigos a la vez."]}
+          preview={<p>Vista de ejemplo</p>}
+        />
+      </MemoryRouter>,
     );
 
-    const preview = container.querySelector('[aria-hidden="true"]');
+    const preview = container.querySelector('div[aria-hidden="true"]');
     expect(preview).not.toBeNull();
     expect(preview).toContainElement(screen.getByText("Vista de ejemplo"));
   });

@@ -64,9 +64,7 @@ export function CatalogForm({
                 value={values[field.key] ?? ""}
                 aria-invalid={errors[field.key] !== undefined}
                 aria-describedby={describedBy}
-                onChange={(event) =>
-                  onChange({ ...values, [field.key]: event.target.value })
-                }
+                onChange={(event) => onChange({ ...values, [field.key]: event.target.value })}
               />
             ) : field.kind === "parent" ? (
               <select
@@ -75,9 +73,7 @@ export function CatalogForm({
                 value={values[field.key] ?? ""}
                 aria-invalid={errors[field.key] !== undefined}
                 aria-describedby={describedBy}
-                onChange={(event) =>
-                  onChange({ ...values, [field.key]: event.target.value })
-                }
+                onChange={(event) => onChange({ ...values, [field.key]: event.target.value })}
               >
                 <option value="">Sin categoría padre</option>
                 {parentOptions.map((option) => (
@@ -94,9 +90,7 @@ export function CatalogForm({
                 value={values[field.key] ?? ""}
                 aria-invalid={errors[field.key] !== undefined}
                 aria-describedby={describedBy}
-                onChange={(event) =>
-                  onChange({ ...values, [field.key]: event.target.value })
-                }
+                onChange={(event) => onChange({ ...values, [field.key]: event.target.value })}
               />
             )}
             {errors[field.key] !== undefined && (

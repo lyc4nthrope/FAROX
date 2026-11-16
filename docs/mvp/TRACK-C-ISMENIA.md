@@ -2,26 +2,35 @@
 
 > **Alcance:** pedidos y entregas (DIST-02), dashboard (INT-01), pruebas E2E (H1–H4), manual de usuario, informe final y ensayo de la demo.
 > **Antes de empezar:** leer `docs/mvp/PLAN.md` §0–§6. Patrón a copiar: `src/features/stores` (escritura por RPC) y `src/features/distributors` (listados).
-> **Datos para probar:** mientras B4/B5 no estén, pedirle a Daniel que cargue por SQL editor stock de prueba en una tienda (asignaciones con `assign_product_to_store`).
+> **Datos para probar:** mientras B4/B5 no estén, pedirle a Daniel que cargue por SQL editor stock de prueba en una tienda (asignaciones con `add_store_product`).
+
+> **Actualización 2026-11-12 — documento histórico.** C0.1-C0.4 y C1-C5 están implementados; C0.5 es parcial, C0.6 no empezó, C6 no existe y C7/C8 están incompletos. El estado real está en `PLAN.md` → "Estado real al 2026-11-12".
 
 > **Orden:** primero la Fase 0 (C0.1–C0.6), después las funcionalidades (C1–C8).
 
-| ID | Tarea | Día | Depende de | Estado |
-|---|---|---|---|---|
-| **C0.1** | Paginación en todas las listas + conteos acotados | 1 | — | ⬜ |
-| **C0.2** | "Eliminar" = desactivar (+ reactivar) y formularios de edición seguros | 2 | C0.1 | ⬜ |
-| **C0.3** | Errores: `mapError` para 0013, NIT vs nombre, perfil | 2 | — | ⬜ |
-| **C0.4** | Roles, categorías, auditoría y límites entre features | 2 | — | ⬜ |
-| **C0.5** | Pruebas de la capa `api.ts` (productos, tiendas, catálogos, perfil) | 3 | C0.2 | ⬜ |
-| **C0.6** | Política de privacidad alineada con el sistema (Ley 1581) | 3 | — | ⬜ |
-| C1 | Pedidos: api + listado por rol | 4 | Fase 0 | ⬜ |
-| C2 | Crear pedido | 4–5 | C1 | ⬜ |
-| C3 | Detalle de pedido + cambios de estado | 5 | C2 | ⬜ |
-| C4 | Confirmar entrega (incluye parcial) | 6 | C3 | ⬜ |
-| C5 | Dashboard + realtime | 7 | C4, B6 (regla de realtime) | ⬜ |
-| C6 | Playwright: H1–H4 | 8–9 | C5, A4, A7 | ⬜ |
-| C7 | Manual de usuario | 9 | C6 | ⬜ |
-| C8 | Informe final + ensayo de demo ×2 | 10 | todo | ⬜ |
+| ID       | Tarea                                                                  | Día | Depende de                 | Estado                                                                                                           |
+| -------- | ---------------------------------------------------------------------- | --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **C0.1** | Paginación en todas las listas + conteos acotados                      | 1   | —                          | ✅                                                                                                               |
+| **C0.2** | "Eliminar" = desactivar (+ reactivar) y formularios de edición seguros | 2   | C0.1                       | ✅                                                                                                               |
+| **C0.3** | Errores: `mapError` para 0013, NIT vs nombre, perfil                   | 2   | —                          | ✅                                                                                                               |
+| **C0.4** | Roles, categorías, auditoría y límites entre features                  | 2   | —                          | 🟡 Roles, auditoría y límites ✅; el picker de categoría padre solo excluye la propia fila, no los descendientes |
+| **C0.5** | Pruebas de la capa `api.ts` (productos, tiendas, catálogos, perfil)    | 3   | C0.2                       | 🟡 Faltan `stores`, `catalogs` y `profile`; `products` solo tiene paginación                                     |
+| **C0.6** | Política de privacidad alineada con el sistema (Ley 1581)              | 3   | —                          | ❌ Pendiente: "interés legítimo", eliminación de cuenta y versión 1.1                                            |
+| C1       | Pedidos: api + listado por rol                                         | 4   | Fase 0                     | ✅                                                                                                               |
+| C2       | Crear pedido                                                           | 4–5 | C1                         | ✅                                                                                                               |
+| C3       | Detalle de pedido + cambios de estado                                  | 5   | C2                         | ✅                                                                                                               |
+| C4       | Confirmar entrega (incluye parcial)                                    | 6   | C3                         | ✅                                                                                                               |
+| C5       | Dashboard + realtime                                                   | 7   | C4, B6 (regla de realtime) | ✅ `get_dashboard` + realtime con `dashboard_daily`                                                              |
+| C6       | Playwright: H1–H4                                                      | 8–9 | C5, A4, A7                 | ❌ No hay Playwright, ni `e2e/`, ni dependencia                                                                  |
+| C7       | Manual de usuario                                                      | 9   | C6                         | 🟡 `docs/manual/USO-POR-ROL.md` (98 líneas) es una guía rápida, no el manual completo                            |
+| C8       | Informe final + ensayo de demo ×2                                      | 10  | todo                       | 🟡 `docs/informe/INFORME-DE-DESARROLLO.md` existe con corte al 26 oct; falta actualizarlo                        |
+
+**Notas de actualización (2026-11-12):**
+
+- **C6:** `scripts/smoke-local.mjs` cubre H1-H3 + QR + fiado a nivel RPC; no reemplaza Playwright ni prueba la UI.
+- **C7:** el manual completo (`docs/manual/MANUAL.md`) no existe; solo está la guía por rol.
+- **C8:** el informe existe y es extenso, pero su corte es el 26 oct; no incluye asistente fase 2, precios masivos, teléfono verificado, límites ni WhatsApp.
+- **C0.4:** el picker de categoría padre en `CatalogCrudPage` excluye la fila en edición, pero no sus descendientes; falta cerrar ese ciclo.
 
 ---
 

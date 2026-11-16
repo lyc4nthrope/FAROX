@@ -10,12 +10,12 @@
 
 ## Por qué es un protocolo humano (y no un workflow)
 
-Los previews son un fenómeno **portal + workflow** de Azure: existen **iff** algún workflow del repo observa eventos PR — docs: *"When a pull request is created against a branch that the workflow watches, the pre-production environment gets built"* + *"Only GitHub Actions deployments support pre-production environments"* (learn.microsoft.com review-publish-pull-requests). Verificar su ausencia requiere tres superficies que solo un humano ve: el portal Azure (Environments tab), la lista de runs de Actions y el hilo del PR.
+Los previews son un fenómeno **portal + workflow** de Azure: existen **iff** algún workflow del repo observa eventos PR — docs: _"When a pull request is created against a branch that the workflow watches, the pre-production environment gets built"_ + _"Only GitHub Actions deployments support pre-production environments"_ (learn.microsoft.com review-publish-pull-requests). Verificar su ausencia requiere tres superficies que solo un humano ve: el portal Azure (Environments tab), la lista de runs de Actions y el hilo del PR.
 
 ## Pre-requisitos (hard deps)
 
 - [ ] **T0.1**: `package-lock.json` commiteado (sino, `deploy-front` rojo por `npm ci` — ruido que contamina la observación).
-- [ ] **T1.1 (G1)**: app SWA creada + repo conectado + deployment token como repo secret. El workflow **generado por el portal** revisado: triggers `pull_request` **eliminados** (design U1: *"strip PR triggers from EVERY workflow Azure generates at G1"* — la plantilla del portal los trae por defecto) y nombres de inputs conservados VERBATIM (U5).
+- [ ] **T1.1 (G1)**: app SWA creada + repo conectado + deployment token como repo secret. El workflow **generado por el portal** revisado: triggers `pull_request` **eliminados** (design U1: _"strip PR triggers from EVERY workflow Azure generates at G1"_ — la plantilla del portal los trae por defecto) y nombres de inputs conservados VERBATIM (U5).
 - [ ] **T2.4**: `deploy-front.yml` merged — `on: push: branches: [main]` SIN `pull_request` (grep = 0).
 
 ## Protocolo (4 puntos de éxito, design #507 §1 U1)
@@ -29,15 +29,15 @@ Los previews son un fenómeno **portal + workflow** de Azure: existen **iff** al
 
 ## Rúbrica de decisión
 
-| Resultado observado | Significado | Acción |
-|---|---|---|
-| Los 4 puntos limpios (runs de deploy = 0 · Environments = solo "production" · sin bot comment · PR cerrado) | **U1 RESUELTO** — previews deshabilitadas por construcción (workflow-driven, #506 pin 3) | Registrar evidencia (screenshot + link del PR) vía `mem_save` en engram, o como comentario en el PR (ACCEPT de T3.1/T3.2); sale U3/U1 del registro UNVERIFIED |
-| CUALQUIER preview (bot comment · env extra en el portal · run de deploy en el PR) | DEV-02: **accepted-risk entry** + **HUMAN-SIGNED-OFF** + borrar el env stray vía portal → Environments tab; investigar qué workflow observa eventos PR (¿el generado en G1?) y quitarle `pull_request` | Repetir el protocolo tras el fix |
-| >0 previews aunque sea 1 | señal de **CONFIG DRIFT**, no licencia — Free = 3 pre-prod envs es un *backstop* (learn.microsoft.com plans), no permiso | Investigar triggers, borrar el env |
+| Resultado observado                                                                                         | Significado                                                                                                                                                                                            | Acción                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Los 4 puntos limpios (runs de deploy = 0 · Environments = solo "production" · sin bot comment · PR cerrado) | **U1 RESUELTO** — previews deshabilitadas por construcción (workflow-driven, #506 pin 3)                                                                                                               | Registrar evidencia (screenshot + link del PR) vía `mem_save` en engram, o como comentario en el PR (ACCEPT de T3.1/T3.2); sale U3/U1 del registro UNVERIFIED |
+| CUALQUIER preview (bot comment · env extra en el portal · run de deploy en el PR)                           | DEV-02: **accepted-risk entry** + **HUMAN-SIGNED-OFF** + borrar el env stray vía portal → Environments tab; investigar qué workflow observa eventos PR (¿el generado en G1?) y quitarle `pull_request` | Repetir el protocolo tras el fix                                                                                                                              |
+| >0 previews aunque sea 1                                                                                    | señal de **CONFIG DRIFT**, no licencia — Free = 3 pre-prod envs es un _backstop_ (learn.microsoft.com plans), no permiso                                                                               | Investigar triggers, borrar el env                                                                                                                            |
 
-**NO CLAIM**: no existe en docs un toggle global del lado del portal para deshabilitar previews (#506 pin 3 — *"No portal-side global disable toggle found in docs"*). El mecanismo bajo nuestro control son **los triggers del workflow**. No afirmar lo contrario.
+**NO CLAIM**: no existe en docs un toggle global del lado del portal para deshabilitar previews (#506 pin 3 — _"No portal-side global disable toggle found in docs"_). El mecanismo bajo nuestro control son **los triggers del workflow**. No afirmar lo contrario.
 
 ## Qué desbloquea
 
-- **PASS** ⇒ U1 cerrado: satisface el verify HUMAN de DEV-02 (*"Azure portal 'Preview environments' list empty after opening a test PR"*) complementando el verify MACHINE de T2.4 (grep de triggers).
+- **PASS** ⇒ U1 cerrado: satisface el verify HUMAN de DEV-02 (_"Azure portal 'Preview environments' list empty after opening a test PR"_) complementando el verify MACHINE de T2.4 (grep de triggers).
 - **FAIL** ⇒ accepted-risk firmado + mitigación viva (borrado manual de envs + revisión de triggers generated en cada cambio de G3/merges).

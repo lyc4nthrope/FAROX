@@ -20,10 +20,7 @@ export function readCachedOnboardingSignals(userId: string): OnboardingSignals |
   return cache.get(userId) ?? null;
 }
 
-export function writeCachedOnboardingSignals(
-  userId: string,
-  signals: OnboardingSignals,
-): void {
+export function writeCachedOnboardingSignals(userId: string, signals: OnboardingSignals): void {
   cache.set(userId, signals);
 }
 

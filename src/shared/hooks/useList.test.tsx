@@ -163,9 +163,7 @@ describe("useList (D4 — fetch/refetch/mutate→refetch, sin realtime)", () => 
   });
 
   it("un fetcher que rechaza (sin red) degrada a mensaje de conexión, sin crash", async () => {
-    const fetcher = vi
-      .fn<ListFetcher<Fila>>()
-      .mockRejectedValue(new TypeError("Failed to fetch"));
+    const fetcher = vi.fn<ListFetcher<Fila>>().mockRejectedValue(new TypeError("Failed to fetch"));
     const { result } = renderHook(() => useList(fetcher));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
