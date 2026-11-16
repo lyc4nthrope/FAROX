@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -166,8 +166,9 @@ describe("OnboardingGate (T2.2 · guard derivado post-RequireAuth)", () => {
     expect(await screen.findByText("contenido de la app")).toBeInTheDocument();
     expect(screen.queryByText("Cargando tu perfil…")).not.toBeInTheDocument();
     expect(screen.queryByText("pantalla de onboarding")).not.toBeInTheDocument();
-    // El refresh de fondo corrió igual (una sola consulta).
-    expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(1);
+    // El refresh de fondo corrió igual (una sola consulta). Corre en un efecto
+    // posterior al primer pintado: esperarlo, no asumir que ya pasó.
+    await waitFor(() => expect(onboardingApi.fetchOnboardingSignals).toHaveBeenCalledTimes(1));
   });
 
   it("con caché de SIN_SEÑAL: también hidrata — la pregunta aparece sin pasar por loading", async () => {
