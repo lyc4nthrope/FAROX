@@ -409,7 +409,9 @@ export function DashboardPage() {
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Analítica</p>
       <div className="mt-1 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <PremiumBadge />
+        {/* La insignia marca suscripción: el admin administra Premium, no lo compra
+            (misma regla que AppShell, HomePage y ProfilePage). */}
+        {role !== "admin" && <PremiumBadge />}
       </div>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         {esDistribuidor

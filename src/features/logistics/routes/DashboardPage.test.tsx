@@ -112,6 +112,23 @@ describe("DashboardPage · gráficos por rol", () => {
     expect((await screen.findAllByText("Distribuidora Norte")).length).toBeGreaterThan(0);
   });
 
+  it("el admin no ve la insignia Premium aunque tenga la exención (auditoría S3)", async () => {
+    mockDistributorNames();
+    renderPage("admin", true);
+
+    // «Rango» solo existe en la rama Premium: esperar a que resuelvan los privilegios.
+    expect(await screen.findByText("Rango")).toBeInTheDocument();
+    expect(screen.queryByText("Premium")).not.toBeInTheDocument();
+  });
+
+  it("el operador Premium sí ve la insignia", async () => {
+    mockDistributorNames();
+    renderPage("operador", true);
+
+    expect(await screen.findByText("Rango")).toBeInTheDocument();
+    expect(screen.getByText("Premium")).toBeInTheDocument();
+  });
+
   it("escucha dashboard_daily y recarga al recibir un cambio", async () => {
     const view = renderPage("operador", true);
     await screen.findByText("Participación de ventas");
