@@ -24,13 +24,19 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
     cleanup();
   });
 
-  it("renderiza el título, la versión vigente y el aviso de BORRADOR", () => {
+  it("renderiza el título y la versión vigente, sin aviso de borrador", () => {
     renderPrivacy();
     expect(screen.getByRole("heading", { name: "Política de Privacidad" })).toBeInTheDocument();
     expect(screen.getByText(`Versión vigente: ${PRIVACY_VERSION}`)).toBeInTheDocument();
-    expect(
-      screen.getByText("BORRADOR — requiere revisión legal antes de publicar"),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/BORRADOR/)).not.toBeInTheDocument();
+  });
+
+  it("no publica marcadores sin llenar ni figuras ajenas a la Ley 1581", () => {
+    const { container } = renderPrivacy();
+    expect(container.textContent).not.toMatch(/\{\{|\}\}/);
+    expect(container.textContent).not.toMatch(/interés legítimo/i);
+    expect(container.textContent).toMatch(/Universidad del Quindío/);
+    expect(container.textContent).toMatch(/proyecto académico/);
   });
 
   it("declara los terceros reales: ipwho.is recibe la IP y Nominatim recibe las coordenadas", () => {
@@ -44,6 +50,8 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
     expect(screen.getByText(/^CARTO/)).toBeInTheDocument();
     expect(screen.getByText(/^Mercado Pago/)).toBeInTheDocument();
     expect(screen.getByText(/^Resend/)).toBeInTheDocument();
+    expect(screen.getByText(/^WhatsApp/)).toBeInTheDocument();
+    expect(screen.getByText(/^OpenRouter/)).toBeInTheDocument();
     // Sustantivo legal, no solo el dominio: la transferencia se explica.
     // (Varios terceros mencionan la IP ⇒ getAllByText, no getByText.)
     expect(screen.getAllByText(/dirección IP/).length).toBeGreaterThan(0);
@@ -56,7 +64,7 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
     expect(screen.getByText(/Superintendencia de Industria y Comercio/)).toBeInTheDocument();
     // El placeholder del contacto aparece en DOS sitios (responsable +
     // cómo ejercer derechos) ⇒ getAllByText, no getByText.
-    expect(screen.getAllByText(/\{\{EMAIL_DE_CONTACTO\}\}/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/noseecorp@gmail\.com/).length).toBeGreaterThanOrEqual(2);
   });
 
   it("las secciones del contenido tienen ids únicos e incluyen terceros y derechos", () => {
@@ -72,6 +80,6 @@ describe("PrivacyPage (ruta pública /privacidad)", () => {
 
   it("PRIVACY_VERSION se exporta del slice legal y refleja la revisión F6", () => {
     expect(typeof PRIVACY_VERSION).toBe("string");
-    expect(PRIVACY_VERSION).toBe("1.1");
+    expect(PRIVACY_VERSION).toBe("1.2");
   });
 });

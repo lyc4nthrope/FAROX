@@ -67,6 +67,19 @@ export function PhoneVerificationCard({
     );
   }
 
+  // Sin el número del bot no hay a dónde mandar el código: ofrecer la
+  // verificación dejaba al usuario con un código que no podía usar.
+  if (digits === "") {
+    return (
+      <div className="mt-4 rounded-xl border border-gray-200 px-3 py-3">
+        <p className="text-sm font-medium text-gray-800">Verificación de WhatsApp</p>
+        <p className="mt-1 text-xs text-gray-500">
+          La verificación por WhatsApp no está habilitada en esta instalación.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4 rounded-xl border border-gray-200 px-3 py-3">
       <p className="text-sm font-medium text-gray-800">Verificación de WhatsApp</p>
