@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useLoad } from "../../../shared/hooks/useLoad";
@@ -268,7 +268,6 @@ export function LinkStorePage() {
     ok: null,
   });
   const [busy, setBusy] = useState(false);
-  const autoTried = useRef(false);
 
   async function link(value: string) {
     const parsed = parseLinkCode(value);
@@ -286,13 +285,9 @@ export function LinkStorePage() {
     setMsg({ error, ok: error === null ? "¡Listo! Quedaste vinculado a la tienda." : null });
   }
 
-  // Llegó desde el QR: vincula automáticamente una sola vez.
-  useEffect(() => {
-    if (codeParam && !autoTried.current) {
-      autoTried.current = true;
-      void link(codeParam);
-    }
-  }, [codeParam]);
+  // Llegó por enlace (/vincular/:code): el código queda prellenado y el
+  // vínculo espera el clic en «Vincular». Antes vinculaba solo al abrir el
+  // enlace, así que cualquier link podía crear un vínculo sin consentimiento.
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -306,6 +301,11 @@ export function LinkStorePage() {
       <p className="mt-1 text-sm text-gray-500">
         Escaneá el QR que te compartió la tienda o escribí el código para quedar vinculado.
       </p>
+      {codeParam && msg.ok === null && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Abriste un enlace de vínculo. Revisá el código y tocá «Vincular» para confirmar.
+        </p>
+      )}
       <Status loading={busy} error={msg.error} ok={msg.ok} />
       <Box title="Código de la tienda">
         <p className="text-sm text-gray-600">

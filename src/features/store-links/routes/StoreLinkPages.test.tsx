@@ -124,8 +124,14 @@ describe("LinkStorePage", () => {
     expect(screen.queryByText(RAW_ERROR)).not.toBeInTheDocument();
   });
 
-  it("desde el QR en /vincular/:code vincula una sola vez", async () => {
+  it("abrir /vincular/:code no vincula solo: prellena el código y espera la confirmación", async () => {
+    const user = userEvent.setup();
     renderPage(`/vincular/${CODE}`);
+
+    expect(await screen.findByLabelText("Código")).toHaveValue(CODE);
+    expect(api.linkToStore).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Vincular" }));
 
     await waitFor(() => expect(api.linkToStore).toHaveBeenCalledWith(CODE));
     expect(api.linkToStore).toHaveBeenCalledTimes(1);
