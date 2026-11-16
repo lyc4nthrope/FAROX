@@ -45,6 +45,8 @@ function renderPerfil() {
 describe("ProfilePage (§S2 fila /profile)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // La verificación por WhatsApp solo se ofrece si el número del bot está configurado.
+    vi.stubEnv("VITE_WHATSAPP_AGENT_NUMBER", "573000000000");
     vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
     vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
     vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "operador", premium: false });
@@ -82,6 +84,7 @@ describe("ProfilePage (§S2 fila /profile)", () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
   });
 
   it("muestra el plan actual en el perfil (0032)", async () => {
@@ -154,6 +157,16 @@ describe("ProfilePage (§S2 fila /profile)", () => {
     await user.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(await screen.findByText("Ingresá tu nombre")).toBeInTheDocument();
     expect(profileApi.updateMyProfile).not.toHaveBeenCalled();
+  });
+
+  it("sin número del bot configurado no ofrece una verificación que no se puede completar", async () => {
+    vi.stubEnv("VITE_WHATSAPP_AGENT_NUMBER", "");
+    renderPerfil();
+
+    expect(
+      await screen.findByText(/verificación por WhatsApp no está habilitada/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Verificar este número" })).not.toBeInTheDocument();
   });
 
   it("teléfono sin verificar: ofrece verificar (0042)", async () => {

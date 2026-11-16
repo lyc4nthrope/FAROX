@@ -38,6 +38,11 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # No son secretos: terminan en el JavaScript público. Sin ellas, el
+          # asistente web no propone acciones (H4) y la verificación de teléfono
+          # no ofrece el enlace a WhatsApp. Se cargan como variables del repo.
+          VITE_AGENT_WRITES_ENABLED: ${{ vars.VITE_AGENT_WRITES_ENABLED }}
+          VITE_WHATSAPP_AGENT_NUMBER: ${{ vars.VITE_WHATSAPP_AGENT_NUMBER }}
       - name: Fail if the build has no Supabase URL
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

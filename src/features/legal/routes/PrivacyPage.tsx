@@ -42,14 +42,6 @@ export function PrivacyPage() {
     <div className="mx-auto max-w-3xl px-4 py-12">
       <h1 className="text-2xl font-semibold">Política de Privacidad</h1>
       <p className="mt-1 text-sm text-gray-600">Versión vigente: {PRIVACY_VERSION}</p>
-      {/* Aviso de borrador: el documento NO está listo para publicar sin
-          revisión legal (placeholders {{...}} del responsable pendientes). */}
-      <div
-        role="note"
-        className="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900"
-      >
-        BORRADOR — requiere revisión legal antes de publicar
-      </div>
       {PRIVACY_SECTIONS.map((section) => (
         <section key={section.id} id={section.id} className="mt-8">
           <h2 className="text-lg font-semibold">{section.title}</h2>

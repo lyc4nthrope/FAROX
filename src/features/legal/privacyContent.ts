@@ -5,9 +5,9 @@ import { PRIVACY_VERSION } from "../../shared/lib/legal/privacyVersion";
 // datos puros (sin JSX) para poder versionarlo y testearlo sin arrastrar la
 // UI: el componente de la página solo lo recorre y lo pinta.
 //
-// Los datos del responsable van con placeholders {{ASÍ}} a propósito: este
-// documento es BORRADOR y debe pasar revisión legal (con esos datos
-// completos) antes de publicarse.
+// Versión 1.2: responsable completo (proyecto académico, sin razón social ni
+// NIT), base en la autorización de la Ley 1581 y encargados WhatsApp y
+// OpenRouter. Cualquier cambio de texto sube PRIVACY_VERSION.
 
 export interface PrivacySection {
   id: string;
@@ -76,6 +76,20 @@ export const PRIVACY_THIRD_PARTIES: readonly ThirdParty[] = [
       "Mercado Pago devuelve el estado del pago y de la suscripción para activar o cancelar Premium.",
   },
   {
+    name: "WhatsApp, de Meta (https://www.whatsapp.com)",
+    receives:
+      "si escribes al asistente por WhatsApp o verificas tu teléfono por ese canal, Meta recibe tu " +
+      "número y el contenido de esos mensajes para entregarlos. Solo procesamos mensajes de números " +
+      "que verificaste en tu perfil.",
+  },
+  {
+    name: "OpenRouter (https://openrouter.ai)",
+    receives:
+      "el asistente usa modelos de lenguaje a través de OpenRouter. Recibe el texto de tu consulta, " +
+      "el historial reciente de esa conversación y los datos de inventario, pedidos o tiendas que el " +
+      "asistente consulte para responderte. No recibe tu contraseña ni datos de pago.",
+  },
+  {
     name: "Resend (https://resend.com)",
     receives:
       "si tenés Premium o una suscripción, Resend recibe tu email y nombre para enviarte avisos de renovación, " +
@@ -91,15 +105,11 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
       {
         kind: "p",
         text:
-          "FAROX es la plataforma que conecta distribuidores y tiendas. El responsable del tratamiento " +
-          "de tus datos personales es: {{RAZON_SOCIAL}}, identificado con {{NIT_O_ID}}, con domicilio " +
-          "en {{DIRECCION}}, contacto en {{EMAIL_DE_CONTACTO}} y jurisdicción en {{PAIS_JURISDICCION}}.",
-      },
-      {
-        kind: "p",
-        text:
-          "Los datos del responsable van marcados con {{ }} a propósito: este documento es un borrador " +
-          "y debe completarse y pasar revisión legal antes de publicarse.",
+          "FAROX es la plataforma que conecta distribuidores y tiendas. Es un proyecto académico " +
+          "desarrollado en la Universidad del Quindío; no es una persona jurídica, por eso no tiene " +
+          "razón social ni NIT. El responsable del tratamiento de tus datos personales es el equipo " +
+          "del proyecto FAROX, con domicilio en la Universidad del Quindío, Carrera 15 Calle 12 Norte, " +
+          "Armenia, Quindío, Colombia, contacto en noseecorp@gmail.com y jurisdicción en Colombia.",
       },
     ],
   },
@@ -157,10 +167,10 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
       {
         kind: "p",
         text:
-          "El tratamiento se apoya en: (a) tu consentimiento, que otorgas al marcar la casilla de la " +
-          "Política de Privacidad al registrarte; y (b) el interés legítimo de operar y asegurar la " +
-          "plataforma —por ejemplo, seguridad, prevención de fraude y mejora del servicio— cuando " +
-          "corresponde.",
+          "El tratamiento se apoya en tu autorización previa, expresa e informada (Ley 1581 de 2012, " +
+          "art. 9), que otorgas al marcar la casilla de la Política de Privacidad al registrarte. Esa " +
+          "autorización cubre también el uso de tus datos para operar y proteger la plataforma, por " +
+          "ejemplo, seguridad y prevención de fraude.",
       },
       {
         kind: "p",
@@ -214,9 +224,10 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
         kind: "p",
         text:
           "Conservamos tus datos mientras tu cuenta esté activa y sean necesarios para los fines " +
-          "descritos. Si eliminas tu cuenta, suprimimos o anonimizamos tus datos personales en un " +
-          "plazo razonable, salvo que una norma exija conservarlos —por ejemplo, obligaciones fiscales " +
-          "o contables vinculadas al NIT de una organización—.",
+          "descritos. La app todavía no tiene un botón para eliminar la cuenta: si quieres que la " +
+          "eliminemos, escribe a noseecorp@gmail.com y suprimimos o anonimizamos tus datos personales " +
+          "en un plazo razonable, salvo que una norma exija conservarlos —por ejemplo, obligaciones " +
+          "fiscales o contables vinculadas al NIT de una organización—.",
       },
       {
         kind: "p",
@@ -248,7 +259,7 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
       {
         kind: "p",
         text:
-          "Para ejercerlos, escribe a {{EMAIL_DE_CONTACTO}} con el asunto «Derechos de datos " +
+          "Para ejercerlos, escribe a noseecorp@gmail.com con el asunto «Derechos de datos " +
           "personales», indicando tu nombre, el email con el que te registraste y el derecho que " +
           "quieres ejercer. Daremos respuesta dentro de los plazos que fija la ley. Si no quedas " +
           "conforme con nuestra respuesta, puedes reclamar ante la SIC (www.sic.gov.co).",
