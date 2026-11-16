@@ -2,11 +2,12 @@
 # Corre las pruebas SQL de supabase/tests contra el Postgres LOCAL de Supabase.
 # Cada archivo abre su transacción y termina en ROLLBACK: no deja datos.
 # Uso: scripts/db-test.sh [archivo.sql ...]   (sin argumentos: todos)
-# DB_CONTAINER: contenedor de Postgres (por defecto supabase_db_<carpeta del repo>).
+# DB_CONTAINER: contenedor de Postgres (por defecto supabase_db_<project_id de config.toml>).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-container="${DB_CONTAINER:-supabase_db_$(basename "$root")}"
+project_id="$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' "$root/supabase/config.toml")"
+container="${DB_CONTAINER:-supabase_db_${project_id}}"
 
 if ! docker inspect "$container" >/dev/null 2>&1; then
   echo "No existe el contenedor $container: correr 'npx supabase db start' primero." >&2
