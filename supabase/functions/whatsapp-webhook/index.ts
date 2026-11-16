@@ -512,6 +512,8 @@ async function sendText(to: string, body: string): Promise<void> {
   const version = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? GRAPH_VERSION_DEFAULT;
   const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
     method: "POST",
+    // Envío best-effort: no retener la función si Meta no contesta.
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
