@@ -25,7 +25,11 @@ export async function fetchAllRows<T>(
     if (error !== null) return { data: null, error };
     const batch = data ?? [];
     rows.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
+    if (batch.length < PAGE_SIZE) return { data: rows, error: null };
   }
-  return { data: rows, error: null };
+  // Devolver lo cargado sería el mismo corte silencioso que este helper evita.
+  return {
+    data: null,
+    error: { message: `fetchAllRows: demasiadas filas (más de ${MAX_PAGES * PAGE_SIZE})` },
+  };
 }

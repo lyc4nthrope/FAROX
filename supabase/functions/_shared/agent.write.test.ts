@@ -165,4 +165,20 @@ describe("tiempo límite del proveedor", () => {
     expect(Date.now() - started).toBeLessThan(2000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("un cuerpo de respuesta que se corta a medias también es timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => {
+          throw new DOMException("The signal has been aborted", "TimeoutError");
+        },
+      })),
+    );
+
+    await expect(runAgent({ ...baseInput, writesEnabled: false, timeoutMs: 50 })).rejects.toThrow(
+      /provider timeout/,
+    );
+  });
 });

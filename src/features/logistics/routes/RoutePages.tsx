@@ -23,6 +23,7 @@ import {
   fetchGeoStores,
   fetchLinkedStoreIds,
   fetchRouteDetail,
+  fetchRouteStatusFor,
   fetchRoutes,
   fetchMyDistributorId,
   fetchStoresWithRequests,
@@ -599,11 +600,17 @@ export function RoutesPage() {
         : fetchLinkedStoreIds(Number(distributorId)),
     [distributorId],
   );
-  const linkedIds = linked.data === null ? null : new Set(linked.data);
+  const linkedIds = linked.data === null || linked.loading ? null : new Set(linked.data);
   const storeOptions =
     distributorId === "" || linkedIds === null
       ? []
       : (stores.data ?? []).filter((store) => linkedIds.has(store.id));
+
+  function chooseDistributor(value: string): void {
+    // Las paradas elegidas eran tiendas del distribuidor anterior.
+    setDistributorId(value);
+    setStops([{ storeId: "", time: "" }]);
+  }
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
@@ -627,13 +634,13 @@ export function RoutesPage() {
     }
     // Misma regla que la ruta del distribuidor: una ruta cerrada no se toca y
     // reemplazar una en curso reinicia su avance, así que se confirma.
-    const existing = routes.data?.find(
-      (r) =>
-        r.distributor_id === Number(distributorId) &&
-        r.route_date === date &&
-        r.status !== "cancelled",
-    );
-    if (existing?.status === "completed") {
+    // Se consulta al servidor: el listado trae solo las 50 rutas más recientes.
+    const existing = await fetchRouteStatusFor(Number(distributorId), date);
+    if (existing.error !== null) {
+      setMsg({ error: "No pudimos revisar la ruta de ese día. Probá de nuevo.", ok: null });
+      return;
+    }
+    if (existing.data === "completed") {
       setMsg({
         error: "La ruta de ese día ya está completada; no se puede replanificar.",
         ok: null,
@@ -641,7 +648,7 @@ export function RoutesPage() {
       return;
     }
     if (
-      existing?.status === "active" &&
+      existing.data === "active" &&
       !window.confirm(
         "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
       )
@@ -680,7 +687,7 @@ export function RoutesPage() {
               <select
                 className={inputClass}
                 value={distributorId}
-                onChange={(e) => setDistributorId(e.target.value)}
+                onChange={(e) => chooseDistributor(e.target.value)}
               >
                 <option value="">— elegir —</option>
                 {distributors.data?.map((d) => (

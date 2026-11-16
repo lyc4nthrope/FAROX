@@ -20,6 +20,7 @@ vi.mock("../api", () => ({
   fetchDistributors: vi.fn(),
   fetchGeoStores: vi.fn(),
   fetchLinkedStoreIds: vi.fn(),
+  fetchRouteStatusFor: vi.fn(),
   fetchRouteDetail: vi.fn(),
   fetchMyDistributorId: vi.fn(),
   fetchStoresWithRequests: vi.fn(),
@@ -68,6 +69,7 @@ beforeEach(() => {
   });
   vi.mocked(logisticsApi.fetchLinkedStoreIds).mockResolvedValue({ data: [1], error: null });
   vi.mocked(logisticsApi.fetchRoutes).mockResolvedValue({ data: [], error: null });
+  vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({ data: null, error: null });
   vi.mocked(logisticsApi.saveRoute).mockResolvedValue({ error: null });
 });
 
@@ -97,39 +99,22 @@ describe("RoutesPage · planificar ruta (0056)", () => {
   });
 
   it("pide confirmación antes de reemplazar una ruta en curso", async () => {
-    vi.mocked(logisticsApi.fetchRoutes).mockResolvedValue({
-      data: [
-        {
-          id: 9,
-          route_date: TODAY,
-          status: "active",
-          distributor_id: 5,
-          distributor_name: "Distribuidora Andes",
-        },
-      ],
-      error: null,
-    });
+    // La ruta no está entre las 50 del listado: el chequeo consulta el servidor.
+    vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({ data: "active", error: null });
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { user, storeSelect } = await chooseDistributorAndStore();
     await user.selectOptions(storeSelect, "1");
 
     await user.click(screen.getByRole("button", { name: "Guardar ruta" }));
 
+    expect(logisticsApi.fetchRouteStatusFor).toHaveBeenCalledWith(5, TODAY);
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(logisticsApi.saveRoute).not.toHaveBeenCalled();
   });
 
   it("no intenta reemplazar una ruta completada", async () => {
-    vi.mocked(logisticsApi.fetchRoutes).mockResolvedValue({
-      data: [
-        {
-          id: 9,
-          route_date: TODAY,
-          status: "completed",
-          distributor_id: 5,
-          distributor_name: "Distribuidora Andes",
-        },
-      ],
+    vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({
+      data: "completed",
       error: null,
     });
     const { user, storeSelect } = await chooseDistributorAndStore();
@@ -139,5 +124,23 @@ describe("RoutesPage · planificar ruta (0056)", () => {
 
     expect(await screen.findByText(/ya está completada/i)).toBeInTheDocument();
     expect(logisticsApi.saveRoute).not.toHaveBeenCalled();
+  });
+
+  it("cambiar de distribuidor descarta las paradas elegidas", async () => {
+    vi.mocked(logisticsApi.fetchDistributors).mockResolvedValue({
+      data: [
+        { id: 5, name: "Distribuidora Andes" },
+        { id: 6, name: "Distribuidora Café" },
+      ],
+      error: null,
+    });
+    const { user, storeSelect } = await chooseDistributorAndStore();
+    await user.selectOptions(storeSelect, "1");
+
+    // La tienda 1 también está vinculada al otro distribuidor: sin el reinicio
+    // la parada seguiría elegida aunque nadie la haya elegido para él.
+    await user.selectOptions(screen.getByLabelText("Distribuidor"), "6");
+
+    expect(screen.getByLabelText("Tienda de la parada 1")).toHaveValue("");
   });
 });

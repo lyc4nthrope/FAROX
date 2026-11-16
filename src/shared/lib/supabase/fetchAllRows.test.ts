@@ -32,4 +32,13 @@ describe("fetchAllRows", () => {
 
     expect(await fetchAllRows(page)).toEqual({ data: null, error: { message: "boom" } });
   });
+
+  it("si llega al tope de páginas devuelve error en vez de datos incompletos", async () => {
+    const page = vi.fn(async () => ({ data: Array(PAGE_SIZE).fill({}), error: null }));
+
+    const { data, error } = await fetchAllRows(page);
+
+    expect(data).toBeNull();
+    expect(error?.message).toMatch(/demasiadas filas/i);
+  });
 });

@@ -427,6 +427,7 @@ export async function runAgent(input: {
 
   async function callModel(): Promise<ChatResponse> {
     let response: Response;
+    let detail: string;
     try {
       response = await fetch(url, {
         method: "POST",
@@ -440,14 +441,15 @@ export async function runAgent(input: {
           temperature: 0.2,
         }),
       });
+      // La señal también corta la lectura del cuerpo: queda dentro del try.
+      if (response.ok) return (await response.json()) as ChatResponse;
+      detail = await response.text();
     } catch (error) {
       if (error instanceof DOMException && error.name === "TimeoutError") {
         throw new Error(`provider timeout after ${timeoutMs} ms`);
       }
       throw error;
     }
-    if (response.ok) return (await response.json()) as ChatResponse;
-    const detail = await response.text();
     const short = `provider ${response.status}: ${detail.slice(0, 300)}`;
     if (isModelUnavailable(response.status, detail)) {
       throw new ModelUnavailableError(short, response.status);

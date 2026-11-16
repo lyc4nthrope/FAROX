@@ -1,5 +1,6 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { supabase } from "../../shared/lib/supabase/client";
+import { fetchAllRows } from "../../shared/lib/supabase/fetchAllRows";
 
 // DIST-03 rutas: save_route (admin), mark_stop y update_route_status
 // (distribuidor sobre su ruta). Coordenadas desde la vista stores_geo.
@@ -88,15 +89,32 @@ export async function fetchRoutes(): Promise<LoadResult<RouteRow[]>> {
 
 /** 0056: tiendas vinculadas al distribuidor; save_route solo acepta esas paradas. */
 export async function fetchLinkedStoreIds(distributorId: number): Promise<LoadResult<number[]>> {
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("store_distributors")
+      .select("store_id")
+      .eq("distributor_id", distributorId)
+      .order("store_id")
+      .range(from, to),
+  );
+  if (error !== null) return { data: null, error };
+  return { data: ((data ?? []) as { store_id: number }[]).map((r) => Number(r.store_id)), error };
+}
+
+/** 0056: estado de la ruta vigente del distribuidor en esa fecha (null = no hay). */
+export async function fetchRouteStatusFor(
+  distributorId: number,
+  date: string,
+): Promise<LoadResult<RouteStatus>> {
   const { data, error } = await supabase
-    .from("store_distributors")
-    .select("store_id")
+    .from("routes")
+    .select("status")
     .eq("distributor_id", distributorId)
-    .limit(500);
-  return {
-    data: ((data ?? []) as { store_id: number }[]).map((r) => Number(r.store_id)),
-    error,
-  };
+    .eq("route_date", date)
+    .neq("status", "cancelled")
+    .limit(1)
+    .maybeSingle();
+  return { data: (data?.status as RouteStatus | undefined) ?? null, error };
 }
 
 export async function fetchGeoStores(): Promise<LoadResult<GeoStore[]>> {
