@@ -303,6 +303,13 @@ export function mapError(error: unknown): string {
     return FRIENDLY.invalidCredentials;
   }
 
+  // 0055: la venta del distribuidor sin stock suficiente trae el disponible
+  // en el mensaje; se muestra tal cual porque es lo que necesita para corregir.
+  const stock = /stock insuficiente: (hay .+)$/i.exec(extractMessage(error));
+  if (stock) {
+    return `Stock insuficiente: ${stock[1]}.`;
+  }
+
   // Reglas de negocio de las RPC (RAISE EXCEPTION): substring → texto de UI.
   for (const [needle, friendly] of BUSINESS_RULES) {
     if (message.includes(needle)) {

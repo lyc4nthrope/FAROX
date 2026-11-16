@@ -19,6 +19,8 @@
 --   · Filas de stock para CADA producto × CADA tienda activa, con cantidades
 --     variables, umbrales y fechas de caducidad en perecederos
 --   · Alertas `stock_low` materializadas para los pares bajo umbral
+--   · Stock inicial en el catálogo de cada distribuidor que nunca se movió
+--     (necesario desde 0055: la venta del distribuidor descuenta su stock)
 --
 -- Idempotente
 --   Se puede correr varias veces: no duplica categorías, marcas, productos ni
@@ -426,6 +428,30 @@ WHERE NOT EXISTS (
   FROM public.stock st
   WHERE st.product_id = p.id AND st.store_id = s.id
 );
+
+-- ----------------------------------------------------------------------------
+-- 8b. Stock inicial del catálogo de cada distribuidor (0055)
+--    Desde 0055 la venta directa del distribuidor descuenta su inventario y se
+--    rechaza si no alcanza. Sin esta sección, un catálogo recién armado queda
+--    en 0 y la demo no puede vender. Solo toca filas que NUNCA se movieron:
+--    cantidad 0, sin compras registradas y sin movimientos de ese distribuidor
+--    para ese producto. Cantidad = 5 × base_stock del producto sembrado
+--    (abastece varias tiendas); 50 para productos que no vienen de este seed.
+-- ----------------------------------------------------------------------------
+UPDATE public.distributor_products dp
+SET quantity = COALESCE(
+      (SELECT round(c.base_stock * 5, 3)
+       FROM public.products p
+       JOIN public.brands b ON b.id = p.brand_id
+       JOIN _seed_catalog c ON c.name = p.name AND c.brand = b.name
+       WHERE p.id = dp.product_id),
+      50),
+    updated_at = now()
+WHERE dp.quantity = 0
+  AND NOT EXISTS (SELECT 1 FROM public.distributor_purchases pu
+                  WHERE pu.distributor_id = dp.distributor_id AND pu.product_id = dp.product_id)
+  AND NOT EXISTS (SELECT 1 FROM public.movements m
+                  WHERE m.distributor_id = dp.distributor_id AND m.product_id = dp.product_id);
 
 -- ----------------------------------------------------------------------------
 -- 9. Alertas stock_low coherentes con las cantidades sembradas

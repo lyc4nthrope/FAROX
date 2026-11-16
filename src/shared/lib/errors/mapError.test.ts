@@ -291,3 +291,21 @@ describe("mapError — límites de longitud y rate limit (0040/0041)", () => {
     );
   });
 });
+
+describe("mapError · stock del distribuidor (0055)", () => {
+  it("muestra cuánto hay disponible cuando la venta no alcanza", () => {
+    expect(
+      mapError({
+        code: "P0001",
+        message:
+          "register_distributor_sale: stock insuficiente: hay 6 disponibles y se intentó vender 7",
+      }),
+    ).toBe("Stock insuficiente: hay 6 disponibles y se intentó vender 7.");
+  });
+
+  it("la salida de stock de la tienda conserva su mensaje genérico", () => {
+    expect(
+      mapError({ message: "stock insuficiente o fila inexistente (producto 1, tienda 2)" }),
+    ).toBe("No hay stock suficiente para esa salida.");
+  });
+});
