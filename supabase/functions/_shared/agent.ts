@@ -22,6 +22,10 @@ import {
 // ============================================================================
 
 const MAX_STEPS = 4;
+// Límite por llamada al proveedor. Sin él, un modelo colgado retenía el turno
+// hasta que la plataforma mataba la función: el usuario no recibía nada y, en
+// WhatsApp, el mensaje ya deduplicado no se reintentaba.
+export const MODEL_TIMEOUT_MS = 25_000;
 const MAX_HISTORY = 8;
 
 export interface AgentHistoryItem {
@@ -390,6 +394,8 @@ export async function runAgent(input: {
   fallbackModel?: string | null;
   message: string;
   history: readonly AgentHistoryItem[];
+  /** Solo para pruebas; por defecto MODEL_TIMEOUT_MS. */
+  timeoutMs?: number;
 }): Promise<{ reply: string; toolLog: AgentToolLog[]; model: string }> {
   const storeRule =
     input.store !== null
@@ -417,20 +423,33 @@ export async function runAgent(input: {
   let prepared = false;
   const fallback = input.fallbackModel ?? null;
 
+  const timeoutMs = input.timeoutMs ?? MODEL_TIMEOUT_MS;
+
   async function callModel(): Promise<ChatResponse> {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: providerHeaders(input.apiKey),
-      body: JSON.stringify({
-        model: activeModel,
-        messages,
-        tools,
-        tool_choice: "auto",
-        temperature: 0.2,
-      }),
-    });
-    if (response.ok) return (await response.json()) as ChatResponse;
-    const detail = await response.text();
+    let response: Response;
+    let detail: string;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: providerHeaders(input.apiKey),
+        signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify({
+          model: activeModel,
+          messages,
+          tools,
+          tool_choice: "auto",
+          temperature: 0.2,
+        }),
+      });
+      // La señal también corta la lectura del cuerpo: queda dentro del try.
+      if (response.ok) return (await response.json()) as ChatResponse;
+      detail = await response.text();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "TimeoutError") {
+        throw new Error(`provider timeout after ${timeoutMs} ms`);
+      }
+      throw error;
+    }
     const short = `provider ${response.status}: ${detail.slice(0, 300)}`;
     if (isModelUnavailable(response.status, detail)) {
       throw new ModelUnavailableError(short, response.status);

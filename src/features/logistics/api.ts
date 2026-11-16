@@ -1,5 +1,6 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { supabase } from "../../shared/lib/supabase/client";
+import { fetchAllRows } from "../../shared/lib/supabase/fetchAllRows";
 
 // DIST-03 rutas: save_route (admin), mark_stop y update_route_status
 // (distribuidor sobre su ruta). Coordenadas desde la vista stores_geo.
@@ -26,6 +27,7 @@ export interface RouteRow {
   id: number;
   route_date: string;
   status: RouteStatus;
+  distributor_id: number;
   distributor_name: string;
 }
 export interface StopRow {
@@ -72,16 +74,47 @@ function relName(value: unknown): string {
 export async function fetchRoutes(): Promise<LoadResult<RouteRow[]>> {
   const { data, error } = await supabase
     .from("routes")
-    .select("id,route_date,status,distributor:distributors(name)")
+    .select("id,route_date,status,distributor_id,distributor:distributors(name)")
     .order("route_date", { ascending: false })
     .limit(50);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.id),
     route_date: String(r.route_date),
     status: r.status as RouteStatus,
+    distributor_id: Number(r.distributor_id),
     distributor_name: relName(r.distributor),
   }));
   return { data: rows, error };
+}
+
+/** 0056: tiendas vinculadas al distribuidor; save_route solo acepta esas paradas. */
+export async function fetchLinkedStoreIds(distributorId: number): Promise<LoadResult<number[]>> {
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("store_distributors")
+      .select("store_id")
+      .eq("distributor_id", distributorId)
+      .order("store_id")
+      .range(from, to),
+  );
+  if (error !== null) return { data: null, error };
+  return { data: ((data ?? []) as { store_id: number }[]).map((r) => Number(r.store_id)), error };
+}
+
+/** 0056: estado de la ruta vigente del distribuidor en esa fecha (null = no hay). */
+export async function fetchRouteStatusFor(
+  distributorId: number,
+  date: string,
+): Promise<LoadResult<RouteStatus>> {
+  const { data, error } = await supabase
+    .from("routes")
+    .select("status")
+    .eq("distributor_id", distributorId)
+    .eq("route_date", date)
+    .neq("status", "cancelled")
+    .limit(1)
+    .maybeSingle();
+  return { data: (data?.status as RouteStatus | undefined) ?? null, error };
 }
 
 export async function fetchGeoStores(): Promise<LoadResult<GeoStore[]>> {
@@ -189,7 +222,7 @@ export async function fetchRouteDetail(
   let query = supabase
     .from("routes")
     .select(
-      "id,route_date,status,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
+      "id,route_date,status,distributor_id,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
     );
   query =
     routeId === null
@@ -233,6 +266,7 @@ export async function fetchRouteDetail(
       id: Number(r.id),
       route_date: String(r.route_date),
       status: r.status as RouteStatus,
+      distributor_id: Number(r.distributor_id),
       distributor_name: relName(r.distributor),
       stops,
     },

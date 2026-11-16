@@ -1,6 +1,7 @@
 import type { LoadResult } from "../../shared/hooks/useLoad";
 import { pageRange, type ListQuery, type ListResult } from "../../shared/lib/list";
 import { supabase } from "../../shared/lib/supabase/client";
+import { fetchAllRows } from "../../shared/lib/supabase/fetchAllRows";
 import type { ProductFormValues } from "./schemas";
 import type {
   CatalogContext,
@@ -509,13 +510,15 @@ export interface DistributorPriceOption {
 export async function fetchDistributorPriceOptions(): Promise<
   LoadResult<DistributorPriceOption[]>
 > {
-  const { data, error } = await supabase
-    .from("distributor_products")
-    .select(
-      "product_id,purchase_price,sale_price,margin_pct,product:products!inner(name,brand:brands(name))",
-    )
-    .order("product_id")
-    .limit(500);
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("distributor_products")
+      .select(
+        "product_id,purchase_price,sale_price,margin_pct,product:products!inner(name,brand:brands(name))",
+      )
+      .order("product_id")
+      .range(from, to),
+  );
   if (error !== null) return { data: null, error };
   const rows = ((data ?? []) as Record<string, unknown>[]).map((raw) => {
     const product = normalizeListRow(
@@ -705,25 +708,31 @@ export async function fetchStoreRelationPrices(
   storeId: number,
 ): Promise<LoadResult<StoreRelationPriceRow[]>> {
   const [sales, purchases, margins] = await Promise.all([
-    supabase
-      .from("price_publications")
-      .select("product_id,price")
-      .eq("store_id", storeId)
-      .eq("is_active", true)
-      .order("product_id")
-      .limit(500),
-    supabase
-      .from("store_product_prices")
-      .select("product_id,purchase_price")
-      .eq("store_id", storeId)
-      .order("product_id")
-      .limit(500),
-    supabase
-      .from("store_product_margins")
-      .select("product_id,margin_pct")
-      .eq("store_id", storeId)
-      .order("product_id")
-      .limit(500),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("price_publications")
+        .select("product_id,price")
+        .eq("store_id", storeId)
+        .eq("is_active", true)
+        .order("product_id")
+        .range(from, to),
+    ),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("store_product_prices")
+        .select("product_id,purchase_price")
+        .eq("store_id", storeId)
+        .order("product_id")
+        .range(from, to),
+    ),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("store_product_margins")
+        .select("product_id,margin_pct")
+        .eq("store_id", storeId)
+        .order("product_id")
+        .range(from, to),
+    ),
   ]);
   const error = sales.error ?? purchases.error ?? margins.error;
   if (error !== null) {
@@ -766,12 +775,14 @@ export async function fetchStoreRelationPrices(
 export async function fetchStoreProductMargins(
   storeId: number,
 ): Promise<LoadResult<Map<number, number>>> {
-  const { data, error } = await supabase
-    .from("store_product_margins")
-    .select("product_id,margin_pct")
-    .eq("store_id", storeId)
-    .order("product_id")
-    .limit(500);
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("store_product_margins")
+      .select("product_id,margin_pct")
+      .eq("store_id", storeId)
+      .order("product_id")
+      .range(from, to),
+  );
   const margins = new Map<number, number>();
   for (const raw of (data ?? []) as Record<string, unknown>[]) {
     const margin = normalizeOptionalPercent(raw.margin_pct);
@@ -810,12 +821,14 @@ export async function setDistributorProductMargin(
 export async function fetchStorePurchasePrices(
   storeId: number,
 ): Promise<LoadResult<Map<number, number>>> {
-  const { data, error } = await supabase
-    .from("store_product_prices")
-    .select("product_id,purchase_price")
-    .eq("store_id", storeId)
-    .order("product_id")
-    .limit(500);
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("store_product_prices")
+      .select("product_id,purchase_price")
+      .eq("store_id", storeId)
+      .order("product_id")
+      .range(from, to),
+  );
   const prices = new Map<number, number>();
   for (const raw of (data ?? []) as Record<string, unknown>[]) {
     const price = normalizeOptionalPrice(raw.purchase_price);

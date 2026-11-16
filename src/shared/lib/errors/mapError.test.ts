@@ -291,3 +291,37 @@ describe("mapError — límites de longitud y rate limit (0040/0041)", () => {
     );
   });
 });
+
+describe("mapError · stock del distribuidor (0055)", () => {
+  it("muestra cuánto hay disponible cuando la venta no alcanza", () => {
+    expect(
+      mapError({
+        code: "P0001",
+        message:
+          "register_distributor_sale: stock insuficiente: hay 6 disponibles y se intentó vender 7",
+      }),
+    ).toBe("Stock insuficiente: hay 6 disponibles y se intentó vender 7.");
+  });
+
+  it("la salida de stock de la tienda conserva su mensaje genérico", () => {
+    expect(
+      mapError({ message: "stock insuficiente o fila inexistente (producto 1, tienda 2)" }),
+    ).toBe("No hay stock suficiente para esa salida.");
+  });
+});
+
+describe("mapError · rutas (0056)", () => {
+  it("parada en tienda no vinculada", () => {
+    expect(
+      mapError({ message: "save_route: la tienda 12 no está vinculada a este distribuidor" }),
+    ).toBe("Esa tienda no está vinculada a este distribuidor.");
+  });
+
+  it("ruta completada", () => {
+    expect(
+      mapError({
+        message: "save_route: la ruta del 2026-11-16 ya está completada; no se puede replanificar",
+      }),
+    ).toBe("La ruta de ese día ya está completada; no se puede replanificar.");
+  });
+});

@@ -65,6 +65,8 @@ import { HomePage } from "./shell/HomePage";
 const ADMIN_ONLY: readonly RoleName[] = ["admin"];
 const ADMIN_OR_OPERATOR: readonly RoleName[] = ["admin", "operador"];
 const DISTRIBUTOR_ONLY: readonly RoleName[] = ["distribuidor"];
+// 0054: el distribuidor lee el fiado de sus pedidos (acreedor).
+const ALL_ROLES: readonly RoleName[] = ["admin", "operador", "distribuidor"];
 
 // La landing es la primera impresión y vive en la raíz PÚBLICA. Una sesión ya
 // activa no ve marketing: vuelve al inicio de la app, el mismo destino al que
@@ -325,7 +327,7 @@ export function AppRoutes() {
             <Route
               path="/fiado"
               element={
-                <RequireRole roles={ADMIN_OR_OPERATOR}>
+                <RequireRole roles={ALL_ROLES}>
                   <CreditsPage />
                 </RequireRole>
               }

@@ -87,6 +87,9 @@ function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () 
   const paidPct = credit.total_amount > 0 ? Math.min(100, (paid / credit.total_amount) * 100) : 0;
   const overdue =
     credit.status === "pending" && credit.due_date !== null && credit.due_date < todayIso();
+  // 0054: el distribuidor (acreedor) lee el fiado; los pagos los registra la
+  // tienda o el admin (register_payment rechaza otros roles).
+  const canPay = role === "admin" || role === "operador";
 
   return (
     <div>
@@ -125,7 +128,13 @@ function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () 
 
       <Status error={msg.error ?? payments.error} ok={msg.ok} />
 
-      {credit.status === "pending" && (
+      {credit.status === "pending" && !canPay && (
+        <p className="mt-4 text-sm text-gray-600">
+          La tienda registra los pagos; acá ves el saldo y cada abono.
+        </p>
+      )}
+
+      {credit.status === "pending" && canPay && (
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50/60 p-3">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
             Registrar pago
@@ -224,7 +233,7 @@ function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () 
   );
 }
 
-/** /fiado — cartera de créditos (admin y operador). */
+/** /fiado — cartera de créditos (admin y operador; el distribuidor, solo lectura). */
 export function CreditsPage() {
   const credits = useLoad(() => fetchCredits(), []);
   const rows = credits.data ?? [];

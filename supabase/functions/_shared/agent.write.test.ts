@@ -146,3 +146,39 @@ describe("write tools", () => {
     );
   });
 });
+
+describe("tiempo límite del proveedor", () => {
+  it("un modelo que no responde termina en error en vez de colgar el turno", async () => {
+    // fetch que nunca resuelve salvo que se aborte su señal.
+    const fetchMock = vi.fn(
+      (_url: string, init: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const started = Date.now();
+    await expect(runAgent({ ...baseInput, writesEnabled: false, timeoutMs: 50 })).rejects.toThrow(
+      /timeout/i,
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("un cuerpo de respuesta que se corta a medias también es timeout", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => {
+          throw new DOMException("The signal has been aborted", "TimeoutError");
+        },
+      })),
+    );
+
+    await expect(runAgent({ ...baseInput, writesEnabled: false, timeoutMs: 50 })).rejects.toThrow(
+      /provider timeout/,
+    );
+  });
+});

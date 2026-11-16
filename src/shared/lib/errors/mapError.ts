@@ -163,6 +163,12 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   // catálogos se validan también en create_order.
   ["tienda y distribuidor son obligatorios", "Elegí tienda y distribuidor."],
   ["no está vinculado a la tienda", "Ese distribuidor no está vinculado a la tienda."],
+  // Rutas (0056).
+  ["no está vinculada a este distribuidor", "Esa tienda no está vinculada a este distribuidor."],
+  [
+    "ya está completada; no se puede replanificar",
+    "La ruta de ese día ya está completada; no se puede replanificar.",
+  ],
   [
     "no está en el catálogo del distribuidor",
     "Ese producto no está disponible en el catálogo del distribuidor.",
@@ -301,6 +307,13 @@ export function mapError(error: unknown): string {
   }
   if (message.includes("invalid login credentials")) {
     return FRIENDLY.invalidCredentials;
+  }
+
+  // 0055: la venta del distribuidor sin stock suficiente trae el disponible
+  // en el mensaje; se muestra tal cual porque es lo que necesita para corregir.
+  const stock = /stock insuficiente: (hay .+)$/i.exec(extractMessage(error));
+  if (stock) {
+    return `Stock insuficiente: ${stock[1]}.`;
   }
 
   // Reglas de negocio de las RPC (RAISE EXCEPTION): substring → texto de UI.

@@ -38,6 +38,8 @@ export function BarcodeScanner({
   const video = useRef<HTMLVideoElement>(null);
   const controls = useRef<IScannerControls | null>(null);
   const finished = useRef(false);
+  // La pantalla se cerró: si el permiso de cámara llega después, se apaga ya.
+  const unmounted = useRef(false);
   const lastRead = useRef<{ code: string; at: number } | null>(null);
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode;
@@ -81,7 +83,7 @@ export function BarcodeScanner({
           onCodeRef.current(code);
         },
       );
-      if (finished.current) {
+      if (finished.current || unmounted.current) {
         scanner.stop();
         return;
       }
@@ -95,7 +97,11 @@ export function BarcodeScanner({
   }
 
   useEffect(() => {
-    return () => controls.current?.stop();
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      controls.current?.stop();
+    };
   }, []);
 
   return (

@@ -6,7 +6,8 @@
 # en un Postgres limpio y el job exige evidencia de cada archivo. La
 # verificación 0012 es histórica (0009-0012): sus fixtures H3 no conocen
 # store_distributors ni el alcance actual de pedidos, así que NO se re-ejecuta
-# contra el esquema de 51 migraciones. El lint de plpgsql_check sigue cubriendo
+# contra el esquema actual de migraciones. Las reglas de 0054+ se prueban con
+# supabase/tests (scripts/db-test.sh, último paso). El lint de plpgsql_check sigue cubriendo
 # la superficie propia de la app (PostGIS se excluye porque vive en `public`).
 
 name: Schema Check
@@ -77,3 +78,6 @@ jobs:
           test -s extension-functions.txt || { echo "::error::lista de funciones de PostGIS vacía — fail-closed (¿cambió el nombre de la extensión?)"; exit 1; }
           supabase db lint --level=warning > db-lint.json
           node scripts/check-db-lint.mjs db-lint.json extension-functions.txt
+
+      - name: "Pruebas SQL (supabase/tests) — cada archivo en una transacción con ROLLBACK"
+        run: scripts/db-test.sh

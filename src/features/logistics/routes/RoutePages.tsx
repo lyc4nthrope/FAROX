@@ -21,7 +21,9 @@ import {
   STOP_LABELS,
   fetchDistributors,
   fetchGeoStores,
+  fetchLinkedStoreIds,
   fetchRouteDetail,
+  fetchRouteStatusFor,
   fetchRoutes,
   fetchMyDistributorId,
   fetchStoresWithRequests,
@@ -171,7 +173,8 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {role === "admin" && route.status === "planned" && (
+        {/* 0056: el distribuidor también inicia su propia ruta. */}
+        {(role === "admin" || role === "distribuidor") && route.status === "planned" && (
           <button
             className={buttonClass}
             type="button"
@@ -179,11 +182,6 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
           >
             Iniciar ruta
           </button>
-        )}
-        {role === "distribuidor" && route.status === "planned" && (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            El administrador debe iniciar la ruta para poder terminarla.
-          </p>
         )}
         {((role === "admin" && (route.status === "planned" || route.status === "active")) ||
           (role === "distribuidor" && route.status === "active")) && (
@@ -594,6 +592,25 @@ export function RoutesPage() {
   const [stops, setStops] = useState<{ storeId: string; time: string }[]>([
     { storeId: "", time: "" },
   ]);
+  // 0056: save_route rechaza paradas en tiendas no vinculadas; ofrecer solo esas.
+  const linked = useLoad(
+    () =>
+      distributorId === ""
+        ? Promise.resolve({ data: null, error: null })
+        : fetchLinkedStoreIds(Number(distributorId)),
+    [distributorId],
+  );
+  const linkedIds = linked.data === null || linked.loading ? null : new Set(linked.data);
+  const storeOptions =
+    distributorId === "" || linkedIds === null
+      ? []
+      : (stores.data ?? []).filter((store) => linkedIds.has(store.id));
+
+  function chooseDistributor(value: string): void {
+    // Las paradas elegidas eran tiendas del distribuidor anterior.
+    setDistributorId(value);
+    setStops([{ storeId: "", time: "" }]);
+  }
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
@@ -613,6 +630,29 @@ export function RoutesPage() {
     const chosen = stops.filter((s) => s.storeId !== "");
     if (distributorId === "" || chosen.length === 0) {
       setMsg({ error: "Elegí distribuidor y al menos una tienda.", ok: null });
+      return;
+    }
+    // Misma regla que la ruta del distribuidor: una ruta cerrada no se toca y
+    // reemplazar una en curso reinicia su avance, así que se confirma.
+    // Se consulta al servidor: el listado trae solo las 50 rutas más recientes.
+    const existing = await fetchRouteStatusFor(Number(distributorId), date);
+    if (existing.error !== null) {
+      setMsg({ error: "No pudimos revisar la ruta de ese día. Probá de nuevo.", ok: null });
+      return;
+    }
+    if (existing.data === "completed") {
+      setMsg({
+        error: "La ruta de ese día ya está completada; no se puede replanificar.",
+        ok: null,
+      });
+      return;
+    }
+    if (
+      existing.data === "active" &&
+      !window.confirm(
+        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
+      )
+    ) {
       return;
     }
     const payload = chosen.map((s, i) => ({
@@ -637,14 +677,17 @@ export function RoutesPage() {
       </p>
 
       <Box title="Planificar ruta">
-        <Status error={msg.error ?? distributors.error ?? stores.error} ok={msg.ok} />
+        <Status
+          error={msg.error ?? distributors.error ?? stores.error ?? linked.error}
+          ok={msg.ok}
+        />
         <form onSubmit={(e) => void onSubmit(e)}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Distribuidor">
               <select
                 className={inputClass}
                 value={distributorId}
-                onChange={(e) => setDistributorId(e.target.value)}
+                onChange={(e) => chooseDistributor(e.target.value)}
               >
                 <option value="">— elegir —</option>
                 {distributors.data?.map((d) => (
@@ -689,8 +732,10 @@ export function RoutesPage() {
                     )
                   }
                 >
-                  <option value="">— tienda —</option>
-                  {stores.data?.map((st) => (
+                  <option value="">
+                    {distributorId === "" ? "— elegí primero el distribuidor —" : "— tienda —"}
+                  </option>
+                  {storeOptions.map((st) => (
                     <option key={st.id} value={st.id}>
                       {st.name}
                     </option>

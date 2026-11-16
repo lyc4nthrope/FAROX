@@ -15,6 +15,8 @@ export function QrScanner({
   const video = useRef<HTMLVideoElement>(null);
   const controls = useRef<IScannerControls | null>(null);
   const finished = useRef(false);
+  // La pantalla se cerró: si el permiso de cámara llega después, se apaga ya.
+  const unmounted = useRef(false);
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function QrScanner({
           onCode(result.getText());
         },
       );
-      if (finished.current) {
+      if (finished.current || unmounted.current) {
         scanner.stop();
         return;
       }
@@ -57,7 +59,11 @@ export function QrScanner({
   }
 
   useEffect(() => {
-    return () => controls.current?.stop();
+    unmounted.current = false;
+    return () => {
+      unmounted.current = true;
+      controls.current?.stop();
+    };
   }, []);
 
   return (
