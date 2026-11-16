@@ -55,6 +55,7 @@ const OPERATOR_ITEMS: readonly NavItem[] = [
 const DISTRIBUTOR_ITEMS: readonly NavItem[] = [
   { to: "/mi-ruta", label: "Mi ruta" },
   { to: "/pedidos", label: "Mis pedidos" },
+  { to: "/fiado", label: "Fiado" },
   { to: "/movimientos", label: "Movimientos" },
   { to: "/products", label: "Productos" },
   { to: "/alertas", label: "Alertas" },

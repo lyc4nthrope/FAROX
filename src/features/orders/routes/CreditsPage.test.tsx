@@ -96,3 +96,44 @@ describe("CreditsPage: registrar pago", () => {
     expect(within(dialog).getByLabelText("Monto")).toHaveValue(null);
   });
 });
+
+describe("CreditsPage: distribuidor acreedor (0054)", () => {
+  beforeEach(() => {
+    vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u3", email: "dist@farox.app" });
+    vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "distribuidor", premium: false });
+    vi.mocked(ordersApi.fetchCredits).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          order_id: 10,
+          store_name: "Tienda Centro",
+          total_amount: 20000,
+          balance: 15000,
+          status: "pending",
+          due_date: null,
+        },
+      ],
+      error: null,
+    });
+    vi.mocked(ordersApi.fetchPayments).mockResolvedValue({ data: [], error: null });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("ve el saldo que le deben pero no puede registrar pagos", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole("button", { name: "Ver detalle" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getAllByText("$ 15.000").length).toBeGreaterThan(0);
+    expect(within(dialog).getByText(/la tienda registra los pagos/i)).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Monto")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: /registrar pago/i }),
+    ).not.toBeInTheDocument();
+  });
+});
