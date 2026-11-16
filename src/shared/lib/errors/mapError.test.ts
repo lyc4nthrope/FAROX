@@ -309,3 +309,19 @@ describe("mapError · stock del distribuidor (0055)", () => {
     ).toBe("No hay stock suficiente para esa salida.");
   });
 });
+
+describe("mapError · rutas (0056)", () => {
+  it("parada en tienda no vinculada", () => {
+    expect(
+      mapError({ message: "save_route: la tienda 12 no está vinculada a este distribuidor" }),
+    ).toBe("Esa tienda no está vinculada a este distribuidor.");
+  });
+
+  it("ruta completada", () => {
+    expect(
+      mapError({
+        message: "save_route: la ruta del 2026-11-16 ya está completada; no se puede replanificar",
+      }),
+    ).toBe("La ruta de ese día ya está completada; no se puede replanificar.");
+  });
+});

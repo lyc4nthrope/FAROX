@@ -21,6 +21,7 @@ import {
   STOP_LABELS,
   fetchDistributors,
   fetchGeoStores,
+  fetchLinkedStoreIds,
   fetchRouteDetail,
   fetchRoutes,
   fetchMyDistributorId,
@@ -171,7 +172,8 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {role === "admin" && route.status === "planned" && (
+        {/* 0056: el distribuidor también inicia su propia ruta. */}
+        {(role === "admin" || role === "distribuidor") && route.status === "planned" && (
           <button
             className={buttonClass}
             type="button"
@@ -179,11 +181,6 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
           >
             Iniciar ruta
           </button>
-        )}
-        {role === "distribuidor" && route.status === "planned" && (
-          <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-            El administrador debe iniciar la ruta para poder terminarla.
-          </p>
         )}
         {((role === "admin" && (route.status === "planned" || route.status === "active")) ||
           (role === "distribuidor" && route.status === "active")) && (
@@ -594,6 +591,19 @@ export function RoutesPage() {
   const [stops, setStops] = useState<{ storeId: string; time: string }[]>([
     { storeId: "", time: "" },
   ]);
+  // 0056: save_route rechaza paradas en tiendas no vinculadas; ofrecer solo esas.
+  const linked = useLoad(
+    () =>
+      distributorId === ""
+        ? Promise.resolve({ data: null, error: null })
+        : fetchLinkedStoreIds(Number(distributorId)),
+    [distributorId],
+  );
+  const linkedIds = linked.data === null ? null : new Set(linked.data);
+  const storeOptions =
+    distributorId === "" || linkedIds === null
+      ? []
+      : (stores.data ?? []).filter((store) => linkedIds.has(store.id));
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
@@ -613,6 +623,29 @@ export function RoutesPage() {
     const chosen = stops.filter((s) => s.storeId !== "");
     if (distributorId === "" || chosen.length === 0) {
       setMsg({ error: "Elegí distribuidor y al menos una tienda.", ok: null });
+      return;
+    }
+    // Misma regla que la ruta del distribuidor: una ruta cerrada no se toca y
+    // reemplazar una en curso reinicia su avance, así que se confirma.
+    const existing = routes.data?.find(
+      (r) =>
+        r.distributor_id === Number(distributorId) &&
+        r.route_date === date &&
+        r.status !== "cancelled",
+    );
+    if (existing?.status === "completed") {
+      setMsg({
+        error: "La ruta de ese día ya está completada; no se puede replanificar.",
+        ok: null,
+      });
+      return;
+    }
+    if (
+      existing?.status === "active" &&
+      !window.confirm(
+        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
+      )
+    ) {
       return;
     }
     const payload = chosen.map((s, i) => ({
@@ -637,7 +670,10 @@ export function RoutesPage() {
       </p>
 
       <Box title="Planificar ruta">
-        <Status error={msg.error ?? distributors.error ?? stores.error} ok={msg.ok} />
+        <Status
+          error={msg.error ?? distributors.error ?? stores.error ?? linked.error}
+          ok={msg.ok}
+        />
         <form onSubmit={(e) => void onSubmit(e)}>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Distribuidor">
@@ -689,8 +725,10 @@ export function RoutesPage() {
                     )
                   }
                 >
-                  <option value="">— tienda —</option>
-                  {stores.data?.map((st) => (
+                  <option value="">
+                    {distributorId === "" ? "— elegí primero el distribuidor —" : "— tienda —"}
+                  </option>
+                  {storeOptions.map((st) => (
                     <option key={st.id} value={st.id}>
                       {st.name}
                     </option>

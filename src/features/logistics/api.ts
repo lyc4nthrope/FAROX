@@ -26,6 +26,7 @@ export interface RouteRow {
   id: number;
   route_date: string;
   status: RouteStatus;
+  distributor_id: number;
   distributor_name: string;
 }
 export interface StopRow {
@@ -72,16 +73,30 @@ function relName(value: unknown): string {
 export async function fetchRoutes(): Promise<LoadResult<RouteRow[]>> {
   const { data, error } = await supabase
     .from("routes")
-    .select("id,route_date,status,distributor:distributors(name)")
+    .select("id,route_date,status,distributor_id,distributor:distributors(name)")
     .order("route_date", { ascending: false })
     .limit(50);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: Number(r.id),
     route_date: String(r.route_date),
     status: r.status as RouteStatus,
+    distributor_id: Number(r.distributor_id),
     distributor_name: relName(r.distributor),
   }));
   return { data: rows, error };
+}
+
+/** 0056: tiendas vinculadas al distribuidor; save_route solo acepta esas paradas. */
+export async function fetchLinkedStoreIds(distributorId: number): Promise<LoadResult<number[]>> {
+  const { data, error } = await supabase
+    .from("store_distributors")
+    .select("store_id")
+    .eq("distributor_id", distributorId)
+    .limit(500);
+  return {
+    data: ((data ?? []) as { store_id: number }[]).map((r) => Number(r.store_id)),
+    error,
+  };
 }
 
 export async function fetchGeoStores(): Promise<LoadResult<GeoStore[]>> {
@@ -189,7 +204,7 @@ export async function fetchRouteDetail(
   let query = supabase
     .from("routes")
     .select(
-      "id,route_date,status,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
+      "id,route_date,status,distributor_id,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
     );
   query =
     routeId === null
@@ -233,6 +248,7 @@ export async function fetchRouteDetail(
       id: Number(r.id),
       route_date: String(r.route_date),
       status: r.status as RouteStatus,
+      distributor_id: Number(r.distributor_id),
       distributor_name: relName(r.distributor),
       stops,
     },

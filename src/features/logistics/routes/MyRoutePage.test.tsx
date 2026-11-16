@@ -200,6 +200,7 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
         id: 9,
         route_date: "2026-10-28",
         status: "active",
+        distributor_id: 5,
         distributor_name: "Distribuidora Andes",
         stops: [
           {
@@ -252,6 +253,7 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
         id: 7,
         route_date: "2026-10-28",
         status: "planned",
+        distributor_id: 5,
         distributor_name: "Distribuidora Andes",
         stops: [
           {
@@ -275,5 +277,27 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
     expect(screen.getByText("Pendiente")).toBeInTheDocument();
     expect(screen.getByText("Tu día")).toBeInTheDocument();
     expect(screen.getByText("Paradas").nextElementSibling).toHaveTextContent("1");
+  });
+
+  it("el distribuidor inicia su propia ruta planificada (0056)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(logisticsApi.updateRouteStatus).mockResolvedValue({ error: null });
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: {
+        id: 7,
+        route_date: "2026-10-28",
+        status: "planned",
+        distributor_id: 5,
+        distributor_name: "Distribuidora Andes",
+        stops: [],
+      },
+      error: null,
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Iniciar ruta" }));
+
+    expect(logisticsApi.updateRouteStatus).toHaveBeenCalledWith(7, "active");
+    expect(screen.queryByText(/administrador debe iniciar/i)).not.toBeInTheDocument();
   });
 });

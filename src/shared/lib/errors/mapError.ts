@@ -163,6 +163,12 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   // catálogos se validan también en create_order.
   ["tienda y distribuidor son obligatorios", "Elegí tienda y distribuidor."],
   ["no está vinculado a la tienda", "Ese distribuidor no está vinculado a la tienda."],
+  // Rutas (0056).
+  ["no está vinculada a este distribuidor", "Esa tienda no está vinculada a este distribuidor."],
+  [
+    "ya está completada; no se puede replanificar",
+    "La ruta de ese día ya está completada; no se puede replanificar.",
+  ],
   [
     "no está en el catálogo del distribuidor",
     "Ese producto no está disponible en el catálogo del distribuidor.",
