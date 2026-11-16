@@ -109,6 +109,13 @@ export function OrderDetailPage() {
       setMsg({ error: "Cada cantidad recibida debe estar entre 0 y la pedida.", ok: null });
       return;
     }
+    // Cerrar la entrega es irreversible: se confirma igual que en el listado.
+    const totalReceived = payload.reduce((sum, p) => sum + p.received_quantity, 0);
+    const question =
+      totalReceived === 0
+        ? `No marcaste ninguna unidad recibida. ¿Cerrar el pedido #${orderId} como entregado igual?`
+        : `¿Confirmar la entrega del pedido #${orderId}? Las cantidades recibidas se suman al stock y no se puede deshacer.`;
+    if (!window.confirm(question)) return;
     // 0029: si el distribuidor ajustó la cotización, se persiste antes de
     // entregar para que el movimiento de salida registre ese precio de venta.
     if (canQuote) {

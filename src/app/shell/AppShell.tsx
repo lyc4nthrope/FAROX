@@ -37,11 +37,10 @@ export function AppShell() {
     [showOrders, location.pathname],
   );
   const orderCount = openOrders.data ?? 0;
-  // sdd/admin-console T-E1 (ADM-11): primer branch de UI que CONSUME el
-  // `premium` ya cargado en el contexto (AuthProvider:183). D7 — is_premium()
-  // = premium OR admin (0004:39-48) ⇒ un admin sin premium TAMBIÉN ve la
-  // insignia: está exento del gate premium.
-  const verInsigniaPremium = premium || role === "admin";
+  // ADM-11: is_premium() = premium OR admin (D7: el admin está exento del gate).
+  // La insignia marca a un cliente Premium; el admin administra Premium, no lo
+  // compra, así que no la lleva.
+  const verInsigniaPremium = premium && role !== "admin";
 
   return (
     <div className="min-h-dvh bg-gray-50 text-gray-900">

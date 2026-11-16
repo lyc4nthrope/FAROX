@@ -890,7 +890,14 @@ export function InventoryPage() {
 
       {modal === "bulkPrice" && (
         <Modal title="Carga masiva de precios" size="lg" onClose={() => setModal(null)}>
-          {stockOptions.data !== null && prices.data !== null && purchasePrices.data !== null ? (
+          {/* Las api devuelven [] junto con el error: sin exigir error === null, una
+              carga fallida abría el editor vacío y guardar pisaba los precios reales. */}
+          {stockOptions.data !== null &&
+          prices.data !== null &&
+          purchasePrices.data !== null &&
+          stockOptions.error === null &&
+          prices.error === null &&
+          purchasePrices.error === null ? (
             <>
               {(bulkProducts.length >= 500 ||
                 salePriceMap.size >= 500 ||

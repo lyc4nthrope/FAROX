@@ -91,6 +91,15 @@ describe("ProfilePage (§S2 fila /profile)", () => {
     expect(screen.getByText("Gratis")).toBeInTheDocument();
   });
 
+  it("admin: no muestra el recuadro de plan (administra Premium, no lo compra)", async () => {
+    vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "admin", premium: true });
+
+    renderPerfil();
+
+    expect(await screen.findByText("Datos de contacto")).toBeInTheDocument();
+    expect(screen.queryByText("Plan")).not.toBeInTheDocument();
+  });
+
   it("distribuidor: ofrece vincular tienda desde Perfil", async () => {
     vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "distribuidor", premium: false });
 

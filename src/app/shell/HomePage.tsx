@@ -43,7 +43,7 @@ export function HomePage() {
             <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-400">
               Panel de control
             </p>
-            {premium && (
+            {premium && role !== "admin" && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/15 px-2.5 py-1 text-[11px] font-semibold text-amber-200">
                 <svg
                   aria-hidden="true"

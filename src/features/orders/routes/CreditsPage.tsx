@@ -61,12 +61,25 @@ function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () 
     ok: null,
   });
 
-  async function act(action: () => Promise<{ error: { message: string } | null }>, ok: string) {
-    const error = await runAction(action);
-    setMsg({ error, ok: error === null ? ok : null });
-    if (error === null) {
-      payments.reload();
-      onChanged();
+  // Una acción a la vez: sin este candado, un doble clic registraba dos pagos.
+  const [busy, setBusy] = useState(false);
+
+  async function act(
+    action: () => Promise<{ error: { message: string } | null }>,
+    ok: string,
+  ): Promise<boolean> {
+    if (busy) return false;
+    setBusy(true);
+    try {
+      const error = await runAction(action);
+      setMsg({ error, ok: error === null ? ok : null });
+      if (error === null) {
+        payments.reload();
+        onChanged();
+      }
+      return error === null;
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -143,13 +156,18 @@ function CreditDetail({ credit, onChanged }: { credit: CreditRow; onChanged: () 
             <button
               className={buttonClass}
               type="button"
+              disabled={busy}
               onClick={() => {
-                if (Number(amount) > 0) {
-                  void act(
-                    () => registerPayment(credit.id, Number(amount), method),
-                    "Pago registrado.",
-                  );
+                if (!(Number(amount) > 0)) {
+                  setMsg({ error: "El monto debe ser mayor a cero.", ok: null });
+                  return;
                 }
+                void act(
+                  () => registerPayment(credit.id, Number(amount), method),
+                  "Pago registrado.",
+                ).then((done) => {
+                  if (done) setAmount("");
+                });
               }}
             >
               Registrar pago

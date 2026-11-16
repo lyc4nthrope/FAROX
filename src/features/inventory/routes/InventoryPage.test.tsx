@@ -180,6 +180,23 @@ describe("InventoryPage · pestañas", () => {
     ).toBeInTheDocument();
   });
 
+  it("la carga masiva NO abre el editor si falló la carga de precios (auditoría S1)", async () => {
+    vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({
+      data: [],
+      error: { message: "fallo de red", code: "PGRST000" },
+    } as never);
+
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /precios/i }));
+    await user.click(await screen.findByRole("button", { name: "Carga masiva" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Carga masiva de precios" });
+    expect(await within(dialog).findByRole("alert")).toBeInTheDocument();
+    expect(within(dialog).queryByText("La tienda no tiene productos asignados.")).toBeNull();
+  });
+
   it("la carga masiva ofrece aplicar el margen del usuario (0045)", async () => {
     vi.mocked(profileApi.fetchMyMargin).mockResolvedValue({ data: 50, error: null });
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
