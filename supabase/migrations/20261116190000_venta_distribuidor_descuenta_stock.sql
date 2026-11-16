@@ -11,9 +11,21 @@
 --   register_distributor_sales_bulk llama a esta función por línea, así que un
 --   ticket que no alcanza se revierte completo (una sola transacción).
 --
---   Re-ejecutable: CREATE OR REPLACE (conserva los GRANT de 0029).
---   Rollback: restaurar la función desde 20261029000029_entregas_ventas_y_contacto.sql.
+--   Cada venta queda marcada (movements.decrements_distributor_stock) para que
+--   register_reverse devuelva las unidades al distribuidor. Las ventas previas a
+--   0055 nunca descontaron: su reverso no toca distributor_products.
+--
+--   Re-ejecutable: ADD COLUMN IF NOT EXISTS + CREATE OR REPLACE (conserva los
+--   GRANT de 0029 y 0011).
+--   Rollback: restaurar register_distributor_sale desde
+--   20261029000029_entregas_ventas_y_contacto.sql, register_reverse desde
+--   20261016000011_seguridad.sql y quitar la columna.
 -- ============================================================================
+
+ALTER TABLE public.movements
+  ADD COLUMN IF NOT EXISTS decrements_distributor_stock boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN public.movements.decrements_distributor_stock IS
+  '0055: la venta descontó distributor_products; su reverso devuelve las unidades.';
 
 CREATE OR REPLACE FUNCTION public.register_distributor_sale(
   p_product bigint, p_store bigint, p_qty numeric(12,3),
@@ -73,8 +85,58 @@ BEGIN
   UPDATE public.distributor_products dp
   SET quantity = dp.quantity - p_qty, updated_at = now()
   WHERE dp.distributor_id = v_dist AND dp.product_id = p_product;
+  UPDATE public.movements SET decrements_distributor_stock = true WHERE id = v_id;
   PERFORM public.internal_eval_distributor_alert(v_dist, p_product);
   PERFORM public.internal_dashboard_upsert(v_dist, 1, 0, p_qty * p_unit_price, 0);
+  RETURN v_id;
+END;
+$$;
+
+-- register_reverse (0011) + devolución al distribuidor.
+CREATE OR REPLACE FUNCTION public.register_reverse(
+  p_movement_id bigint, p_reason text
+) RETURNS bigint
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  m     public.movements%ROWTYPE;
+  v_opp public.movement_type;
+  v_id  bigint;
+BEGIN
+  PERFORM public.assert_admin();  -- D-4
+  IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
+    RAISE EXCEPTION 'register_reverse: reason requerido';
+  END IF;
+  SELECT * INTO m FROM public.movements WHERE id = p_movement_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'movimiento inexistente: %', p_movement_id; END IF;
+  IF m.reverso_of_id IS NOT NULL THEN
+    RAISE EXCEPTION 'D31: reverso-de-reverso prohibido (movimiento % ya es un reverso)', p_movement_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.movements mv WHERE mv.reverso_of_id = p_movement_id) THEN
+    RAISE EXCEPTION 'D31: el movimiento % ya tiene reverso', p_movement_id;
+  END IF;
+  v_opp := CASE m.type WHEN 'entry' THEN 'exit'::public.movement_type ELSE 'entry'::public.movement_type END;
+  -- stock opuesto + alertas, atómico (entry ⇒ decrementa con guard; exit ⇒ suma)
+  v_id := public.internal_stock_entry(v_opp, m.product_id, m.store_id, m.quantity,
+                                      m.motive_id, m.order_id, m.distributor_id,
+                                      m.unit_price, NULL, auth.uid(), p_movement_id);
+  -- 0055: la venta descontó al distribuidor; el reverso le devuelve las unidades.
+  IF m.decrements_distributor_stock THEN
+    UPDATE public.distributor_products dp
+    SET quantity = dp.quantity + m.quantity, updated_at = now()
+    WHERE dp.distributor_id = m.distributor_id AND dp.product_id = m.product_id;
+    PERFORM public.internal_eval_distributor_alert(m.distributor_id, m.product_id);
+  END IF;
+  -- dashboard: re-evalúa restando la contribución original (clampa en 0)
+  IF m.type = 'entry' THEN
+    PERFORM public.internal_dashboard_upsert(COALESCE(m.distributor_id, 0), -1, 0,
+      CASE WHEN m.unit_price IS NULL THEN 0 ELSE m.quantity * m.unit_price END, 0);
+  ELSE
+    PERFORM public.internal_dashboard_upsert(COALESCE(m.distributor_id, 0), 0, -1, 0,
+      CASE WHEN m.unit_price IS NULL THEN 0 ELSE m.quantity * m.unit_price END);
+  END IF;
+  INSERT INTO public.audit_log (created_by, table_name, action, row_id, diff)
+  VALUES (auth.uid(), 'movements', 'update', p_movement_id::text,
+          jsonb_build_object('reverso_of_id', v_id, 'reason', p_reason));
   RETURN v_id;
 END;
 $$;

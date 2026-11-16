@@ -95,4 +95,40 @@ BEGIN
   RAISE NOTICE 'PASS T5 vender todo el stock deja 0';
 END $$;
 
+-- T6. Revertir una venta (admin) devuelve las unidades al distribuidor.
+DO $$
+DECLARE v_mov bigint; v_dist numeric;
+BEGIN
+  SELECT min(id) INTO v_mov FROM public.movements
+  WHERE distributor_id = 990001 AND product_id = 990001 AND reverso_of_id IS NULL;
+  PERFORM set_config('request.jwt.claims', pg_temp.claims('00000000-0000-0000-0000-000000990001'), true);
+  SET LOCAL ROLE authenticated;
+  PERFORM public.register_reverse(v_mov, 'prueba de reverso');  -- la venta de 4 (T1)
+  RESET ROLE;
+  SELECT quantity INTO v_dist FROM public.distributor_products
+  WHERE distributor_id = 990001 AND product_id = 990001;
+  ASSERT v_dist = 4, format('T6: inventario tras el reverso %s (esperado 4)', v_dist);
+  RAISE NOTICE 'PASS T6 el reverso de una venta devuelve el stock al distribuidor (0 → 4)';
+END $$;
+
+-- T7. Una venta anterior a 0055 (nunca descontó) se revierte sin crear stock.
+INSERT INTO public.movements (type, product_id, store_id, distributor_id, motive_id, created_by, quantity, unit_price)
+SELECT 'entry', 990001, 990001, 990001, mo.id, '00000000-0000-0000-0000-000000990003', 3, 1500
+FROM public.motives mo WHERE mo.name = 'venta';
+UPDATE public.stock SET quantity = quantity + 3 WHERE store_id = 990001 AND product_id = 990001;
+DO $$
+DECLARE v_mov bigint; v_dist numeric;
+BEGIN
+  SELECT max(id) INTO v_mov FROM public.movements
+  WHERE distributor_id = 990001 AND product_id = 990001 AND reverso_of_id IS NULL;
+  PERFORM set_config('request.jwt.claims', pg_temp.claims('00000000-0000-0000-0000-000000990001'), true);
+  SET LOCAL ROLE authenticated;
+  PERFORM public.register_reverse(v_mov, 'venta vieja');
+  RESET ROLE;
+  SELECT quantity INTO v_dist FROM public.distributor_products
+  WHERE distributor_id = 990001 AND product_id = 990001;
+  ASSERT v_dist = 4, format('T7: el reverso de una venta vieja dejó %s (esperado 4)', v_dist);
+  RAISE NOTICE 'PASS T7 venta anterior a 0055: el reverso no inventa stock';
+END $$;
+
 ROLLBACK;

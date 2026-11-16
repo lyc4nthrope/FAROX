@@ -432,26 +432,43 @@ WHERE NOT EXISTS (
 -- ----------------------------------------------------------------------------
 -- 8b. Stock inicial del catálogo de cada distribuidor (0055)
 --    Desde 0055 la venta directa del distribuidor descuenta su inventario y se
---    rechaza si no alcanza. Sin esta sección, un catálogo recién armado queda
---    en 0 y la demo no puede vender. Solo toca filas que NUNCA se movieron:
---    cantidad 0, sin compras registradas y sin movimientos de ese distribuidor
---    para ese producto. Cantidad = 5 × base_stock del producto sembrado
---    (abastece varias tiendas); 50 para productos que no vienen de este seed.
+--    rechaza si no alcanza. Sin esta sección, un catálogo sin compras queda en
+--    0 y la demo no puede vender. Igual que el stock de la sección 8, aplica a
+--    TODOS los distribuidores: este script es solo para el entorno de demo.
+--    Solo repone filas en 0 que nunca recibieron stock real: sin compras
+--    registradas y sin ventas que hayan descontado (las ventas previas a 0055
+--    nunca descontaron, así que no cuentan). Cantidad = 5 × base_stock del
+--    producto sembrado; 50 para productos que no vienen de este seed. Después
+--    re-evalúa la alerta de stock bajo del distribuidor.
 -- ----------------------------------------------------------------------------
-UPDATE public.distributor_products dp
-SET quantity = COALESCE(
-      (SELECT round(c.base_stock * 5, 3)
-       FROM public.products p
-       JOIN public.brands b ON b.id = p.brand_id
-       JOIN _seed_catalog c ON c.name = p.name AND c.brand = b.name
-       WHERE p.id = dp.product_id),
-      50),
-    updated_at = now()
-WHERE dp.quantity = 0
-  AND NOT EXISTS (SELECT 1 FROM public.distributor_purchases pu
-                  WHERE pu.distributor_id = dp.distributor_id AND pu.product_id = dp.product_id)
-  AND NOT EXISTS (SELECT 1 FROM public.movements m
-                  WHERE m.distributor_id = dp.distributor_id AND m.product_id = dp.product_id);
+DO $$
+DECLARE
+  r   record;
+  v_n integer := 0;
+BEGIN
+  FOR r IN
+    UPDATE public.distributor_products dp
+    SET quantity = COALESCE(
+          (SELECT round(c.base_stock * 5, 3)
+           FROM public.products p
+           JOIN public.brands b ON b.id = p.brand_id
+           JOIN _seed_catalog c ON c.name = p.name AND c.brand = b.name
+           WHERE p.id = dp.product_id),
+          50),
+        updated_at = now()
+    WHERE dp.quantity = 0
+      AND NOT EXISTS (SELECT 1 FROM public.distributor_purchases pu
+                      WHERE pu.distributor_id = dp.distributor_id AND pu.product_id = dp.product_id)
+      AND NOT EXISTS (SELECT 1 FROM public.movements m
+                      WHERE m.distributor_id = dp.distributor_id AND m.product_id = dp.product_id
+                        AND m.decrements_distributor_stock)
+    RETURNING dp.distributor_id, dp.product_id
+  LOOP
+    PERFORM public.internal_eval_distributor_alert(r.distributor_id, r.product_id);
+    v_n := v_n + 1;
+  END LOOP;
+  RAISE NOTICE 'FAROX seed: % productos de distribuidores con stock inicial', v_n;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- 9. Alertas stock_low coherentes con las cantidades sembradas
