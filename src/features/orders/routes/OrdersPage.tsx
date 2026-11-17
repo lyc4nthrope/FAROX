@@ -13,9 +13,9 @@ import {
   buttonClass,
   inputClass,
   runAction,
-  secondaryButtonClass,
   type BadgeTone,
 } from "../../../shared/ui/Box";
+import { OrderActions } from "../components/OrderActions";
 import {
   ORDER_STATUS_LABELS,
   confirmFullDelivery,
@@ -68,49 +68,21 @@ export function OrdersPage() {
 
   function renderActions(o: OrderRow) {
     return (
-      <>
-        {o.status === "pending" && (
-          <button
-            className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-            type="button"
-            disabled={busyId === o.id}
-            onClick={() =>
-              void act(o.id, () => updateOrderStatus(o.id, "in_route", null), "Pedido en ruta.")
-            }
-          >
-            En ruta
-          </button>
-        )}
-        {o.status === "in_route" && (
-          <>
-            <button
-              className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-              type="button"
-              disabled={busyId === o.id}
-              onClick={() =>
-                void act(
-                  o.id,
-                  () => updateOrderStatus(o.id, "pending", null),
-                  "Pedido devuelto a pendiente.",
-                )
-              }
-            >
-              Devolver a pendiente
-            </button>
-            <button
-              className={`${buttonClass} px-2.5 py-1 text-xs`}
-              type="button"
-              disabled={busyId === o.id}
-              onClick={() => deliver(o.id)}
-            >
-              Entregar todo
-            </button>
-          </>
-        )}
-        {o.status !== "pending" && o.status !== "in_route" && (
-          <span className="text-xs text-gray-400">—</span>
-        )}
-      </>
+      <OrderActions
+        status={o.status}
+        busy={busyId === o.id}
+        onInRoute={() =>
+          void act(o.id, () => updateOrderStatus(o.id, "in_route", null), "Pedido en ruta.")
+        }
+        onPending={() =>
+          void act(
+            o.id,
+            () => updateOrderStatus(o.id, "pending", null),
+            "Pedido devuelto a pendiente.",
+          )
+        }
+        onDeliver={() => deliver(o.id)}
+      />
     );
   }
 

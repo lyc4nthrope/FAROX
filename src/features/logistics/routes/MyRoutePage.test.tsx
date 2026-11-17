@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as logisticsApi from "../api";
+import * as ordersApi from "../../orders/api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
 import { MyRoutePage } from "./RoutePages";
 
@@ -22,6 +23,7 @@ vi.mock("../api", () => ({
     skipped: "Omitida",
   },
   fetchRouteDetail: vi.fn(),
+  fetchRouteOpenOrders: vi.fn(),
   fetchStoresWithRequests: vi.fn(),
   fetchMyDistributorId: vi.fn(),
   saveRoute: vi.fn(),
@@ -38,6 +40,16 @@ vi.mock("../api", () => ({
   },
   markStop: vi.fn(),
   updateRouteStatus: vi.fn(),
+}));
+vi.mock("../../orders/api", () => ({
+  ORDER_STATUS_LABELS: {
+    pending: "Pendiente",
+    in_route: "En ruta",
+    delivered: "Entregado",
+    cancelled: "Cancelado",
+  },
+  updateOrderStatus: vi.fn(),
+  confirmFullDelivery: vi.fn(),
 }));
 vi.mock("../components/StoreRouteMap", () => ({
   StoreRouteMap: ({ stores }: { stores: unknown[] }) => (
@@ -78,6 +90,29 @@ const STORES: logisticsApi.RequestStore[] = [
   },
 ];
 
+function assignedRoute(status: "pending" | "completed" = "pending"): logisticsApi.RouteDetail {
+  return {
+    id: 7,
+    route_date: "2026-10-28",
+    status: "active",
+    distributor_id: 5,
+    distributor_name: "Distribuidora Andes",
+    stops: [
+      {
+        id: 1,
+        stop_order: 1,
+        status,
+        estimated_time: null,
+        arrived_at: null,
+        store_id: 1,
+        store_name: "Tienda Centro",
+        lat: 4.6,
+        lng: -74.1,
+      },
+    ],
+  };
+}
+
 function renderPage() {
   vi.mocked(authApi.getSession).mockResolvedValue({ userId: "u1", email: "demo@farox.app" });
   vi.mocked(authApi.fetchPrivileges).mockResolvedValue({ role: "distribuidor", premium: false });
@@ -95,12 +130,15 @@ beforeEach(() => {
   vi.mocked(authApi.subscribeToAuthChanges).mockReturnValue(() => {});
   vi.mocked(authApi.signOut).mockResolvedValue(undefined);
   vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({ data: null, error: null });
+  vi.mocked(logisticsApi.fetchRouteOpenOrders).mockResolvedValue({ data: {}, error: null });
   vi.mocked(logisticsApi.fetchStoresWithRequests).mockResolvedValue({
     data: STORES,
     error: null,
   });
   vi.mocked(logisticsApi.fetchMyDistributorId).mockResolvedValue({ data: 7, error: null });
   vi.mocked(logisticsApi.saveRoute).mockResolvedValue({ error: null });
+  vi.mocked(ordersApi.updateOrderStatus).mockResolvedValue({ error: null });
+  vi.mocked(ordersApi.confirmFullDelivery).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -299,5 +337,70 @@ describe("MyRoutePage · mapa de tiendas con solicitudes (S14)", () => {
 
     expect(logisticsApi.updateRouteStatus).toHaveBeenCalledWith(7, "active");
     expect(screen.queryByText(/administrador debe iniciar/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra los pedidos abiertos de la parada y los pasa a en ruta", async () => {
+    const user = userEvent.setup();
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: assignedRoute(),
+      error: null,
+    });
+    vi.mocked(logisticsApi.fetchRouteOpenOrders).mockResolvedValue({
+      data: { 1: [{ id: 10, store_id: 1, status: "pending" }] },
+      error: null,
+    });
+    renderPage();
+
+    expect(await screen.findByText("Pedidos de esta parada")).toBeInTheDocument();
+    expect(screen.getByText(/Pedido #10/)).toBeInTheDocument();
+    expect(logisticsApi.fetchRouteOpenOrders).toHaveBeenCalledWith(5);
+
+    await user.click(screen.getByRole("button", { name: "En ruta" }));
+
+    await waitFor(() =>
+      expect(ordersApi.updateOrderStatus).toHaveBeenCalledWith(10, "in_route", null),
+    );
+  });
+
+  it("no muestra en una parada los pedidos de otra tienda", async () => {
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: assignedRoute(),
+      error: null,
+    });
+    vi.mocked(logisticsApi.fetchRouteOpenOrders).mockResolvedValue({
+      data: {
+        1: [{ id: 10, store_id: 1, status: "pending" }],
+        2: [{ id: 20, store_id: 2, status: "pending" }],
+      },
+      error: null,
+    });
+    renderPage();
+
+    expect(await screen.findByText(/Pedido #10/)).toBeInTheDocument();
+    expect(screen.queryByText(/Pedido #20/)).not.toBeInTheDocument();
+  });
+
+  it("Entregar todo pide confirmación antes de entregar", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: assignedRoute(),
+      error: null,
+    });
+    vi.mocked(logisticsApi.fetchRouteOpenOrders).mockResolvedValue({
+      data: { 1: [{ id: 12, store_id: 1, status: "in_route" }] },
+      error: null,
+    });
+    renderPage();
+
+    const button = await screen.findByRole("button", { name: "Entregar todo" });
+    await user.click(button);
+    expect(confirm).toHaveBeenCalled();
+    expect(ordersApi.confirmFullDelivery).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(button);
+    await waitFor(() => expect(ordersApi.confirmFullDelivery).toHaveBeenCalledWith(12));
+    confirm.mockRestore();
   });
 });

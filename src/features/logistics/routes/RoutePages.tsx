@@ -16,6 +16,8 @@ import {
 } from "../../../shared/ui/Box";
 import { StoreRouteMap } from "../components/StoreRouteMap";
 import { ContactButton } from "../../store-links";
+import { OrderActions } from "../../orders/components/OrderActions";
+import { ORDER_STATUS_LABELS, confirmFullDelivery, updateOrderStatus } from "../../orders/api";
 import {
   ROUTE_LABELS,
   STOP_LABELS,
@@ -23,6 +25,7 @@ import {
   fetchGeoStores,
   fetchLinkedStoreIds,
   fetchRouteDetail,
+  fetchRouteOpenOrders,
   fetchRouteStatusFor,
   fetchRoutes,
   fetchMyDistributorId,
@@ -32,6 +35,7 @@ import {
   saveRoute,
   updateRouteStatus,
   type RouteDetail,
+  type RouteOrder,
 } from "../api";
 
 function todayIso(): string {
@@ -63,11 +67,43 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
     ok: null,
   });
   const mapsUrl = googleMapsUrl(route.stops);
+  const [busyOrder, setBusyOrder] = useState<number | null>(null);
+  // Los pedidos abiertos de la ruta se muestran por parada; el admin no los
+  // consulta (gestiona los pedidos desde /pedidos).
+  const orders = useLoad(
+    () =>
+      role === "distribuidor"
+        ? fetchRouteOpenOrders(route.distributor_id)
+        : Promise.resolve({ data: {} as Record<number, RouteOrder[]>, error: null }),
+    [role, route.distributor_id],
+  );
 
   async function act(action: () => Promise<{ error: { message: string } | null }>, ok: string) {
     const error = await runAction(action);
     setMsg({ error, ok: error === null ? ok : null });
     if (error === null) onChanged();
+  }
+
+  async function actOrder(
+    orderId: number,
+    action: () => Promise<{ error: { message: string } | null }>,
+    ok: string,
+  ): Promise<void> {
+    setBusyOrder(orderId);
+    const error = await runAction(action);
+    setMsg({ error, ok: error === null ? ok : null });
+    if (error === null) {
+      orders.reload();
+      onChanged();
+    }
+    setBusyOrder(null);
+  }
+
+  function deliverOrder(orderId: number): void {
+    if (!window.confirm(`¿Entregar todo el pedido #${orderId} y sumar las cantidades al stock?`)) {
+      return;
+    }
+    void actOrder(orderId, () => confirmFullDelivery(orderId), "Pedido entregado.");
   }
 
   return (
@@ -105,71 +141,116 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
           </a>
         )}
       </div>
-      <Status error={msg.error} ok={msg.ok} />
+      <Status error={msg.error ?? orders.error} ok={msg.ok} />
 
       <ol className="mt-4 space-y-2">
-        {route.stops.map((s, index) => (
-          <li key={s.id} className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-semibold text-white">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{s.store_name}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    {s.estimated_time
-                      ? `Hora estimada ${s.estimated_time.slice(0, 5)}`
-                      : "Sin hora estimada"}
-                    {s.lat !== null && s.lng !== null
-                      ? ` · ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}`
-                      : ""}
-                  </p>
+        {route.stops.map((s, index) => {
+          const stopOrders = orders.data?.[s.store_id] ?? [];
+          return (
+            <li key={s.id} className="rounded-xl border border-gray-100 bg-gray-50/40 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-900 text-[11px] font-semibold text-white">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{s.store_name}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      {s.estimated_time
+                        ? `Hora estimada ${s.estimated_time.slice(0, 5)}`
+                        : "Sin hora estimada"}
+                      {s.lat !== null && s.lng !== null
+                        ? ` · ${s.lat.toFixed(5)}, ${s.lng.toFixed(5)}`
+                        : ""}
+                    </p>
+                  </div>
                 </div>
+                <Badge
+                  tone={
+                    s.status === "completed"
+                      ? "green"
+                      : s.status === "skipped"
+                        ? "gray"
+                        : s.status === "arrived"
+                          ? "blue"
+                          : "amber"
+                  }
+                >
+                  {STOP_LABELS[s.status]}
+                </Badge>
               </div>
-              <Badge
-                tone={
-                  s.status === "completed"
-                    ? "green"
-                    : s.status === "skipped"
-                      ? "gray"
-                      : s.status === "arrived"
-                        ? "blue"
-                        : "amber"
-                }
-              >
-                {STOP_LABELS[s.status]}
-              </Badge>
-            </div>
-            {role === "distribuidor" && (s.status === "pending" || s.status === "arrived") && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {s.status === "pending" && (
+              {role === "distribuidor" && (s.status === "pending" || s.status === "arrived") && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {s.status === "pending" && (
+                    <button
+                      className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                      type="button"
+                      onClick={() =>
+                        void act(() => markStop(s.id, "arrived"), "Llegada registrada.")
+                      }
+                    >
+                      Llegué
+                    </button>
+                  )}
                   <button
                     className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
                     type="button"
-                    onClick={() => void act(() => markStop(s.id, "arrived"), "Llegada registrada.")}
+                    onClick={() =>
+                      void act(() => markStop(s.id, "completed"), "Parada completada.")
+                    }
                   >
-                    Llegué
+                    Completada
                   </button>
-                )}
-                <button
-                  className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-                  type="button"
-                  onClick={() => void act(() => markStop(s.id, "completed"), "Parada completada.")}
-                >
-                  Completada
-                </button>
-                <button
-                  className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
-                  type="button"
-                  onClick={() => void act(() => markStop(s.id, "skipped"), "Parada omitida.")}
-                >
-                  Omitir
-                </button>
-              </div>
-            )}
-          </li>
-        ))}
+                  <button
+                    className={`${secondaryButtonClass} px-2.5 py-1 text-xs`}
+                    type="button"
+                    onClick={() => void act(() => markStop(s.id, "skipped"), "Parada omitida.")}
+                  >
+                    Omitir
+                  </button>
+                </div>
+              )}
+              {stopOrders.length > 0 && (
+                <div className="mt-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                    Pedidos de esta parada
+                  </p>
+                  <ul className="mt-1.5 space-y-1.5">
+                    {stopOrders.map((order) => (
+                      <li
+                        key={order.id}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span className="text-xs text-gray-700">
+                          Pedido #{order.id} · {ORDER_STATUS_LABELS[order.status]}
+                        </span>
+                        <OrderActions
+                          status={order.status}
+                          busy={busyOrder === order.id}
+                          onInRoute={() =>
+                            void actOrder(
+                              order.id,
+                              () => updateOrderStatus(order.id, "in_route", null),
+                              "Pedido en ruta.",
+                            )
+                          }
+                          onPending={() =>
+                            void actOrder(
+                              order.id,
+                              () => updateOrderStatus(order.id, "pending", null),
+                              "Pedido devuelto a pendiente.",
+                            )
+                          }
+                          onDeliver={() => deliverOrder(order.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -369,7 +450,15 @@ export function MyRoutePage() {
               hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
             />
           )}
-          {route.data && <RouteView route={route.data} onChanged={route.reload} />}
+          {route.data && (
+            <RouteView
+              route={route.data}
+              onChanged={() => {
+                route.reload();
+                requests.reload();
+              }}
+            />
+          )}
         </div>
       </div>
 

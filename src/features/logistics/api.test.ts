@@ -7,6 +7,7 @@ import {
   saveRoute,
   updateRouteStatus,
   fetchStoresWithRequests,
+  fetchRouteOpenOrders,
 } from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
@@ -101,6 +102,44 @@ describe("fetchStoresWithRequests", () => {
     ]);
     expect(orders.in).toHaveBeenCalledWith("status", ["pending", "in_route"]);
     expect(geo.in).toHaveBeenCalledWith("id", [1, 2]);
+  });
+});
+
+describe("fetchRouteOpenOrders", () => {
+  it("agrupa los pedidos abiertos por tienda y filtra por distribuidor", async () => {
+    const orders = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      in: vi.fn(),
+      order: vi.fn(),
+      range: vi.fn().mockResolvedValue({
+        data: [
+          { id: 10, store_id: 1, status: "pending" },
+          { id: 11, store_id: 1, status: "in_route" },
+          { id: 12, store_id: 2, status: "pending" },
+        ],
+        error: null,
+      }),
+    };
+    orders.select.mockReturnValue(orders);
+    orders.eq.mockReturnValue(orders);
+    orders.in.mockReturnValue(orders);
+    orders.order.mockReturnValue(orders);
+    from.mockReturnValue(orders);
+
+    const result = await fetchRouteOpenOrders(7);
+
+    expect(from).toHaveBeenCalledWith("orders");
+    expect(orders.eq).toHaveBeenCalledWith("distributor_id", 7);
+    expect(orders.in).toHaveBeenCalledWith("status", ["pending", "in_route"]);
+    expect(result.error).toBeNull();
+    expect(result.data).toEqual({
+      1: [
+        { id: 10, store_id: 1, status: "pending" },
+        { id: 11, store_id: 1, status: "in_route" },
+      ],
+      2: [{ id: 12, store_id: 2, status: "pending" }],
+    });
   });
 });
 
