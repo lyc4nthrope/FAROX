@@ -214,6 +214,43 @@ export async function fetchStoresWithRequests(): Promise<LoadResult<RequestStore
   return { data: rows, error: null };
 }
 
+/** Pedido abierto de una parada; solo lo mínimo para las acciones de Mi ruta. */
+export interface RouteOrder {
+  id: number;
+  store_id: number;
+  status: "pending" | "in_route";
+}
+
+/**
+ * Pedidos abiertos del distribuidor agrupados por tienda, para las paradas de
+ * Mi ruta. La RLS ya acota por rol; el filtro por distributor_id evita mezclar
+ * pedidos de otra distribuidora si el usuario tuviera acceso a más de una.
+ */
+export async function fetchRouteOpenOrders(
+  distributorId: number,
+): Promise<LoadResult<Record<number, RouteOrder[]>>> {
+  const { data, error } = await fetchAllRows((from, to) =>
+    supabase
+      .from("orders")
+      .select("id,store_id,status")
+      .eq("distributor_id", distributorId)
+      .in("status", ["pending", "in_route"])
+      .order("id")
+      .range(from, to),
+  );
+  if (error !== null) return { data: null, error };
+  const grouped: Record<number, RouteOrder[]> = {};
+  for (const row of (data ?? []) as { id: number; store_id: number; status: string }[]) {
+    const storeId = Number(row.store_id);
+    (grouped[storeId] ??= []).push({
+      id: Number(row.id),
+      store_id: storeId,
+      status: row.status as RouteOrder["status"],
+    });
+  }
+  return { data: grouped, error: null };
+}
+
 /** Ruta por id, o la ruta de hoy del distribuidor si id es null (la RLS filtra). */
 export async function fetchRouteDetail(
   routeId: number | null,

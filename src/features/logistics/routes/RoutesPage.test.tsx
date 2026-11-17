@@ -1,12 +1,12 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "../../auth/api";
 import * as logisticsApi from "../api";
 import { AuthProvider } from "../../../app/providers/AuthProvider";
-import { RoutesPage } from "./RoutePages";
+import { RouteDetailPage, RoutesPage } from "./RoutePages";
 
 vi.mock("../api", () => ({
   ROUTE_LABELS: {
@@ -15,13 +15,19 @@ vi.mock("../api", () => ({
     completed: "Completada",
     cancelled: "Cancelada",
   },
-  STOP_LABELS: {},
+  STOP_LABELS: {
+    pending: "Pendiente",
+    arrived: "Llegó",
+    completed: "Completada",
+    skipped: "Omitida",
+  },
   fetchRoutes: vi.fn(),
   fetchDistributors: vi.fn(),
   fetchGeoStores: vi.fn(),
   fetchLinkedStoreIds: vi.fn(),
   fetchRouteStatusFor: vi.fn(),
   fetchRouteDetail: vi.fn(),
+  fetchRouteOpenOrders: vi.fn(),
   fetchMyDistributorId: vi.fn(),
   fetchStoresWithRequests: vi.fn(),
   googleMapsUrl: () => null,
@@ -142,5 +148,48 @@ describe("RoutesPage · planificar ruta (0056)", () => {
     await user.selectOptions(screen.getByLabelText("Distribuidor"), "6");
 
     expect(screen.getByLabelText("Tienda de la parada 1")).toHaveValue("");
+  });
+});
+
+describe("RouteDetailPage · vista admin", () => {
+  it("no consulta ni ofrece las acciones de pedidos de las paradas", async () => {
+    vi.mocked(logisticsApi.fetchRouteDetail).mockResolvedValue({
+      data: {
+        id: 7,
+        route_date: TODAY,
+        status: "active",
+        distributor_id: 5,
+        distributor_name: "Distribuidora Andes",
+        stops: [
+          {
+            id: 1,
+            stop_order: 1,
+            status: "pending",
+            estimated_time: null,
+            arrived_at: null,
+            store_id: 1,
+            store_name: "Tienda Centro",
+            lat: 4.5,
+            lng: -75.6,
+          },
+        ],
+      },
+      error: null,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/rutas/7"]}>
+        <AuthProvider>
+          <Routes>
+            <Route path="/rutas/:routeId" element={<RouteDetailPage />} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Ruta del/)).toBeInTheDocument();
+    expect(logisticsApi.fetchRouteOpenOrders).not.toHaveBeenCalled();
+    expect(screen.queryByText("Pedidos de esta parada")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "En ruta" })).not.toBeInTheDocument();
   });
 });
