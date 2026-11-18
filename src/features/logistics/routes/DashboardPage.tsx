@@ -48,6 +48,9 @@ const RANGE_PRESETS = [
 
 const MAX_RANGE_DAYS = 366;
 const REALTIME_RELOAD_DEBOUNCE_MS = 500;
+// Respaldo si el WebSocket de Realtime no entrega eventos (red, extensión,
+// pestaña suspendida o cache): el dashboard se refresca solo cada 30 s.
+const POLL_INTERVAL_MS = 30_000;
 
 // Colores del sistema: las ventas conservan el verde que ya usaba «Salidas»
 // y las compras el gris oscuro de «Entradas». La dona usa una paleta corta
@@ -137,7 +140,8 @@ export function DashboardPage() {
 
   // dashboard_daily ya está publicada en Realtime (migración 0007) y 0048 deja
   // un solo upsert por ticket: un evento = un refresco. El debounce agrupa
-  // ráfagas y el foco/visibilidad cubren eventos perdidos en segundo plano.
+  // ráfagas; foco/visibilidad y el polling de 30 s cubren eventos perdidos,
+  // WebSockets bloqueados o pestañas suspendidas.
   useEffect(() => {
     if (!premium) return;
 
@@ -157,18 +161,25 @@ export function DashboardPage() {
         { event: "*", schema: "public", table: "dashboard_daily" },
         scheduleReload,
       )
-      .subscribe();
+      .subscribe((status, error) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("[FAROX] dashboard realtime:", status, error?.message ?? "");
+        }
+      });
 
     const onFocus = () => scheduleReload();
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") scheduleReload();
     };
+    // Red de seguridad: no depende de que el WebSocket entregue el evento.
+    const interval = setInterval(scheduleReload, POLL_INTERVAL_MS);
 
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       if (timer !== null) clearTimeout(timer);
+      clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       void supabase.removeChannel(channel);

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { supabase } from "../../shared/lib/supabase/client";
 import {
+  fetchMovements,
   fetchStockOptions,
   registerMovement,
   reverseMovement,
@@ -188,5 +189,43 @@ describe("inventory api — carga masiva de precios (0043)", () => {
     ]);
 
     expect(result.error).toBe(error);
+  });
+});
+
+describe("fetchMovements", () => {
+  it("incluye precio, descuento y pedido para que el operador vea el precio de la venta", async () => {
+    const builder = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+      limit: vi.fn().mockResolvedValue({
+        data: [
+          {
+            id: 1,
+            product_id: 10,
+            type: "exit",
+            quantity: 2,
+            unit_price: 15000,
+            discount_pct: null,
+            order_id: null,
+            created_at: "2026-11-18T02:19:17Z",
+            reverso_of_id: null,
+            product: { name: "Arroz" },
+            motive: { name: "venta" },
+          },
+        ],
+        error: null,
+      }),
+    };
+    builder.select.mockReturnValue(builder);
+    builder.eq.mockReturnValue(builder);
+    builder.order.mockReturnValue(builder);
+    from.mockReturnValue(builder);
+
+    const result = await fetchMovements(10);
+
+    expect(builder.select).toHaveBeenCalledWith(expect.stringContaining("unit_price"));
+    expect(result.data?.[0]?.unit_price).toBe(15000);
+    expect(result.data?.[0]?.product_name).toBe("Arroz");
   });
 });
