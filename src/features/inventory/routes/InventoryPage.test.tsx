@@ -200,7 +200,16 @@ describe("InventoryPage · pestañas", () => {
   it("la carga masiva ofrece aplicar el margen del usuario (0045)", async () => {
     vi.mocked(profileApi.fetchMyMargin).mockResolvedValue({ data: 50, error: null });
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
-      data: [{ product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 10 }],
+      data: [
+        {
+          product_id: 1,
+          product_name: "Arroz Diana",
+          brand: "Diana",
+          quantity: 10,
+          is_bulk: false,
+          unit: "und",
+        },
+      ],
       error: null,
     });
     vi.mocked(productsApi.fetchStorePurchasePrices).mockResolvedValue({
@@ -234,7 +243,16 @@ describe("InventoryPage · pestañas", () => {
 
   it("guarda la carga masiva con solo la fila y la columna tocadas", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
-      data: [{ product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 10 }],
+      data: [
+        {
+          product_id: 1,
+          product_name: "Arroz Diana",
+          brand: "Diana",
+          quantity: 10,
+          is_bulk: false,
+          unit: "und",
+        },
+      ],
       error: null,
     });
     vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({
@@ -289,8 +307,22 @@ describe("InventoryPage · acciones en botones", () => {
   it("la compra se busca por marca y se registra como ticket", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
       data: [
-        { product_id: 1, product_name: "Arroz Diana", brand: "Diana", quantity: 12 },
-        { product_id: 2, product_name: "Leche Alpina", brand: "Alpina", quantity: 30 },
+        {
+          product_id: 1,
+          product_name: "Arroz Diana",
+          brand: "Diana",
+          quantity: 12,
+          is_bulk: false,
+          unit: "und",
+        },
+        {
+          product_id: 2,
+          product_name: "Leche Alpina",
+          brand: "Alpina",
+          quantity: 30,
+          is_bulk: false,
+          unit: "und",
+        },
       ],
       error: null,
     });
@@ -336,6 +368,8 @@ describe("InventoryPage · acciones en botones", () => {
           product_name: "Leche Alpina",
           brand: "Alpina",
           quantity: 30,
+          is_bulk: false,
+          unit: "und",
         },
       ],
       error: null,
@@ -368,7 +402,16 @@ describe("InventoryPage · acciones en botones", () => {
 
   it("en una venta prellena el precio activo y aplica el descuento al neto (0037)", async () => {
     vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
-      data: [{ product_id: 2, product_name: "Leche Alpina", brand: "Alpina", quantity: 30 }],
+      data: [
+        {
+          product_id: 2,
+          product_name: "Leche Alpina",
+          brand: "Alpina",
+          quantity: 30,
+          is_bulk: false,
+          unit: "und",
+        },
+      ],
       error: null,
     });
     vi.mocked(inventoryApi.fetchPrices).mockResolvedValue({

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatQty } from "../../../shared/lib/format";
+import { formatQty, formatQtyUnit } from "../../../shared/lib/format";
 import { EmptyState, ErrorBanner, ResponsiveTable } from "../../../shared/ui";
 import { Badge, Box, Status, buttonClass, inputClass } from "../../../shared/ui/Box";
 import { fetchLinkedDistributorOptions } from "../../store-links/api";
@@ -131,7 +131,7 @@ export function ShortagePanel() {
                 render: (row) => (
                   <span className="flex flex-wrap items-center gap-2">
                     <span>
-                      {formatQty(row.quantity)} / {formatQty(row.base_quantity)}
+                      {formatQtyUnit(row.quantity, row.unit)} / {formatQty(row.base_quantity)}
                     </span>
                     {row.quantity === 0 ? (
                       <Badge tone="red">Sin stock</Badge>

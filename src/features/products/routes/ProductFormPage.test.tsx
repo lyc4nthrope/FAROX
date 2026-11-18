@@ -58,6 +58,7 @@ const P1: ProductRow = {
   brand_id: 1,
   unit_type_id: 2,
   base_quantity: 1.5,
+  is_bulk: false,
   barcode: null,
 };
 
@@ -66,6 +67,7 @@ const FILA_NUEVA: ProductListRow = {
   id: 7,
   name: "Café molido",
   is_active: true,
+  is_bulk: false,
   brand: { id: 1, name: "Andina" },
   unit: { id: 2, name: "Gramos" },
   category: { id: 1, name: "Bebidas" },
@@ -183,10 +185,23 @@ describe("ProductFormPage (PROD-2/PROD-3 · §S2 fila Product form)", () => {
       brand_id: "1",
       unit_type_id: "2",
       category_id: "1",
+      is_bulk: false,
       base_quantity: "1.5",
       barcode: "",
     });
     expect(productsApi.fetchProducts).toHaveBeenCalledTimes(2);
+  });
+
+  it("admin elige venta a granel y el alta lo persiste (0059)", async () => {
+    const user = userEvent.setup();
+    renderRutas("/products/new", "admin");
+
+    await completarAlta(user);
+    await user.selectOptions(await screen.findByLabelText("Forma de venta"), "bulk");
+    await user.click(await screen.findByRole("button", { name: "Crear producto" }));
+
+    const [values] = vi.mocked(productsApi.createProduct).mock.calls[0];
+    expect(values.is_bulk).toBe(true);
   });
 
   it("operador en /products/new: denegado ANTES de montar — cero llamadas (0019/S7)", async () => {

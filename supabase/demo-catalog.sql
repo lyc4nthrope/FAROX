@@ -368,7 +368,7 @@ END $$;
 -- ----------------------------------------------------------------------------
 INSERT INTO public.products
   (name, description, category_id, brand_id, unit_type_id,
-   created_by, base_quantity, barcode, is_active)
+   created_by, base_quantity, is_bulk, barcode, is_active)
 SELECT
   c.name,
   c.descr,
@@ -377,6 +377,12 @@ SELECT
   ut.id,
   ctx.admin_id,
   c.base_qty,
+  CASE
+    WHEN c.unit = 'kg'
+      OR c.name ILIKE '%granel%'
+      OR c.descr ILIKE '%por litro%' THEN true
+    ELSE false
+  END,
   '7701' || lpad(c.seq::text, 8, '0') || (
     (10 - (
       SELECT sum(substr('7701' || lpad(c.seq::text, 8, '0'), g, 1)::int
@@ -411,10 +417,20 @@ SELECT
   s.id,
   CASE
     WHEN (c.seq + s.id) % 19 = 0 THEN 0::numeric(12,3)
+    WHEN NOT p.is_bulk THEN
+      greatest(1, round(
+        CASE
+          WHEN (c.seq + s.id) % 11 = 0 THEN c.base_stock * 0.12
+          ELSE c.base_stock * (0.75 + ((c.seq + s.id) % 6) * 0.10)
+        END
+      ))::numeric(12,3)
     WHEN (c.seq + s.id) % 11 = 0 THEN round(c.base_stock * 0.12, 3)
     ELSE round(c.base_stock * (0.75 + ((c.seq + s.id) % 6) * 0.10), 3)
   END,
-  round(c.base_stock * 0.20, 3),
+  CASE
+    WHEN p.is_bulk THEN round(c.base_stock * 0.20, 3)
+    ELSE greatest(1, round(c.base_stock * 0.20))::numeric(12,3)
+  END,
   CASE
     WHEN c.perish THEN current_date + ((((c.seq * 3 + s.id) % 45) + 2)::integer)
     ELSE NULL

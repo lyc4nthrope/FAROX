@@ -46,12 +46,12 @@ const NO_SESSION = {
 // NUNCA 'exact' + .range (Base:695, contrato useList). El error sale CRUDO
 // acá: useList lo pasa por mapError() — jamás texto crudo al DOM (HARD-1).
 const LIST_SELECT =
-  "id, name, is_active, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name)";
+  "id, name, is_active, is_bulk, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name)";
 
 // El formulario SÍ necesita description (solo los listados la excluyen,
 // Base:695); created_by queda fuera (D4 — la policy resuelve el ownership).
 const FORM_SELECT =
-  "id, name, description, category_id, brand_id, unit_type_id, base_quantity, barcode";
+  "id, name, description, category_id, brand_id, unit_type_id, base_quantity, is_bulk, barcode";
 
 // products.id / brands.id son bigint (0002:91,50): PostgREST los serializa
 // como número, pero se tolera también la forma string por si el proyecto
@@ -77,6 +77,7 @@ function normalizeListRow(raw: Record<string, unknown>): ProductListRow {
     id: normalizeId(raw.id),
     name: typeof raw.name === "string" ? raw.name : "",
     is_active: raw.is_active === true,
+    is_bulk: raw.is_bulk === true,
     brand: normalizeCatalogRef(raw.brand),
     unit: normalizeCatalogRef(raw.unit),
     category: normalizeCatalogRef(raw.category),
@@ -100,6 +101,7 @@ function normalizeRow(raw: Record<string, unknown>): ProductRow {
     brand_id: normalizeId(raw.brand_id),
     unit_type_id: normalizeId(raw.unit_type_id),
     base_quantity: normalizeQuantity(raw.base_quantity),
+    is_bulk: raw.is_bulk === true,
     barcode: typeof raw.barcode === "string" ? raw.barcode : null,
   };
 }
@@ -189,6 +191,7 @@ export async function createProduct(
       unit_type_id: Number(values.unit_type_id),
       created_by: data.session.user.id,
       base_quantity: Number(values.base_quantity),
+      is_bulk: values.is_bulk,
       barcode: values.barcode === "" ? null : values.barcode,
     })
     .select("id")
@@ -215,6 +218,7 @@ export async function updateProduct(
       brand_id: Number(values.brand_id),
       unit_type_id: Number(values.unit_type_id),
       base_quantity: Number(values.base_quantity),
+      is_bulk: values.is_bulk,
       barcode: values.barcode === "" ? null : values.barcode,
     })
     .eq("id", id)
@@ -301,7 +305,7 @@ export async function deleteProduct(id: number): Promise<{ error: { message: str
 // (product.name / product.category_id) recorten las filas de stock: sin él,
 // PostgREST devuelve el padre igual y el filtro se vuelve decorativo.
 const CATALOG_PRODUCT_SELECT =
-  "product:products!inner(id, name, is_active, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name))";
+  "product:products!inner(id, name, is_active, is_bulk, brand:brands(id, name), unit:unit_types(id, name), category:product_categories(id, name))";
 
 // Patrón LIKE del buscador. El usuario escribe texto libre: `%` y `_` son
 // comodines de SQL, así que se escapan para que "50%" busque el literal.
@@ -328,6 +332,7 @@ function normalizeCatalogEntry(
           id: normalizeId(raw.product_id),
           name: "",
           is_active: false,
+          is_bulk: false,
           brand: null,
           unit: null,
           category: null,

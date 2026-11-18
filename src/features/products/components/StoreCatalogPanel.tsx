@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatQty } from "../../../shared/lib/format";
+import { formatQty, saleUnit, unitAbbreviation } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { DataTable, QuantityStepper, type DataTableColumn } from "../../../shared/ui";
 import {
@@ -335,6 +335,10 @@ export function StoreCatalogPanel({
     }
     if (!Number.isFinite(quantity) || quantity < 0) {
       setEditError("La cantidad no puede ser negativa.");
+      return;
+    }
+    if (!row.is_bulk && !Number.isInteger(quantity)) {
+      setEditError("Los productos por unidad o paquete necesitan una cantidad entera.");
       return;
     }
     if (threshold !== null && (!Number.isFinite(threshold) || threshold < 0)) {
@@ -677,6 +681,8 @@ export function StoreCatalogPanel({
                     label={editing.name}
                     value={editDraft.quantity}
                     min={0}
+                    integer={!editing.is_bulk}
+                    unit={saleUnit(editing.is_bulk, editing.unit?.name)}
                     onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
                   />
                 </div>
@@ -689,7 +695,7 @@ export function StoreCatalogPanel({
                   className={`mt-1 ${inputClass}`}
                   type="number"
                   min="0"
-                  step="0.001"
+                  step={editing.is_bulk ? "0.001" : "1"}
                   placeholder="Sin umbral"
                   aria-label={
                     isStore ? "Umbral de alerta (opcional)" : "Umbral de aviso (opcional)"
@@ -773,7 +779,10 @@ export function StoreCatalogPanel({
                   </label>
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  Opcionales. Margen vacío = general; 0 = no sugerir.
+                  Opcionales. Margen vacío = general; 0 = no sugerir.{" "}
+                  {editing.is_bulk
+                    ? `Precio por ${unitAbbreviation(editing.unit?.name) || "unidad de peso"}.`
+                    : "Precio por paquete."}
                 </p>
               </div>
             ) : (

@@ -135,8 +135,24 @@ describe("store-links api · tiendas y distribuidores vinculados", () => {
     });
     expect(result).toEqual({
       data: [
-        { id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 },
-        { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
+        {
+          id: 10,
+          name: "Arroz",
+          brand: null,
+          quantity: null,
+          price: 4500,
+          is_bulk: false,
+          unit: null,
+        },
+        {
+          id: 11,
+          name: "Aceite",
+          brand: null,
+          quantity: null,
+          price: null,
+          is_bulk: false,
+          unit: null,
+        },
       ],
       error: null,
     });
@@ -157,12 +173,22 @@ describe("store-links api · tiendas y distribuidores vinculados", () => {
 
     expect(from).toHaveBeenCalledWith("stock");
     expect(stock.select).toHaveBeenCalledWith(
-      "product_id,quantity,product:products(brand:brands(name))",
+      "product_id,quantity,product:products(is_bulk, unit:unit_types(abbreviation), brand:brands(name))",
     );
     expect(stock.eq).toHaveBeenCalledWith("store_id", 3);
     expect(stock.in).toHaveBeenCalledWith("product_id", [10]);
     expect(result).toEqual({
-      data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12, price: 4500 }],
+      data: [
+        {
+          id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          quantity: 12,
+          price: 4500,
+          is_bulk: false,
+          unit: null,
+        },
+      ],
       error: null,
     });
   });

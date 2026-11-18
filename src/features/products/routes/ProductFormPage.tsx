@@ -23,6 +23,7 @@ const EMPTY_VALUES: ProductFormValues = {
   brand_id: "",
   unit_type_id: "",
   category_id: "",
+  is_bulk: false,
   base_quantity: "",
   barcode: "",
 };
@@ -113,6 +114,7 @@ export function ProductFormPage() {
           brand_id: String(row.brand_id),
           unit_type_id: String(row.unit_type_id),
           category_id: String(row.category_id),
+          is_bulk: row.is_bulk,
           base_quantity: String(row.base_quantity),
           barcode: row.barcode ?? "",
         });

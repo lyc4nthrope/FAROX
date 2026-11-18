@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
-import { formatQty } from "../../../shared/lib/format";
+import { formatQty, saleUnit } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { Badge, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
@@ -44,6 +44,7 @@ const EMPTY_VALUES: ProductFormValues = {
   brand_id: "",
   unit_type_id: "",
   category_id: "",
+  is_bulk: false,
   base_quantity: "",
   barcode: "",
 };
@@ -266,6 +267,14 @@ export function AddProductsPanel({
     setBusyId(product.id);
     const raw = Number(quantityOf(product.id));
     const quantity = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+    if (!product.is_bulk && !Number.isInteger(quantity)) {
+      setMsg({
+        error: "Los productos por unidad o paquete necesitan una cantidad entera.",
+        ok: null,
+      });
+      setBusyId(null);
+      return;
+    }
     const rawPrice = priceOf(product.id).trim();
     const price = rawPrice === "" ? null : Number(rawPrice);
     if (price !== null && (!Number.isFinite(price) || price <= 0)) {
@@ -475,6 +484,9 @@ export function AddProductsPanel({
                           <QuantityStepper
                             label={row.name}
                             value={quantityOf(row.id)}
+                            min={0}
+                            integer={!row.is_bulk}
+                            unit={saleUnit(row.is_bulk, row.unit?.name)}
                             onChange={(value) =>
                               setQuantities((current) => ({ ...current, [row.id]: value }))
                             }

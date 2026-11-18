@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { formatCOP, formatQty } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import { Badge, secondaryButtonClass } from "../../../shared/ui/Box";
 import type { MovementRow } from "../api";
 
@@ -124,7 +124,7 @@ export function MovementList({
                 </p>
                 <p className={`text-sm font-semibold tabular-nums ${tone.quantity}`}>
                   {direction === "entry" ? "+" : "−"}
-                  {formatQty(movement.quantity)}
+                  {formatQtyUnit(movement.quantity, saleUnit(movement.is_bulk, movement.unit))}
                 </p>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
@@ -145,7 +145,10 @@ export function MovementList({
                 {showPrice && movement.unit_price !== null && movement.unit_price !== undefined && (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span className="tabular-nums">Precio: {formatCOP(movement.unit_price)}</span>
+                    <span className="tabular-nums">
+                      Precio: {formatCOP(movement.unit_price)}
+                      {movement.is_bulk && movement.unit !== null ? ` / ${movement.unit}` : ""}
+                    </span>
                   </>
                 )}
                 {movement.discount_pct !== null && movement.discount_pct !== undefined && (

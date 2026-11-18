@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatCOP, formatQty } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   Box,
@@ -37,6 +37,9 @@ type ProductOption = Option & {
   brand: string | null;
   quantity: number | null;
   price?: number | null;
+  /** 0059: false = paquete/unidad entera; true = granel. */
+  is_bulk: boolean;
+  unit: string | null;
 };
 
 const MAX_RESULTS = 12;
@@ -214,6 +217,15 @@ export function NewOrderPage() {
     if (items.length === 0) return setError("Agregá al menos un producto.");
     if (items.some((item) => !(item.quantity > 0)))
       return setError("Las cantidades deben ser mayores que 0.");
+    if (
+      lines.some((line) => {
+        const product = productById.get(Number(line.productId));
+        return (
+          product !== undefined && !product.is_bulk && !Number.isInteger(Number(line.quantity))
+        );
+      })
+    )
+      return setError("Los productos por unidad o paquete necesitan cantidades enteras.");
     if (new Set(ids).size !== ids.length) return setError("Hay un producto repetido en la lista.");
     setSaving(true);
     try {
@@ -240,7 +252,11 @@ export function NewOrderPage() {
     if (product === undefined) return "Producto del catálogo";
     const parts: string[] = [];
     if (product.brand !== null && product.brand !== "") parts.push(product.brand);
-    parts.push(product.quantity === null ? "Stock: —" : `Stock: ${formatQty(product.quantity)}`);
+    parts.push(
+      product.quantity === null
+        ? "Stock: -"
+        : `Stock: ${formatQtyUnit(product.quantity, product.unit)}`,
+    );
     if (product.price === null) parts.push("sin precio");
     else if (product.price !== undefined) parts.push(formatCOP(product.price));
     return parts.join(" · ");
@@ -449,6 +465,8 @@ export function NewOrderPage() {
                         <QuantityStepper
                           label={name}
                           value={line.quantity}
+                          integer={product !== undefined && !product.is_bulk}
+                          unit={saleUnit(product?.is_bulk, product?.unit)}
                           onChange={(value) => updateQuantity(index, value)}
                         />
                         <button
@@ -563,7 +581,9 @@ function ShortageLabel({ row }: { row: ShortageRow }) {
     <span className="min-w-0">
       <span className="font-medium text-gray-900">{row.name}</span>
       {row.brand !== null && <span className="text-gray-500"> · {row.brand}</span>}
-      <span className="ml-2 text-xs text-gray-500">Stock: {formatQty(row.quantity)}</span>
+      <span className="ml-2 text-xs text-gray-500">
+        Stock: {formatQtyUnit(row.quantity, row.unit)}
+      </span>
     </span>
   );
 }

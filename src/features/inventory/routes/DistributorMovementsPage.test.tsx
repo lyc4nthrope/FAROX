@@ -90,6 +90,8 @@ const PRODUCT = {
   quantity: 10,
   purchasePrice: 3000,
   salePrice: 4500,
+  is_bulk: false,
+  unit: "und",
 };
 
 function renderPage() {

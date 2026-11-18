@@ -46,7 +46,7 @@ describe("inventory api — stock paginado", () => {
     const result = await fetchStockOptions(3);
 
     expect(builder.select).toHaveBeenCalledWith(
-      "product_id,quantity,product:products(name, barcode, brand:brands(name))",
+      "product_id,quantity,product:products(name, barcode, is_bulk, unit:unit_types(abbreviation), brand:brands(name))",
     );
     expect(result.data).toEqual([
       {
@@ -55,6 +55,8 @@ describe("inventory api — stock paginado", () => {
         brand: "Diana",
         quantity: 12,
         barcode: "770123",
+        is_bulk: false,
+        unit: null,
       },
     ]);
   });

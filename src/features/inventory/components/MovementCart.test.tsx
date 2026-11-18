@@ -38,6 +38,8 @@ const OPTIONS: readonly MovementProductOption[] = [
     quantity: 10,
     purchasePrice: 2000,
     salePrice: 3000,
+    is_bulk: false,
+    unit: "und",
   },
   {
     id: 2,
@@ -47,6 +49,8 @@ const OPTIONS: readonly MovementProductOption[] = [
     quantity: 20,
     purchasePrice: 3500,
     salePrice: 4500,
+    is_bulk: false,
+    unit: "und",
   },
 ];
 

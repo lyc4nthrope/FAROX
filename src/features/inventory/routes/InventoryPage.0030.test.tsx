@@ -64,6 +64,7 @@ const ROW = {
   id: 2,
   name: "Leche Alpina",
   is_active: true,
+  is_bulk: false,
   brand: { id: 1, name: "Alpina" },
   unit: { id: 1, name: "L" },
   category: { id: 1, name: "Lacteos" },
@@ -79,6 +80,7 @@ const NEW_ROW = {
   id: 3,
   name: "Arroz Diana",
   is_active: true,
+  is_bulk: false,
   brand: { id: 2, name: "Diana" },
   unit: { id: 1, name: "kg" },
   category: { id: 2, name: "Granos" },
@@ -118,7 +120,16 @@ beforeEach(() => {
   vi.mocked(authApi.signOut).mockResolvedValue(undefined);
   vi.mocked(inventoryApi.fetchStoreName).mockResolvedValue({ data: "Prueba1", error: null });
   vi.mocked(inventoryApi.fetchStockOptions).mockResolvedValue({
-    data: [{ product_id: 2, product_name: "Leche Alpina", brand: "Alpina", quantity: 30 }],
+    data: [
+      {
+        product_id: 2,
+        product_name: "Leche Alpina",
+        brand: "Alpina",
+        quantity: 30,
+        is_bulk: true,
+        unit: "kg",
+      },
+    ],
     error: null,
   });
   vi.mocked(inventoryApi.fetchPrices).mockImplementation(async () => ({
@@ -152,6 +163,7 @@ beforeEach(() => {
         id: 3,
         name: "Arroz Diana",
         is_active: true,
+        is_bulk: false,
         brand: { id: 2, name: "Diana" },
         unit: { id: 1, name: "kg" },
         category: { id: 2, name: "Granos" },

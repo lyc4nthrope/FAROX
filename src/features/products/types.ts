@@ -18,6 +18,8 @@ export interface ProductListRow {
   id: number;
   name: string;
   is_active: boolean;
+  /** 0059: false = paquete/unidad entera; true = granel (peso/volumen). */
+  is_bulk: boolean;
   brand: CatalogRef | null;
   unit: CatalogRef | null;
   category: CatalogRef | null;
@@ -108,5 +110,7 @@ export interface ProductRow {
   brand_id: number;
   unit_type_id: number;
   base_quantity: number;
+  /** 0059: false = paquete/unidad entera; true = granel (peso/volumen). */
+  is_bulk: boolean;
   barcode: string | null;
 }

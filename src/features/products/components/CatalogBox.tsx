@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { PAGE_SIZE } from "../../../shared/lib/list";
-import { formatQty } from "../../../shared/lib/format";
+import { formatQty, saleUnit } from "../../../shared/lib/format";
 import { Box, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
 import { Pager } from "../../../shared/ui/Pager";
 import {
@@ -217,6 +217,8 @@ export function CatalogBox({
           <QuantityEditor
             productName={row.name}
             value={row.quantity ?? 0}
+            isBulk={row.is_bulk}
+            unit={saleUnit(row.is_bulk, row.unit?.name)}
             saving={busy?.id === row.id && busy.action === "qty"}
             disabled={row.quantity === null || row.quantity === undefined}
             onSave={(quantity) => void guardarCantidad(row as CatalogEntry, quantity)}

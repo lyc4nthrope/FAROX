@@ -90,8 +90,8 @@ describe("ShortagePage (0023 · faltantes del operador)", () => {
 
     expect(await screen.findByText("Sin stock")).toBeInTheDocument();
     expect(await screen.findByText("Reponer")).toBeInTheDocument();
-    expect(await screen.findByText("0 / 500")).toBeInTheDocument();
-    expect(await screen.findByText("120 / 500")).toBeInTheDocument();
+    expect(await screen.findByText("0 Gramos / 500")).toBeInTheDocument();
+    expect(await screen.findByText("120 Gramos / 500")).toBeInTheDocument();
   });
 
   it("sin faltantes: estado vacío explícito", async () => {
