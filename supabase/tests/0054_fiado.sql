@@ -18,7 +18,7 @@ INSERT INTO public.order_items (order_id, product_id, quantity, received_quantit
 VALUES (990001, 990001, 10, 4, 'partial', 1000),
        (990001, 990002, 5, NULL, 'pending', 2000),
        (990002, 990001, 3, NULL, 'pending', 1000),
-       (990003, 990001, 2, 2, 'delivered', 1000);
+       (990003, 990001, 2, 2, 'received', 1000);
 
 -- T1. El operador crea el fiado: el total es lo entregado (4000), no lo pedido.
 DO $$

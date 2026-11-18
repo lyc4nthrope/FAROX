@@ -16,11 +16,11 @@
 
 ## Tasks
 
-| ID  | Specs | Ruta   | Estado | Evidencia |
-| --- | ----- | ------ | ------ | --------- |
-| T1  | S1-S2 | inline | hecho  | Migración `20261118120000_fiado_distribuidor_y_entrega_parcial.sql` + `supabase/tests/0058_fiado_distribuidor.sql` |
-| T2  | S3-S4 | inline | hecho  | `OrdersPage` badge/acción; `OrderDetailPage` box para distribuidor; `has_shortage` en `OrderRow` |
-| T3  | S5    | inline | hecho  | Reutiliza componentes y `createCredit`; sin tablas nuevas |
+| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                                          |
+| --- | ----- | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | S1-S2 | inline | hecho  | Migración `20261118120000_fiado_distribuidor_y_entrega_parcial.sql` + `supabase/tests/0058_fiado_distribuidor.sql`                                                                                 |
+| T2  | S3-S4 | inline | hecho  | `OrdersPage` badge/acción; `OrderDetailPage` box para distribuidor; `has_shortage` en `OrderRow`                                                                                                   |
+| T3  | S5    | inline | hecho  | Reutiliza componentes y `createCredit`; sin tablas nuevas                                                                                                                                          |
 | T4  | S6    | inline | hecho  | Suite front 995/995 y tsc en verde; SQL 0058 pendiente local (sin Docker), lo corre CI. 0054 T5 se alineó al contrato nuevo: el distribuidor crea el fiado propio y sigue sin poder tocar el ajeno |
 
 ## Log
