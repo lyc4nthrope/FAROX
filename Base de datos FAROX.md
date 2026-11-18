@@ -7,7 +7,7 @@
 
 ---
 
-> **Estado al 2026-11-17:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0057**; el índice de cambios y los pendientes vigentes están en §10.
+> **Estado al 2026-11-17:** las secciones §2-§9 describen el baseline del Sprint 1 (0001-0012) y su historia. El esquema vigente se define en [`supabase/migrations/`](supabase/migrations) hasta la migración **0057**, aplicada en el remoto el 2026-11-17; el índice de cambios y los pendientes vigentes están en §10.
 
 ## 0. Contexto y origen
 
@@ -1033,7 +1033,7 @@ _(agente revisor; corregir al alinear el .md — son nombres/semántica, este do
 - [ ] **Playwright H1-H4**: no hay `playwright.config.ts`, ni `e2e/`, ni dependencia.
 - [ ] **Tests de `api.ts`**: faltan `stores`, `catalogs` y `profile`; `products` solo tiene paginación.
 - [ ] **Manual e informe**: `docs/manual/USO-POR-ROL.md` es una guía rápida; el informe tiene corte al 26 oct.
-- [ ] **0052-0057 pendientes en el remoto**: los wrappers VOLATILE (0052), `review_fixes` (0053), las correcciones funcionales (0054-0056) y las rutas múltiples por día (0057) están en el repo, pero el proyecto sigue en 0051.
+- [x] **0052-0057 aplicadas en el remoto (2026-11-17)**: los wrappers VOLATILE (0052), `review_fixes` (0053), las correcciones funcionales (0054-0056) y las rutas múltiples por día (0057) están aplicadas; el proyecto quedó en 0057.
 
 ### 10.4 Convenciones que cambiaron
 
