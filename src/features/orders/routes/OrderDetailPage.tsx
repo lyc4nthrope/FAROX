@@ -14,7 +14,7 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { ResponsiveTable, type ResponsiveTableColumn } from "../../../shared/ui";
-import { formatCOP } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
 import {
   ORDER_STATUS_LABELS,
   confirmDelivery,
@@ -107,6 +107,18 @@ export function OrderDetailPage() {
       )
     ) {
       setMsg({ error: "Cada cantidad recibida debe estar entre 0 y la pedida.", ok: null });
+      return;
+    }
+    if (
+      payload.some((p, idx) => {
+        const item = items.data?.[idx];
+        return item !== undefined && !item.is_bulk && !Number.isInteger(p.received_quantity);
+      })
+    ) {
+      setMsg({
+        error: "Los productos por unidad o paquete necesitan cantidades recibidas enteras.",
+        ok: null,
+      });
       return;
     }
     // Cerrar la entrega es irreversible: se confirma igual que en el listado.
@@ -242,8 +254,17 @@ export function OrderDetailPage() {
       primary: true,
       render: (item) => <span className="font-medium text-gray-900">{item.product_name}</span>,
     },
-    { key: "quantity", header: "Pedido", render: (item) => item.quantity },
-    { key: "received", header: "Recibido", render: (item) => item.received_quantity ?? "—" },
+    {
+      key: "quantity",
+      header: "Pedido",
+      render: (item) => formatQtyUnit(item.quantity, item.unit),
+    },
+    {
+      key: "received",
+      header: "Recibido",
+      render: (item) =>
+        item.received_quantity === null ? "-" : formatQtyUnit(item.received_quantity, item.unit),
+    },
     {
       key: "lineStatus",
       header: "Estado línea",
@@ -417,18 +438,23 @@ export function OrderDetailPage() {
             actions={
               open && canDispatch
                 ? (item) => (
-                    <input
-                      aria-label={`Recibido de ${item.product_name}`}
-                      className={`${inputClass} max-w-28`}
-                      type="number"
-                      min="0"
-                      max={item.quantity}
-                      step="0.001"
-                      value={received[item.product_id] ?? ""}
-                      onChange={(e) =>
-                        setReceived({ ...received, [item.product_id]: e.target.value })
-                      }
-                    />
+                    <div className="flex items-center gap-1">
+                      <input
+                        aria-label={`Recibido de ${item.product_name}`}
+                        className={`${inputClass} max-w-28`}
+                        type="number"
+                        min="0"
+                        max={item.quantity}
+                        step={item.is_bulk ? "0.001" : "1"}
+                        value={received[item.product_id] ?? ""}
+                        onChange={(e) =>
+                          setReceived({ ...received, [item.product_id]: e.target.value })
+                        }
+                      />
+                      {item.unit !== null && (
+                        <span className="text-xs font-medium text-gray-500">{item.unit}</span>
+                      )}
+                    </div>
                   )
                 : undefined
             }

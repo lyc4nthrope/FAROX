@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import { formatCOP, formatQty } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
 import { Status, buttonClass, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
 import { QuantityStepper } from "../../../shared/ui";
 import { BarcodeScanner } from "../../products/components/BarcodeScanner";
@@ -390,7 +390,9 @@ export function MovementCart({
                       </span>
                       <span className="block truncate text-xs text-gray-500">
                         {option.brand ?? "Sin marca"}
-                        {option.quantity === null ? "" : ` · Stock: ${formatQty(option.quantity)}`}
+                        {option.quantity === null
+                          ? ""
+                          : ` · Stock: ${formatQtyUnit(option.quantity, option.unit)}`}
                         {option.barcode === null ? "" : ` · ${option.barcode}`}
                       </span>
                     </span>
@@ -412,7 +414,10 @@ export function MovementCart({
       ) : (
         <ul className="mt-3 space-y-2">
           {lines.map((line) => {
-            const stock = byId.get(line.productId)?.quantity ?? null;
+            const option = byId.get(line.productId);
+            const stock = option?.quantity ?? null;
+            const isBulk = option?.is_bulk ?? false;
+            const unit = option?.unit ?? null;
             const quantity = Number(line.quantity);
             const overStock = priceKind === "sale" && stock !== null && quantity > stock;
             return (
@@ -422,7 +427,7 @@ export function MovementCart({
                     <p className="truncate text-sm font-medium text-gray-900">{line.name}</p>
                     <p className="text-xs text-gray-500">
                       {line.brand ?? "Sin marca"}
-                      {stock === null ? "" : ` · Stock: ${formatQty(stock)}`}
+                      {stock === null ? "" : ` · Stock: ${formatQtyUnit(stock, unit)}`}
                     </p>
                   </div>
                   <button
@@ -442,6 +447,8 @@ export function MovementCart({
                       <QuantityStepper
                         label={line.name}
                         value={line.quantity}
+                        integer={!isBulk}
+                        unit={unit}
                         onChange={(quantity) => updateLine(line.productId, { quantity })}
                       />
                     </div>
@@ -450,6 +457,7 @@ export function MovementCart({
                     <label className="block">
                       <span className="block text-[11px] font-medium text-gray-500">
                         {priceLabel}
+                        {isBulk && unit !== null ? ` (${unit})` : ""}
                       </span>
                       <input
                         className={`${inputClass} mt-1 w-32`}
@@ -474,7 +482,7 @@ export function MovementCart({
                 </div>
                 {overStock && (
                   <p role="alert" className="mt-2 text-xs font-medium text-red-700">
-                    La cantidad supera el stock disponible ({formatQty(stock ?? 0)}).
+                    La cantidad supera el stock disponible ({formatQtyUnit(stock ?? 0, unit)}).
                   </p>
                 )}
               </li>

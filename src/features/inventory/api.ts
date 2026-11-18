@@ -20,6 +20,10 @@ export interface StockOptionRow {
   quantity: number;
   /** 0037: código de barras para el escáner del ticket. */
   barcode?: string | null;
+  /** 0059: false = paquete/unidad entera; true = granel. */
+  is_bulk: boolean;
+  /** 0059: abreviatura visible (und, kg, L). */
+  unit: string | null;
 }
 export interface MovementRow {
   id: number;
@@ -36,6 +40,9 @@ export interface MovementRow {
   /** 0029: precio de la operación y pedido que la originó (si aplica). */
   unit_price?: number | null;
   order_id?: number | null;
+  /** 0059: modo de venta y unidad del producto, para mostrar la cantidad. */
+  is_bulk?: boolean;
+  unit?: string | null;
   /** 0029: dirección desde la perspectiva del usuario (venta del distribuidor). */
   direction?: "entry" | "exit";
   /** 0037: descuento porcentual aplicado a la venta (auditoría). */
@@ -54,6 +61,10 @@ export interface MovementProductOption {
   /** Precio sugerido: venta o compra según el tipo de ticket. */
   purchasePrice: number | null;
   salePrice: number | null;
+  /** 0059: false = paquete/unidad entera; true = granel. */
+  is_bulk: boolean;
+  /** 0059: abreviatura visible (und, kg, L). */
+  unit: string | null;
 }
 export interface MotiveOption {
   id: number;
@@ -89,6 +100,23 @@ function relBarcode(value: unknown): string | null {
   return typeof barcode === "string" && barcode.trim() !== "" ? barcode.trim() : null;
 }
 
+/** 0059: modo de venta embebido en product. */
+function relBulk(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || !("is_bulk" in value)) return false;
+  return (value as { is_bulk: unknown }).is_bulk === true;
+}
+
+/** 0059: abreviatura de la unidad embebida en product: { unit: { abbreviation } }. */
+function relUnit(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("unit" in value)) return null;
+  const unit = (value as { unit: unknown }).unit;
+  if (unit === null || typeof unit !== "object" || !("abbreviation" in unit)) return null;
+  const abbreviation = (unit as { abbreviation: unknown }).abbreviation;
+  return typeof abbreviation === "string" && abbreviation.trim() !== ""
+    ? abbreviation.trim()
+    : null;
+}
+
 /** Tiendas sobre las que el usuario opera: admin todas; operador su alcance. */
 export async function fetchMyStores(isAdmin: boolean): Promise<LoadResult<StoreOption[]>> {
   let ids: number[] | null = null;
@@ -121,7 +149,9 @@ export async function fetchStoreName(storeId: number): Promise<LoadResult<string
 export async function fetchStockOptions(storeId: number): Promise<LoadResult<StockOptionRow[]>> {
   const { data, error } = await supabase
     .from("stock")
-    .select("product_id,quantity,product:products(name, barcode, brand:brands(name))")
+    .select(
+      "product_id,quantity,product:products(name, barcode, is_bulk, unit:unit_types(abbreviation), brand:brands(name))",
+    )
     .eq("store_id", storeId)
     .order("product_id")
     .limit(500);
@@ -131,6 +161,8 @@ export async function fetchStockOptions(storeId: number): Promise<LoadResult<Sto
     brand: relBrand(r.product),
     quantity: Number(r.quantity),
     barcode: relBarcode(r.product),
+    is_bulk: relBulk(r.product),
+    unit: relUnit(r.product),
   }));
   return { data: rows, error };
 }
@@ -139,7 +171,7 @@ export async function fetchMovements(storeId: number): Promise<LoadResult<Moveme
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,product_id,type,quantity,created_at,reverso_of_id,product:products(name),motive:motives(name)",
+      "id,product_id,type,quantity,created_at,reverso_of_id,product:products(name, is_bulk, unit:unit_types(abbreviation)),motive:motives(name)",
     )
     .eq("store_id", storeId)
     .order("created_at", { ascending: false })
@@ -153,6 +185,8 @@ export async function fetchMovements(storeId: number): Promise<LoadResult<Moveme
     reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
     product_name: relName(r.product),
     motive_name: relName(r.motive),
+    is_bulk: relBulk(r.product),
+    unit: relUnit(r.product),
   }));
   return { data: rows, error };
 }
@@ -165,7 +199,7 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,product_id,type,quantity,unit_price,discount_pct,order_id,created_at,reverso_of_id,product:products(name),motive:motives(name),store:stores(name)",
+      "id,product_id,type,quantity,unit_price,discount_pct,order_id,created_at,reverso_of_id,product:products(name, is_bulk, unit:unit_types(abbreviation)),motive:motives(name),store:stores(name)",
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -187,6 +221,8 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
       product_name: relName(r.product),
       motive_name: relName(r.motive),
       store_name: relName(r.store),
+      is_bulk: relBulk(r.product),
+      unit: relUnit(r.product),
       source: "movement" as const,
     };
   });
@@ -200,7 +236,9 @@ export async function fetchDistributorMovements(): Promise<LoadResult<MovementRo
 export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRow[]>> {
   const { data, error } = await supabase
     .from("distributor_purchases")
-    .select("id,product_id,quantity,unit_cost,expiry_date,created_at,product:products(name)")
+    .select(
+      "id,product_id,quantity,unit_cost,expiry_date,created_at,product:products(name, is_bulk, unit:unit_types(abbreviation))",
+    )
     .order("created_at", { ascending: false })
     .limit(100);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -215,6 +253,8 @@ export async function fetchDistributorPurchases(): Promise<LoadResult<MovementRo
     product_name: relName(r.product),
     motive_name: "Compra a proveedor",
     store_name: null,
+    is_bulk: relBulk(r.product),
+    unit: relUnit(r.product),
     source: "purchase" as const,
   }));
   return { data: rows, error };
@@ -227,7 +267,7 @@ export async function fetchDistributorMovementOptions(): Promise<
   const { data, error } = await supabase
     .from("distributor_products")
     .select(
-      "product_id,quantity,purchase_price,sale_price,product:products!inner(name,is_active,barcode,brand:brands(name))",
+      "product_id,quantity,purchase_price,sale_price,product:products!inner(name,is_active,barcode,is_bulk,unit:unit_types(abbreviation),brand:brands(name))",
     )
     .order("product_id")
     .limit(500);
@@ -239,6 +279,8 @@ export async function fetchDistributorMovementOptions(): Promise<
     quantity: r.quantity == null ? null : Number(r.quantity),
     purchasePrice: r.purchase_price == null ? null : Number(r.purchase_price),
     salePrice: r.sale_price == null ? null : Number(r.sale_price),
+    is_bulk: relBulk(r.product),
+    unit: relUnit(r.product),
   }));
   return { data: rows, error };
 }

@@ -15,3 +15,21 @@ export function formatCOP(value: number): string {
 export function formatQty(value: number): string {
   return value.toLocaleString("es-CO", { maximumFractionDigits: 3 });
 }
+
+/**
+ * Abreviatura visible de la unidad (0059). El catálogo siembra
+ * Unidad/Kilogramo/Litro; se aceptan también las abreviaturas ya guardadas.
+ */
+export function unitAbbreviation(name: string | null | undefined): string {
+  const normalized = (name ?? "").toLocaleLowerCase("es").trim();
+  if (normalized.startsWith("kilogramo") || normalized === "kg") return "kg";
+  if (normalized.startsWith("litro") || normalized === "lt" || normalized === "l") return "L";
+  if (normalized.startsWith("unidad") || normalized === "und") return "und";
+  return name ?? "";
+}
+
+/** 2.5 + "Kilogramo" → "2,5 kg"; 18 + "Unidad" → "18 und". */
+export function formatQtyUnit(value: number, unitName: string | null | undefined): string {
+  const unit = unitAbbreviation(unitName);
+  return unit === "" ? formatQty(value) : `${formatQty(value)} ${unit}`;
+}

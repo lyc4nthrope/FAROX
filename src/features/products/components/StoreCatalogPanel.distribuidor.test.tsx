@@ -35,6 +35,7 @@ const ROW: CatalogEntry = {
   id: 1,
   name: "Arroz Diana",
   is_active: true,
+  is_bulk: false,
   brand: { id: 3, name: "Diana" },
   unit: { id: 1, name: "kg" },
   category: { id: 2, name: "Granos" },

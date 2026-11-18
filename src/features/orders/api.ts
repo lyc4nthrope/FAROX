@@ -38,6 +38,10 @@ export interface OrderItemRow {
   received_quantity: number | null;
   status: string;
   unit_price: number | null;
+  /** 0059: false = paquete/unidad entera; true = granel. */
+  is_bulk: boolean;
+  /** 0059: abreviatura visible (und, kg, L). */
+  unit: string | null;
 }
 export interface Option {
   id: number;
@@ -46,6 +50,8 @@ export interface Option {
 export interface StoreProductOption extends Option {
   brand: string | null;
   quantity: number | null;
+  is_bulk: boolean;
+  unit: string | null;
 }
 export interface CreditRow {
   id: number;
@@ -77,6 +83,22 @@ function relBrand(value: unknown): string | null {
   if (value === null || typeof value !== "object" || !("brand" in value)) return null;
   const brand = relName((value as { brand: unknown }).brand);
   return brand === "" ? null : brand;
+}
+
+/** 0059: modo de venta y unidad embebidos en product. */
+function relBulk(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || !("is_bulk" in value)) return false;
+  return (value as { is_bulk: unknown }).is_bulk === true;
+}
+
+function relUnit(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("unit" in value)) return null;
+  const unit = (value as { unit: unknown }).unit;
+  if (unit === null || typeof unit !== "object" || !("abbreviation" in unit)) return null;
+  const abbreviation = (unit as { abbreviation: unknown }).abbreviation;
+  return typeof abbreviation === "string" && abbreviation.trim() !== ""
+    ? abbreviation.trim()
+    : null;
 }
 
 const ORDER_COLUMNS =
@@ -142,6 +164,8 @@ export async function fetchOrderItems(orderId: number): Promise<LoadResult<Order
     received_quantity: r.received_quantity == null ? null : Number(r.received_quantity),
     status: String(r.status),
     unit_price: r.unit_price == null ? null : Number(r.unit_price),
+    is_bulk: r.is_bulk === true,
+    unit: r.unit == null ? null : String(r.unit),
   }));
   return { data: rows, error };
 }
@@ -176,7 +200,9 @@ export async function fetchStoreProducts(
 ): Promise<LoadResult<StoreProductOption[]>> {
   const { data, error } = await supabase
     .from("stock")
-    .select("product_id,quantity,product:products(name, brand:brands(name))")
+    .select(
+      "product_id,quantity,product:products(name, is_bulk, unit:unit_types(abbreviation), brand:brands(name))",
+    )
     .eq("store_id", storeId)
     .limit(500);
   const rows = ((data ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -184,6 +210,8 @@ export async function fetchStoreProducts(
     name: relName(r.product),
     brand: relBrand(r.product),
     quantity: Number(r.quantity),
+    is_bulk: relBulk(r.product),
+    unit: relUnit(r.product),
   }));
   return { data: rows, error };
 }

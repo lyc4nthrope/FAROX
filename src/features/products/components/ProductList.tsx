@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { formatQty } from "../../../shared/lib/format";
+import { formatQtyUnit } from "../../../shared/lib/format";
 import { EmptyState, ErrorBanner } from "../../../shared/ui";
 import { Badge } from "../../../shared/ui/Box";
 import type { ProductListRow } from "../types";
@@ -99,7 +99,7 @@ export function ProductList({
                         ? renderQuantity(row)
                         : row.quantity === null || row.quantity === undefined
                           ? "—"
-                          : formatQty(row.quantity)}
+                          : formatQtyUnit(row.quantity, row.unit?.name)}
                     </td>
                   )}
                   <td className="py-2 text-gray-700">

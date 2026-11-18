@@ -70,7 +70,7 @@ beforeEach(() => {
     error: null,
   });
   vi.mocked(ordersApi.fetchStoreProducts).mockResolvedValue({
-    data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12 }],
+    data: [{ id: 10, name: "Arroz", brand: "Diana", quantity: 12, is_bulk: false, unit: null }],
     error: null,
   });
   vi.mocked(storeLinksApi.fetchLinkedDistributorOptions).mockResolvedValue({
@@ -79,8 +79,24 @@ beforeEach(() => {
   });
   vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
     data: [
-      { id: 10, name: "Arroz", brand: null, quantity: null, price: 4500 },
-      { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
+      {
+        id: 10,
+        name: "Arroz",
+        brand: null,
+        quantity: null,
+        price: 4500,
+        is_bulk: false,
+        unit: null,
+      },
+      {
+        id: 11,
+        name: "Aceite",
+        brand: null,
+        quantity: null,
+        price: null,
+        is_bulk: false,
+        unit: null,
+      },
     ],
     error: null,
   });
@@ -122,8 +138,24 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
   it("busca por marca y el stock mínimo es un filtro que se muestra solo al abrirlo", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [
-        { id: 10, name: "Arroz", brand: "Diana", quantity: 12, price: 4500 },
-        { id: 11, name: "Aceite", brand: "Premier", quantity: 0, price: 3000 },
+        {
+          id: 10,
+          name: "Arroz",
+          brand: "Diana",
+          quantity: 12,
+          price: 4500,
+          is_bulk: false,
+          unit: null,
+        },
+        {
+          id: 11,
+          name: "Aceite",
+          brand: "Premier",
+          quantity: 0,
+          price: 3000,
+          is_bulk: false,
+          unit: null,
+        },
       ],
       error: null,
     });
@@ -230,8 +262,24 @@ describe("NewOrderPage · solicitudes entre tienda y distribuidor vinculado", ()
   it("operador con todos los productos sin precio: igual puede solicitar", async () => {
     vi.mocked(storeLinksApi.fetchStoreDistributorProducts).mockResolvedValue({
       data: [
-        { id: 10, name: "Arroz", brand: null, quantity: null, price: null },
-        { id: 11, name: "Aceite", brand: null, quantity: null, price: null },
+        {
+          id: 10,
+          name: "Arroz",
+          brand: null,
+          quantity: null,
+          price: null,
+          is_bulk: false,
+          unit: null,
+        },
+        {
+          id: 11,
+          name: "Aceite",
+          brand: null,
+          quantity: null,
+          price: null,
+          is_bulk: false,
+          unit: null,
+        },
       ],
       error: null,
     });

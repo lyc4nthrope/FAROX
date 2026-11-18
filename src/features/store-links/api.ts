@@ -21,6 +21,22 @@ function relBrand(value: unknown): string | null {
   return brand === "" ? null : brand;
 }
 
+/** 0059: modo de venta y unidad embebidos en product. */
+function relBulk(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || !("is_bulk" in value)) return false;
+  return (value as { is_bulk: unknown }).is_bulk === true;
+}
+
+function relUnit(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || !("unit" in value)) return null;
+  const unit = (value as { unit: unknown }).unit;
+  if (unit === null || typeof unit !== "object" || !("abbreviation" in unit)) return null;
+  const abbreviation = (unit as { abbreviation: unknown }).abbreviation;
+  return typeof abbreviation === "string" && abbreviation.trim() !== ""
+    ? abbreviation.trim()
+    : null;
+}
+
 export interface LinkedDistributor {
   distributor_id: number;
   name: string;
@@ -44,6 +60,10 @@ export interface RequestableProduct {
   quantity: number | null;
   /** null = el producto está en ambos catálogos pero no tiene precio activo. */
   price: number | null;
+  /** 0059: false = paquete/unidad entera; true = granel. */
+  is_bulk: boolean;
+  /** 0059: abreviatura visible (und, kg, L). */
+  unit: string | null;
 }
 
 /** 0029: contacto de la contraparte vinculada. */
@@ -184,6 +204,8 @@ export async function fetchStoreDistributorProducts(
     id: Number(r.product_id),
     name: String(r.name ?? ""),
     price: r.price == null ? null : Number(r.price),
+    is_bulk: false,
+    unit: null,
   }));
   if (rows.length === 0) {
     return { data: [], error: null };
@@ -194,7 +216,9 @@ export async function fetchStoreDistributorProducts(
   // selector pueda buscar por marca y filtrar por cantidad.
   const { data: stockData, error: stockError } = await supabase
     .from("stock")
-    .select("product_id,quantity,product:products(brand:brands(name))")
+    .select(
+      "product_id,quantity,product:products(is_bulk, unit:unit_types(abbreviation), brand:brands(name))",
+    )
     .eq("store_id", storeId)
     .in(
       "product_id",
@@ -203,11 +227,16 @@ export async function fetchStoreDistributorProducts(
   if (stockError !== null) {
     return { data: null, error: stockError };
   }
-  const meta = new Map<number, { brand: string | null; quantity: number | null }>();
+  const meta = new Map<
+    number,
+    { brand: string | null; quantity: number | null; is_bulk: boolean; unit: string | null }
+  >();
   for (const raw of (stockData ?? []) as Record<string, unknown>[]) {
     meta.set(Number(raw.product_id), {
       brand: relBrand(raw.product),
       quantity: raw.quantity == null ? null : Number(raw.quantity),
+      is_bulk: relBulk(raw.product),
+      unit: relUnit(raw.product),
     });
   }
   return {
@@ -215,6 +244,8 @@ export async function fetchStoreDistributorProducts(
       ...row,
       brand: meta.get(row.id)?.brand ?? null,
       quantity: meta.get(row.id)?.quantity ?? null,
+      is_bulk: meta.get(row.id)?.is_bulk ?? false,
+      unit: meta.get(row.id)?.unit ?? null,
     })),
     error: null,
   };

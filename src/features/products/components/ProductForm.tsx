@@ -167,6 +167,24 @@ export function ProductForm({
         )}
       </div>
       <div>
+        <label htmlFor="product-sale-mode" className="block text-sm font-medium text-gray-700">
+          Forma de venta
+        </label>
+        <select
+          id="product-sale-mode"
+          disabled={readOnly}
+          className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+          value={values.is_bulk ? "bulk" : "unit"}
+          onChange={(event) => onChange({ ...values, is_bulk: event.target.value === "bulk" })}
+        >
+          <option value="unit">Por unidad o paquete (cantidades enteras)</option>
+          <option value="bulk">A granel (peso o volumen, admite decimales)</option>
+        </select>
+        <span className="mt-1 block text-xs text-gray-500">
+          Un paquete se cuenta entero; el granel se pesa o mide y su precio es por kg/L.
+        </span>
+      </div>
+      <div>
         <label htmlFor="product-category" className="block text-sm font-medium text-gray-700">
           Categoría
         </label>

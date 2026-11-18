@@ -143,6 +143,18 @@ export function DistributorMovementsPage() {
       setMsg({ error: "La cantidad debe ser mayor a 0 en cada línea.", ok: null });
       return;
     }
+    if (
+      lines.some((line) => {
+        const option = (products.data ?? []).find((row) => row.id === line.productId);
+        return option !== undefined && !option.is_bulk && !Number.isInteger(Number(line.quantity));
+      })
+    ) {
+      setMsg({
+        error: "Los productos por unidad o paquete necesitan cantidades enteras.",
+        ok: null,
+      });
+      return;
+    }
     const discountValue = discount.trim() === "" ? null : Number(discount);
     if (
       discountValue !== null &&

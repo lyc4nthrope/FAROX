@@ -359,6 +359,18 @@ export function InventoryPage() {
       setMsg({ error: "La cantidad debe ser mayor a 0 en cada línea.", ok: null });
       return;
     }
+    if (
+      cart.some((line) => {
+        const option = (stockOptions.data ?? []).find((row) => row.product_id === line.productId);
+        return option !== undefined && !option.is_bulk && !Number.isInteger(Number(line.quantity));
+      })
+    ) {
+      setMsg({
+        error: "Los productos por unidad o paquete necesitan cantidades enteras.",
+        ok: null,
+      });
+      return;
+    }
     const discountValue = discount.trim() === "" ? null : Number(discount);
     if (
       discountValue !== null &&
@@ -447,6 +459,8 @@ export function InventoryPage() {
       quantity: row.quantity,
       purchasePrice: purchasePrices.data?.get(row.product_id) ?? null,
       salePrice: salePrices.get(row.product_id) ?? null,
+      is_bulk: row.is_bulk,
+      unit: row.unit,
     }));
     return sortBySalesRanking(options, ranking.data ?? new Map());
   }, [stockOptions.data, purchasePrices.data, prices.data, ranking.data]);

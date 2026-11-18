@@ -28,6 +28,8 @@ export const productSchema = z.object({
   brand_id: z.string().trim().refine(esIdDeCatalogo, "Elegí una marca"),
   unit_type_id: z.string().trim().refine(esIdDeCatalogo, "Elegí la unidad de medida"),
   category_id: z.string().trim().refine(esIdDeCatalogo, "Elegí una categoría"),
+  // 0059: false = paquete/unidad entera; true = granel (peso/volumen).
+  is_bulk: z.boolean(),
   base_quantity: z
     .string()
     .trim()
