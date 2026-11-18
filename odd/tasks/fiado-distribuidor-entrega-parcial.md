@@ -16,15 +16,16 @@
 
 ## Tasks
 
-| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                                          |
-| --- | ----- | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | S1-S2 | inline | hecho  | Migración `20261118120000_fiado_distribuidor_y_entrega_parcial.sql` + `supabase/tests/0058_fiado_distribuidor.sql`                                                                                 |
-| T2  | S3-S4 | inline | hecho  | `OrdersPage` badge/acción; `OrderDetailPage` box para distribuidor; `has_shortage` en `OrderRow`                                                                                                   |
-| T3  | S5    | inline | hecho  | Reutiliza componentes y `createCredit`; sin tablas nuevas                                                                                                                                          |
-| T4  | S6    | inline | hecho  | Suite front 995/995 y tsc en verde; SQL 0058 pendiente local (sin Docker), lo corre CI. 0054 T5 se alineó al contrato nuevo: el distribuidor crea el fiado propio y sigue sin poder tocar el ajeno |
+| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                                                                  |
+| --- | ----- | ------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | S1-S2 | inline | hecho  | Migración `20261118120000_fiado_distribuidor_y_entrega_parcial.sql` + `supabase/tests/0058_fiado_distribuidor.sql`                                                                                                         |
+| T2  | S3-S4 | inline | hecho  | `OrdersPage` badge/acción; `OrderDetailPage` box para distribuidor; `has_shortage` en `OrderRow`                                                                                                                           |
+| T3  | S5    | inline | hecho  | Reutiliza componentes y `createCredit`; sin tablas nuevas                                                                                                                                                                  |
+| T4  | S6    | inline | hecho  | Suite front 999/999 y tsc en verde; `schema-check` verde con las pruebas SQL 0054/0058. `quality` solo falla por el `npm audit` que corrige #22. 0054 T5 alineado: el distribuidor crea el fiado propio y no toca el ajeno |
 
 ## Log
 
 - **L1 (2026-11-18):** «Si, ademas debia incluir al distribuidor, reusando lo mas posible. Aunque creo yo, que es necesario un analisis mas extenso.»
 - **L2 (2026-11-18):** El operador reportó que no veía el registro de una entrega parcial ni una opción de fiado. Producción confirma que `order_items.received_quantity`, los movimientos `entry` y los precios **sí** están; la brecha principal era de UI. Esta tarea agrega la marca persistente y el acceso al fiado, y habilita al distribuidor acreedor.
 - **L3 (diseño):** el flag se mantiene con un trigger sobre `order_items` para no recalcular items al listar. El fiado se crea desde el detalle (fecha de vencimiento opcional); la lista solo enlaza. Registrar pagos sigue siendo de la tienda/admin; el distribuidor lee el crédito y sus pagos.
+- **L4 (2026-11-18):** PR #24. `schema-check` pasó tras corregir el estado `delivered` del fixture 0054 (el enum solo admite `pending/received/partial`); `quality` queda pendiente del gate de auditoría de #22. La 0059 del stock se apila sobre esta rama en el PR #25.
