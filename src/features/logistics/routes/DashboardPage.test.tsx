@@ -87,6 +87,14 @@ describe("DashboardPage · gráficos por rol", () => {
     cleanup();
   });
 
+  it("registra un polling de respaldo de 30 s para el dashboard", async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    renderPage("admin", true);
+
+    await waitFor(() => expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000));
+    setIntervalSpy.mockRestore();
+  });
+
   it("muestra su propia operación y no el desglose por distribuidor", async () => {
     renderPage("distribuidor", true);
 
