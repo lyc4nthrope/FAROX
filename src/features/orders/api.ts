@@ -27,6 +27,8 @@ export interface OrderRow {
   created_at: string;
   notes: string | null;
   cancelled_reason: string | null;
+  /** 0058: la entrega fue parcial (alguna línea recibió menos de lo pedido). */
+  has_shortage: boolean;
 }
 export interface OrderItemRow {
   id: number;
@@ -78,7 +80,7 @@ function relBrand(value: unknown): string | null {
 }
 
 const ORDER_COLUMNS =
-  "id,status,store_id,expected_at,delivered_at,created_at,notes,cancelled_reason,store:stores(name),distributor:distributors(name)";
+  "id,status,store_id,expected_at,delivered_at,created_at,notes,cancelled_reason,has_shortage,store:stores(name),distributor:distributors(name)";
 
 function toOrder(r: Record<string, unknown>): OrderRow {
   return {
@@ -92,6 +94,7 @@ function toOrder(r: Record<string, unknown>): OrderRow {
     created_at: String(r.created_at),
     notes: (r.notes as string | null) ?? null,
     cancelled_reason: (r.cancelled_reason as string | null) ?? null,
+    has_shortage: r.has_shortage === true,
   };
 }
 

@@ -47,6 +47,7 @@ function order(id: number, status: OrderRow["status"]): OrderRow {
     created_at: "2026-10-28T10:00:00Z",
     notes: null,
     cancelled_reason: null,
+    has_shortage: false,
   };
 }
 
@@ -152,5 +153,30 @@ describe("OrdersPage · acciones de estado del distribuidor (0028)", () => {
       "href",
       "/vincular",
     );
+  });
+});
+
+describe("OrdersPage · entrega parcial y fiado (0058)", () => {
+  it("operador: ve Parcial y el acceso Fiar en un pedido entregado", async () => {
+    vi.mocked(ordersApi.fetchOrders).mockResolvedValue({
+      data: [{ ...order(3, "delivered"), has_shortage: true }],
+      error: null,
+    });
+
+    renderPage("operador");
+
+    expect(await screen.findByText("Parcial")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Fiar" })).toHaveAttribute("href", "/pedidos/3");
+  });
+
+  it("distribuidor: ve el acceso Fiar en un pedido entregado", async () => {
+    vi.mocked(ordersApi.fetchOrders).mockResolvedValue({
+      data: [order(4, "delivered")],
+      error: null,
+    });
+
+    renderPage("distribuidor");
+
+    expect(await screen.findByRole("link", { name: "Fiar" })).toHaveAttribute("href", "/pedidos/4");
   });
 });

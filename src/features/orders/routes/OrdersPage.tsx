@@ -32,6 +32,18 @@ const STATUS_TONE: Record<OrderStatus, BadgeTone> = {
   cancelled: "gray",
 };
 
+/** 0058: el fiado se crea en el detalle (con vencimiento); desde la lista se entra. */
+function FiadoLink({ orderId }: { orderId: number }) {
+  return (
+    <Link
+      className="text-xs font-medium text-amber-800 underline underline-offset-4 hover:text-amber-900"
+      to={`/pedidos/${orderId}`}
+    >
+      Fiar
+    </Link>
+  );
+}
+
 /** /pedidos — lista por estado (la RLS limita lo visible por rol). */
 export function OrdersPage() {
   const { role } = useAuth();
@@ -67,23 +79,30 @@ export function OrdersPage() {
   }
 
   function renderActions(o: OrderRow) {
-    return (
-      <OrderActions
-        status={o.status}
-        busy={busyId === o.id}
-        onInRoute={() =>
-          void act(o.id, () => updateOrderStatus(o.id, "in_route", null), "Pedido en ruta.")
-        }
-        onPending={() =>
-          void act(
-            o.id,
-            () => updateOrderStatus(o.id, "pending", null),
-            "Pedido devuelto a pendiente.",
-          )
-        }
-        onDeliver={() => deliver(o.id)}
-      />
-    );
+    if (role === "distribuidor") {
+      return (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <OrderActions
+            status={o.status}
+            busy={busyId === o.id}
+            onInRoute={() =>
+              void act(o.id, () => updateOrderStatus(o.id, "in_route", null), "Pedido en ruta.")
+            }
+            onPending={() =>
+              void act(
+                o.id,
+                () => updateOrderStatus(o.id, "pending", null),
+                "Pedido devuelto a pendiente.",
+              )
+            }
+            onDeliver={() => deliver(o.id)}
+          />
+          {o.status === "delivered" && <FiadoLink orderId={o.id} />}
+        </div>
+      );
+    }
+    if (o.status === "delivered") return <FiadoLink orderId={o.id} />;
+    return <span className="text-xs text-gray-400">—</span>;
   }
 
   return (
@@ -220,7 +239,10 @@ export function OrdersPage() {
                   key: "status",
                   header: "Estado",
                   render: (o) => (
-                    <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge tone={STATUS_TONE[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
+                      {o.has_shortage && <Badge tone="amber">Parcial</Badge>}
+                    </div>
                   ),
                 },
                 {
@@ -238,7 +260,7 @@ export function OrdersPage() {
               ]}
               rows={orders.data}
               rowKey={(o) => String(o.id)}
-              actions={distributor ? renderActions : undefined}
+              actions={renderActions}
             />
           )}
         </Box>
