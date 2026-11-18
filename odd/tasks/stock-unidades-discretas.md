@@ -16,12 +16,12 @@
 
 ## Tasks
 
-| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                          |
-| --- | ----- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | S1-S4 | inline | hecho  | Migración 0059: `is_bulk`, backfill único, guards, `get_order_items`                                                               |
-| T2  | S2-S3 | inline | hecho  | Guards en 6 tablas; normalización de stock; demo sin decimales en unidades; test SQL 0059                                          |
-| T3  | S4-S5 | inline | hecho  | `ProductForm`, `QuantityStepper`, `QuantityEditor`, `MovementCart`, `ProductList`, `StoreCatalogPanel` y páginas de pedido/entrega |
-| T4  | S6-S7 | inline | hecho  | Docs 0059; tests Vitest de paso entero y alta a granel; suite completa pendiente de correr                                         |
+| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                               |
+| --- | ----- | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | S1-S4 | inline | hecho  | Migración 0059: `is_bulk`, backfill único, guards, `get_order_items`                                                                                                                    |
+| T2  | S2-S3 | inline | hecho  | Guards en 6 tablas; normalización de stock; demo sin decimales en unidades; test SQL 0059                                                                                               |
+| T3  | S4-S5 | inline | hecho  | `ProductForm`, `QuantityStepper`, `QuantityEditor`, `MovementCart`, `ProductList`, `StoreCatalogPanel` y páginas de pedido/entrega                                                      |
+| T4  | S6-S7 | inline | hecho  | Docs 0059; tests Vitest de paso entero y alta a granel; suite **999/999**, tsc y lint verdes; `schema-check` verde con el test SQL 0059. `quality` solo falla por el `npm audit` de #22 |
 
 ## Log
 
@@ -30,3 +30,4 @@
 - **L3 (diseño):** los guards viven en triggers de tabla (no en CHECK con subconsulta) para cubrir todas las RPC actuales y futuras; el histórico no se reescribe.
 - **L4 (diseño):** precio: para granel el precio cargado es por `kg`/`L` de la unidad del producto; para paquete es por paquete. La UI muestra el sufijo, sin conversiones automáticas.
 - **L5 (diseño):** la UI NO filtra los decimales al teclear (evita convertir “2,5” en “25”); el submit valida entero y la base es la última barrera con un mensaje claro. Los triggers cubren también las RPC viejas y las futuras.
+- **L6 (2026-11-18):** PR #25, apilado sobre #24 porque 0059 sigue a 0058. `schema-check` pasó con 0059; `quality` queda pendiente del gate de auditoría de #22. Mergear #24 primero y luego #25.
