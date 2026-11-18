@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import { Badge, secondaryButtonClass } from "../../../shared/ui/Box";
 import type { MovementRow } from "../api";
 
@@ -124,7 +124,7 @@ export function MovementList({
                 </p>
                 <p className={`text-sm font-semibold tabular-nums ${tone.quantity}`}>
                   {direction === "entry" ? "+" : "−"}
-                  {formatQtyUnit(movement.quantity, movement.unit)}
+                  {formatQtyUnit(movement.quantity, saleUnit(movement.is_bulk, movement.unit))}
                 </p>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">

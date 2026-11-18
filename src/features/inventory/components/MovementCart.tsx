@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import { Status, buttonClass, inputClass, secondaryButtonClass } from "../../../shared/ui/Box";
 import { QuantityStepper } from "../../../shared/ui";
 import { BarcodeScanner } from "../../products/components/BarcodeScanner";
@@ -392,7 +392,10 @@ export function MovementCart({
                         {option.brand ?? "Sin marca"}
                         {option.quantity === null
                           ? ""
-                          : ` · Stock: ${formatQtyUnit(option.quantity, option.unit)}`}
+                          : ` · Stock: ${formatQtyUnit(
+                              option.quantity,
+                              saleUnit(option.is_bulk, option.unit),
+                            )}`}
                         {option.barcode === null ? "" : ` · ${option.barcode}`}
                       </span>
                     </span>
@@ -427,7 +430,9 @@ export function MovementCart({
                     <p className="truncate text-sm font-medium text-gray-900">{line.name}</p>
                     <p className="text-xs text-gray-500">
                       {line.brand ?? "Sin marca"}
-                      {stock === null ? "" : ` · Stock: ${formatQtyUnit(stock, unit)}`}
+                      {stock === null
+                        ? ""
+                        : ` · Stock: ${formatQtyUnit(stock, saleUnit(isBulk, unit))}`}
                     </p>
                   </div>
                   <button
@@ -448,7 +453,7 @@ export function MovementCart({
                         label={line.name}
                         value={line.quantity}
                         integer={!isBulk}
-                        unit={unit}
+                        unit={saleUnit(isBulk, unit)}
                         onChange={(quantity) => updateLine(line.productId, { quantity })}
                       />
                     </div>
@@ -482,7 +487,8 @@ export function MovementCart({
                 </div>
                 {overStock && (
                   <p role="alert" className="mt-2 text-xs font-medium text-red-700">
-                    La cantidad supera el stock disponible ({formatQtyUnit(stock ?? 0, unit)}).
+                    La cantidad supera el stock disponible (
+                    {formatQtyUnit(stock ?? 0, saleUnit(isBulk, unit))}).
                   </p>
                 )}
               </li>

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import {
   Box,
@@ -466,7 +466,7 @@ export function NewOrderPage() {
                           label={name}
                           value={line.quantity}
                           integer={product !== undefined && !product.is_bulk}
-                          unit={product?.unit ?? null}
+                          unit={saleUnit(product?.is_bulk, product?.unit)}
                           onChange={(value) => updateQuantity(index, value)}
                         />
                         <button

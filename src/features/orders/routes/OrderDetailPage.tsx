@@ -14,7 +14,7 @@ import {
   secondaryButtonClass,
 } from "../../../shared/ui/Box";
 import { ResponsiveTable, type ResponsiveTableColumn } from "../../../shared/ui";
-import { formatCOP, formatQtyUnit } from "../../../shared/lib/format";
+import { formatCOP, formatQtyUnit, saleUnit } from "../../../shared/lib/format";
 import {
   ORDER_STATUS_LABELS,
   confirmDelivery,
@@ -257,13 +257,15 @@ export function OrderDetailPage() {
     {
       key: "quantity",
       header: "Pedido",
-      render: (item) => formatQtyUnit(item.quantity, item.unit),
+      render: (item) => formatQtyUnit(item.quantity, saleUnit(item.is_bulk, item.unit)),
     },
     {
       key: "received",
       header: "Recibido",
       render: (item) =>
-        item.received_quantity === null ? "-" : formatQtyUnit(item.received_quantity, item.unit),
+        item.received_quantity === null
+          ? "-"
+          : formatQtyUnit(item.received_quantity, saleUnit(item.is_bulk, item.unit)),
     },
     {
       key: "lineStatus",
@@ -452,7 +454,9 @@ export function OrderDetailPage() {
                         }
                       />
                       {item.unit !== null && (
-                        <span className="text-xs font-medium text-gray-500">{item.unit}</span>
+                        <span className="text-xs font-medium text-gray-500">
+                          {saleUnit(item.is_bulk, item.unit)}
+                        </span>
                       )}
                     </div>
                   )

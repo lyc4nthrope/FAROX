@@ -16,12 +16,12 @@
 
 ## Tasks
 
-| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                               |
-| --- | ----- | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | S1-S4 | inline | hecho  | Migración 0059: `is_bulk`, backfill único, guards, `get_order_items`                                                                                                                    |
-| T2  | S2-S3 | inline | hecho  | Guards en 6 tablas; normalización de stock; demo sin decimales en unidades; test SQL 0059                                                                                               |
-| T3  | S4-S5 | inline | hecho  | `ProductForm`, `QuantityStepper`, `QuantityEditor`, `MovementCart`, `ProductList`, `StoreCatalogPanel` y páginas de pedido/entrega                                                      |
-| T4  | S6-S7 | inline | hecho  | Docs 0059; tests Vitest de paso entero y alta a granel; suite **999/999**, tsc y lint verdes; `schema-check` verde con el test SQL 0059. `quality` solo falla por el `npm audit` de #22 |
+| ID  | Specs | Ruta   | Estado | Evidencia                                                                                                                                                                                                 |
+| --- | ----- | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | S1-S4 | inline | hecho  | Migración 0059: `is_bulk`, backfill único, guards, `get_order_items`                                                                                                                                      |
+| T2  | S2-S3 | inline | hecho  | Guards en 6 tablas; normalización de stock; demo sin decimales en unidades; test SQL 0059                                                                                                                 |
+| T3  | S4-S5 | inline | hecho  | `ProductForm`, `QuantityStepper`, `QuantityEditor`, `MovementCart`, `ProductList`, `StoreCatalogPanel` y páginas de pedido/entrega                                                                        |
+| T4  | S6-S7 | inline | hecho  | Docs 0059; tests Vitest de paso entero, unidad visible y alta a granel; suite **1002/1002**, tsc y lint verdes; `schema-check` verde con el test SQL 0059. `quality` solo falla por el `npm audit` de #22 |
 
 ## Log
 

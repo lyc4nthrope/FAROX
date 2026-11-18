@@ -33,3 +33,15 @@ export function formatQtyUnit(value: number, unitName: string | null | undefined
   const unit = unitAbbreviation(unitName);
   return unit === "" ? formatQty(value) : `${formatQty(value)} ${unit}`;
 }
+
+/**
+ * 0059: unidad visible según el modo de venta. Un producto por unidad se
+ * cuenta en paquetes aunque su medida sea L o kg (agua 1 L = botellas), así
+ * que se muestra "und". El granel conserva kg/L.
+ */
+export function saleUnit(
+  isBulk: boolean | null | undefined,
+  unitName: string | null | undefined,
+): string {
+  return isBulk === false ? "und" : unitAbbreviation(unitName);
+}

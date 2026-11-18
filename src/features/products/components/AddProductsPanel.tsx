@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad, type LoadResult } from "../../../shared/hooks/useLoad";
-import { formatQty, unitAbbreviation } from "../../../shared/lib/format";
+import { formatQty, saleUnit } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { mapError } from "../../../shared/lib/errors/mapError";
 import { Badge, Status, buttonClass, inputClass, runAction } from "../../../shared/ui/Box";
@@ -486,7 +486,7 @@ export function AddProductsPanel({
                             value={quantityOf(row.id)}
                             min={0}
                             integer={!row.is_bulk}
-                            unit={unitAbbreviation(row.unit?.name)}
+                            unit={saleUnit(row.is_bulk, row.unit?.name)}
                             onChange={(value) =>
                               setQuantities((current) => ({ ...current, [row.id]: value }))
                             }

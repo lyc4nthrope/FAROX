@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useList } from "../../../shared/hooks/useList";
 import { useLoad } from "../../../shared/hooks/useLoad";
-import { formatQty, unitAbbreviation } from "../../../shared/lib/format";
+import { formatQty, saleUnit, unitAbbreviation } from "../../../shared/lib/format";
 import { PAGE_SIZE } from "../../../shared/lib/list";
 import { DataTable, QuantityStepper, type DataTableColumn } from "../../../shared/ui";
 import {
@@ -682,7 +682,7 @@ export function StoreCatalogPanel({
                     value={editDraft.quantity}
                     min={0}
                     integer={!editing.is_bulk}
-                    unit={unitAbbreviation(editing.unit?.name)}
+                    unit={saleUnit(editing.is_bulk, editing.unit?.name)}
                     onChange={(quantity) => setEditDraft({ ...editDraft, quantity })}
                   />
                 </div>
