@@ -297,6 +297,7 @@ export function OrderDetailPage() {
       <div className="mt-2 flex flex-wrap items-center gap-2.5">
         <h1 className="text-2xl font-semibold tracking-tight">Pedido #{orderId}</h1>
         {o && <Badge tone={statusTone}>{ORDER_STATUS_LABELS[o.status]}</Badge>}
+        {o?.has_shortage && <Badge tone="amber">Entrega parcial</Badge>}
       </div>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
         Seguimiento de la entrega, cantidades recibidas y su impacto en el stock de la tienda.
@@ -537,45 +538,47 @@ export function OrderDetailPage() {
         </Box>
       )}
 
-      {/* 0023: el fiado lo puede crear el admin o el operador de la tienda del
-          pedido; la RPC create_credit valida el alcance. */}
-      {o && o.status === "delivered" && (role === "admin" || role === "operador") && (
-        <Box title="Fiado">
-          <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
-            <p className="text-sm text-gray-700">
-              Convertí este pedido entregado en un crédito y seguí sus pagos desde la cartera.
-            </p>
-            <div className="mt-3 flex flex-wrap items-end gap-3">
-              <Field label="Vencimiento del fiado (opcional)">
-                <input
-                  className={inputClass}
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </Field>
-              <button
-                className={buttonClass}
-                type="button"
-                onClick={() =>
-                  void act(
-                    () => createCredit(orderId, dueDate === "" ? null : dueDate),
-                    "Crédito creado.",
-                  )
-                }
+      {/* 0023/0058: el fiado lo puede crear el admin, el operador de la tienda
+          o el distribuidor acreedor; la RPC create_credit valida el alcance. */}
+      {o &&
+        o.status === "delivered" &&
+        (role === "admin" || role === "operador" || role === "distribuidor") && (
+          <Box title="Fiado">
+            <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
+              <p className="text-sm text-gray-700">
+                Convertí este pedido entregado en un crédito y seguí sus pagos desde la cartera.
+              </p>
+              <div className="mt-3 flex flex-wrap items-end gap-3">
+                <Field label="Vencimiento del fiado (opcional)">
+                  <input
+                    className={inputClass}
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
+                </Field>
+                <button
+                  className={buttonClass}
+                  type="button"
+                  onClick={() =>
+                    void act(
+                      () => createCredit(orderId, dueDate === "" ? null : dueDate),
+                      "Crédito creado.",
+                    )
+                  }
+                >
+                  Crear crédito para este pedido
+                </button>
+              </div>
+              <Link
+                className="mt-3 inline-flex text-sm font-medium text-gray-700 underline-offset-4 hover:text-gray-900 hover:underline"
+                to="/fiado"
               >
-                Crear crédito para este pedido
-              </button>
+                Ver cartera
+              </Link>
             </div>
-            <Link
-              className="mt-3 inline-flex text-sm font-medium text-gray-700 underline-offset-4 hover:text-gray-900 hover:underline"
-              to="/fiado"
-            >
-              Ver cartera
-            </Link>
-          </div>
-        </Box>
-      )}
+          </Box>
+        )}
     </section>
   );
 }

@@ -61,6 +61,7 @@ function pedido(status: OrderRow["status"], expectedAt: string | null = null): O
     created_at: "2026-10-25T12:00:00Z",
     notes: null,
     cancelled_reason: null,
+    has_shortage: false,
   };
 }
 
@@ -106,15 +107,25 @@ describe("OrderDetailPage · fiado (0023)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("distribuidor: no crea fiado aunque el pedido esté entregado", async () => {
+  it("distribuidor: crea el fiado de su pedido entregado", async () => {
+    const user = userEvent.setup();
     vi.mocked(ordersApi.fetchOrder).mockResolvedValue({ data: pedido("delivered"), error: null });
 
     renderPage("distribuidor");
 
-    expect(await screen.findByRole("heading", { name: "Pedido #5" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Crear crédito para este pedido" }),
-    ).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Crear crédito para este pedido" }));
+    expect(ordersApi.createCredit).toHaveBeenCalledWith(5, null);
+  });
+
+  it("muestra la marca de entrega parcial", async () => {
+    vi.mocked(ordersApi.fetchOrder).mockResolvedValue({
+      data: { ...pedido("delivered"), has_shortage: true },
+      error: null,
+    });
+
+    renderPage("operador");
+
+    expect(await screen.findByText("Entrega parcial")).toBeInTheDocument();
   });
 });
 
