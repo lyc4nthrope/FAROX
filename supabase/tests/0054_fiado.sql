@@ -12,11 +12,13 @@ BEGIN;
 INSERT INTO public.orders (id, distributor_id, store_id, created_by, status, delivered_at)
 OVERRIDING SYSTEM VALUE
 VALUES (990001, 990001, 990001, '00000000-0000-0000-0000-000000990002', 'delivered', now()),
-       (990002, 990001, 990001, '00000000-0000-0000-0000-000000990002', 'pending', NULL);
+       (990002, 990001, 990001, '00000000-0000-0000-0000-000000990002', 'pending', NULL),
+       (990003, 990002, 990002, '00000000-0000-0000-0000-000000990005', 'delivered', now());
 INSERT INTO public.order_items (order_id, product_id, quantity, received_quantity, status, unit_price)
 VALUES (990001, 990001, 10, 4, 'partial', 1000),
        (990001, 990002, 5, NULL, 'pending', 2000),
-       (990002, 990001, 3, NULL, 'pending', 1000);
+       (990002, 990001, 3, NULL, 'pending', 1000),
+       (990003, 990001, 2, 2, 'delivered', 1000);
 
 -- T1. El operador crea el fiado: el total es lo entregado (4000), no lo pedido.
 DO $$
@@ -87,7 +89,8 @@ BEGIN
   RAISE NOTICE 'PASS T4 terceros no ven el fiado';
 END $$;
 
--- T5. El acreedor solo lee: no puede registrar pagos ni crear fiados.
+-- T5. El acreedor no escribe: no puede registrar pagos ni crear el fiado de
+-- un pedido ajeno. Desde 0058 sí puede crear el de su propio pedido.
 DO $$
 DECLARE v_pay boolean := false; v_new boolean := false;
 BEGIN
@@ -98,12 +101,13 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN v_pay := true;
   END;
   BEGIN
-    PERFORM public.create_credit(990002, NULL);
-  EXCEPTION WHEN raise_exception THEN v_new := true;
+    PERFORM public.create_credit(990003, NULL);
+  EXCEPTION WHEN raise_exception THEN
+    v_new := SQLERRM LIKE '%fuera del alcance del distribuidor%';
   END;
   RESET ROLE;
-  ASSERT v_pay AND v_new, 'T5: el distribuidor pudo escribir en el fiado';
-  RAISE NOTICE 'PASS T5 el acreedor no escribe';
+  ASSERT v_pay AND v_new, 'T5: el distribuidor pudo escribir en el fiado ajeno';
+  RAISE NOTICE 'PASS T5 el acreedor no registra pagos ni fía pedidos ajenos';
 END $$;
 
 ROLLBACK;
