@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,14 +25,13 @@ vi.mock("../api", () => ({
   fetchDistributors: vi.fn(),
   fetchGeoStores: vi.fn(),
   fetchLinkedStoreIds: vi.fn(),
-  fetchRouteStatusFor: vi.fn(),
   fetchRouteDetail: vi.fn(),
   fetchRouteOpenOrders: vi.fn(),
   fetchMyDistributorId: vi.fn(),
   fetchStoresWithRequests: vi.fn(),
   googleMapsUrl: () => null,
   markStop: vi.fn(),
-  saveRoute: vi.fn(),
+  createRoute: vi.fn(),
   updateRouteStatus: vi.fn(),
 }));
 vi.mock("../components/StoreRouteMap", () => ({ StoreRouteMap: () => null }));
@@ -75,8 +74,7 @@ beforeEach(() => {
   });
   vi.mocked(logisticsApi.fetchLinkedStoreIds).mockResolvedValue({ data: [1], error: null });
   vi.mocked(logisticsApi.fetchRoutes).mockResolvedValue({ data: [], error: null });
-  vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({ data: null, error: null });
-  vi.mocked(logisticsApi.saveRoute).mockResolvedValue({ error: null });
+  vi.mocked(logisticsApi.createRoute).mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -104,32 +102,30 @@ describe("RoutesPage · planificar ruta (0056)", () => {
     expect(within(storeSelect).queryByRole("option", { name: "Tienda Ajena" })).toBeNull();
   });
 
-  it("pide confirmación antes de reemplazar una ruta en curso", async () => {
-    // La ruta no está entre las 50 del listado: el chequeo consulta el servidor.
-    vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({ data: "active", error: null });
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
-    const { user, storeSelect } = await chooseDistributorAndStore();
-    await user.selectOptions(storeSelect, "1");
-
-    await user.click(screen.getByRole("button", { name: "Guardar ruta" }));
-
-    expect(logisticsApi.fetchRouteStatusFor).toHaveBeenCalledWith(5, TODAY);
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(logisticsApi.saveRoute).not.toHaveBeenCalled();
-  });
-
-  it("no intenta reemplazar una ruta completada", async () => {
-    vi.mocked(logisticsApi.fetchRouteStatusFor).mockResolvedValue({
-      data: "completed",
+  it("crea una ruta nueva aunque ya exista una del día", async () => {
+    vi.mocked(logisticsApi.fetchRoutes).mockResolvedValue({
+      data: [
+        {
+          id: 1,
+          route_date: TODAY,
+          status: "completed",
+          distributor_id: 5,
+          distributor_name: "Distribuidora Andes",
+        },
+      ],
       error: null,
     });
     const { user, storeSelect } = await chooseDistributorAndStore();
     await user.selectOptions(storeSelect, "1");
 
-    await user.click(screen.getByRole("button", { name: "Guardar ruta" }));
+    await user.click(screen.getByRole("button", { name: "Crear ruta" }));
 
-    expect(await screen.findByText(/ya está completada/i)).toBeInTheDocument();
-    expect(logisticsApi.saveRoute).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(logisticsApi.createRoute).toHaveBeenCalledWith(5, TODAY, [
+        { store_id: 1, stop_order: 1, estimated_time: null },
+      ]),
+    );
+    expect(screen.queryByText(/ya está completada/i)).not.toBeInTheDocument();
   });
 
   it("cambiar de distribuidor descarta las paradas elegidas", async () => {

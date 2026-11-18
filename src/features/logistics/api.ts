@@ -102,21 +102,6 @@ export async function fetchLinkedStoreIds(distributorId: number): Promise<LoadRe
 }
 
 /** 0056: estado de la ruta vigente del distribuidor en esa fecha (null = no hay). */
-export async function fetchRouteStatusFor(
-  distributorId: number,
-  date: string,
-): Promise<LoadResult<RouteStatus>> {
-  const { data, error } = await supabase
-    .from("routes")
-    .select("status")
-    .eq("distributor_id", distributorId)
-    .eq("route_date", date)
-    .neq("status", "cancelled")
-    .limit(1)
-    .maybeSingle();
-  return { data: (data?.status as RouteStatus | undefined) ?? null, error };
-}
-
 export async function fetchGeoStores(): Promise<LoadResult<GeoStore[]>> {
   const { data, error } = await supabase
     .from("stores_geo")
@@ -251,24 +236,11 @@ export async function fetchRouteOpenOrders(
   return { data: grouped, error: null };
 }
 
-/** Ruta por id, o la ruta de hoy del distribuidor si id es null (la RLS filtra). */
-export async function fetchRouteDetail(
-  routeId: number | null,
-  today: string,
-): Promise<LoadResult<RouteDetail>> {
-  let query = supabase
-    .from("routes")
-    .select(
-      "id,route_date,status,distributor_id,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))",
-    );
-  query =
-    routeId === null
-      ? query.eq("route_date", today).neq("status", "cancelled")
-      : query.eq("id", routeId);
-  const { data, error } = await query.limit(1).maybeSingle();
-  if (error || !data) return { data: null, error };
-  const r = data as Record<string, unknown>;
-  const stops = ((r.route_stops ?? []) as Record<string, unknown>[])
+const ROUTE_COLUMNS =
+  "id,route_date,status,distributor_id,distributor:distributors(name),route_stops(id,stop_order,status,estimated_time,arrived_at,store_id,store:stores(name))";
+
+function mapRouteDetail(raw: Record<string, unknown>): RouteDetail {
+  const stops = ((raw.route_stops ?? []) as Record<string, unknown>[])
     .map((s) => ({
       id: Number(s.id),
       stop_order: Number(s.stop_order),
@@ -281,34 +253,67 @@ export async function fetchRouteDetail(
       lng: null as number | null,
     }))
     .sort((a, b) => a.stop_order - b.stop_order);
-  if (stops.length > 0) {
-    const geo = await supabase
-      .from("stores_geo")
-      .select("id,lat,lng")
-      .in(
-        "id",
-        stops.map((s) => s.store_id),
-      );
-    for (const g of (geo.data ?? []) as { id: number; lat: number; lng: number }[]) {
-      for (const s of stops) {
-        if (s.store_id === g.id) {
-          s.lat = g.lat;
-          s.lng = g.lng;
-        }
+  return {
+    id: Number(raw.id),
+    route_date: String(raw.route_date),
+    status: raw.status as RouteStatus,
+    distributor_id: Number(raw.distributor_id),
+    distributor_name: relName(raw.distributor),
+    stops,
+  };
+}
+
+async function attachRouteGeo(routes: RouteDetail[]): Promise<void> {
+  const ids = [...new Set(routes.flatMap((route) => route.stops.map((stop) => stop.store_id)))];
+  if (ids.length === 0) return;
+  const geo = await supabase.from("stores_geo").select("id,lat,lng").in("id", ids);
+  if (geo.error !== null) return;
+  const coords = new Map(
+    ((geo.data ?? []) as { id: number; lat: number; lng: number }[]).map((row) => [
+      Number(row.id),
+      row,
+    ]),
+  );
+  for (const route of routes) {
+    for (const stop of route.stops) {
+      const point = coords.get(stop.store_id);
+      if (point !== undefined) {
+        stop.lat = Number(point.lat);
+        stop.lng = Number(point.lng);
       }
     }
   }
-  return {
-    data: {
-      id: Number(r.id),
-      route_date: String(r.route_date),
-      status: r.status as RouteStatus,
-      distributor_id: Number(r.distributor_id),
-      distributor_name: relName(r.distributor),
-      stops,
-    },
-    error: null,
-  };
+}
+
+/** Ruta por id; con id null devuelve la más reciente de hoy (compatibilidad). */
+export async function fetchRouteDetail(
+  routeId: number | null,
+  today: string,
+): Promise<LoadResult<RouteDetail>> {
+  let query = supabase.from("routes").select(ROUTE_COLUMNS);
+  query =
+    routeId === null
+      ? query.eq("route_date", today).neq("status", "cancelled").order("id", { ascending: false })
+      : query.eq("id", routeId);
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error || !data) return { data: null, error };
+  const route = mapRouteDetail(data as Record<string, unknown>);
+  await attachRouteGeo([route]);
+  return { data: route, error: null };
+}
+
+/** Todas las rutas no canceladas de una fecha, en orden de creación. */
+export async function fetchTodayRoutes(today: string): Promise<LoadResult<RouteDetail[]>> {
+  const { data, error } = await supabase
+    .from("routes")
+    .select(ROUTE_COLUMNS)
+    .eq("route_date", today)
+    .neq("status", "cancelled")
+    .order("id");
+  if (error !== null) return { data: null, error };
+  const routes = ((data ?? []) as Record<string, unknown>[]).map(mapRouteDetail);
+  await attachRouteGeo(routes);
+  return { data: routes, error: null };
 }
 
 /** URL de Google Maps con las paradas en orden (sin API key). */
@@ -333,14 +338,24 @@ export interface NewStop {
   estimated_time: string | null;
 }
 
-export async function saveRoute(
+/** 0057: crear una ruta nueva para el distribuidor y fecha. */
+export async function createRoute(
   distributorId: number,
   date: string,
   stops: NewStop[],
 ): Promise<{ error: Err }> {
-  const { error } = await supabase.rpc("save_route", {
+  const { error } = await supabase.rpc("create_route", {
     p_distributor: distributorId,
     p_route_date: date,
+    p_stops: stops,
+  });
+  return { error };
+}
+
+/** 0057: reemplazar las paradas de una ruta planificada. */
+export async function updateRouteStops(routeId: number, stops: NewStop[]): Promise<{ error: Err }> {
+  const { error } = await supabase.rpc("update_route_stops", {
+    p_route: routeId,
     p_stops: stops,
   });
   return { error };

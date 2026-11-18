@@ -21,18 +21,19 @@ import { ORDER_STATUS_LABELS, confirmFullDelivery, updateOrderStatus } from "../
 import {
   ROUTE_LABELS,
   STOP_LABELS,
+  createRoute,
   fetchDistributors,
   fetchGeoStores,
   fetchLinkedStoreIds,
   fetchRouteDetail,
   fetchRouteOpenOrders,
-  fetchRouteStatusFor,
   fetchRoutes,
+  fetchTodayRoutes,
   fetchMyDistributorId,
   fetchStoresWithRequests,
   googleMapsUrl,
   markStop,
-  saveRoute,
+  updateRouteStops,
   updateRouteStatus,
   type RouteDetail,
   type RouteOrder,
@@ -60,7 +61,17 @@ function formatExpectedDate(value: string | null): string {
 }
 
 /** Vista de una ruta: paradas en orden, enlace a Google Maps y acciones. */
-function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => void }) {
+function RouteView({
+  route,
+  onChanged,
+  onEdit,
+  editing = false,
+}: {
+  route: RouteDetail;
+  onChanged: () => void;
+  onEdit?: () => void;
+  editing?: boolean;
+}) {
   const { role } = useAuth();
   const [msg, setMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
@@ -107,21 +118,26 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
   }
 
   return (
-    <Box title={`Ruta del ${formatRouteDate(route.route_date)} · ${route.distributor_name}`}>
+    <Box
+      title={`Ruta del ${formatRouteDate(route.route_date)} · ${route.distributor_name} · #${route.id}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Badge
-          tone={
-            route.status === "completed"
-              ? "green"
-              : route.status === "cancelled"
-                ? "gray"
-                : route.status === "active"
-                  ? "blue"
-                  : "amber"
-          }
-        >
-          {ROUTE_LABELS[route.status]}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge
+            tone={
+              route.status === "completed"
+                ? "green"
+                : route.status === "cancelled"
+                  ? "gray"
+                  : route.status === "active"
+                    ? "blue"
+                    : "amber"
+            }
+          >
+            {ROUTE_LABELS[route.status]}
+          </Badge>
+          {editing && <Badge tone="blue">Editando</Badge>}
+        </div>
         {mapsUrl && (
           <a className={buttonClass} href={mapsUrl} target="_blank" rel="noopener noreferrer">
             <svg
@@ -254,6 +270,11 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
+        {role === "distribuidor" && route.status === "planned" && onEdit !== undefined && (
+          <button className={secondaryButtonClass} type="button" onClick={onEdit}>
+            Editar paradas
+          </button>
+        )}
         {/* 0056: el distribuidor también inicia su propia ruta. */}
         {(role === "admin" || role === "distribuidor") && route.status === "planned" && (
           <button
@@ -295,31 +316,68 @@ function RouteView({ route, onChanged }: { route: RouteDetail; onChanged: () => 
 /** /mi-ruta — mapa + selector de tiendas con solicitudes y ruta asignada. */
 export function MyRoutePage() {
   const today = todayIso();
-  const route = useLoad(() => fetchRouteDetail(null, today), [today]);
+  const routes = useLoad(() => fetchTodayRoutes(today), [today]);
   const requests = useLoad(fetchStoresWithRequests, []);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [editingRouteId, setEditingRouteId] = useState<number | null>(null);
   const [savingRoute, setSavingRoute] = useState(false);
   const [routeMsg, setRouteMsg] = useState<{ error: string | null; ok: string | null }>({
     error: null,
     ok: null,
   });
   const initialized = useRef(false);
+  const plannerRef = useRef<HTMLDivElement>(null);
 
   // Arrancan todas marcadas: el mapa se ve poblado y desmarcar es un clic.
   useEffect(() => {
-    if (initialized.current || requests.data === null) return;
+    if (initialized.current || editingRouteId !== null || requests.data === null) return;
     initialized.current = true;
     setSelectedIds(new Set(requests.data.map((store) => store.id)));
-  }, [requests.data]);
+  }, [editingRouteId, requests.data]);
 
   const stores = useMemo(() => requests.data ?? [], [requests.data]);
+  const editingRoute = useMemo(
+    () => routes.data?.find((route) => route.id === editingRouteId) ?? null,
+    [routes.data, editingRouteId],
+  );
+  const plannerStores = useMemo(() => {
+    if (editingRoute === null) return stores;
+    const byId = new Map(stores.map((store) => [store.id, store]));
+    const routeStores = editingRoute.stops.map((stop) => {
+      const existing = byId.get(stop.store_id);
+      if (existing !== undefined) return existing;
+      return {
+        id: stop.store_id,
+        name: stop.store_name,
+        address: null,
+        city: null,
+        lat: stop.lat ?? 0,
+        lng: stop.lng ?? 0,
+        orderCount: 0,
+        nextExpectedAt: null,
+      };
+    });
+    const seen = new Set(routeStores.map((store) => store.id));
+    return [...routeStores, ...stores.filter((store) => !seen.has(store.id))];
+  }, [editingRoute, stores]);
   const selectedStores = useMemo(
-    () => stores.filter((store) => selectedIds.has(store.id)),
-    [stores, selectedIds],
+    () => plannerStores.filter((store) => selectedIds.has(store.id)),
+    [plannerStores, selectedIds],
   );
   const selectedOrders = selectedStores.reduce((total, store) => total + store.orderCount, 0);
   const mapsUrl = googleMapsUrl(selectedStores);
   const orderIndex = new Map(selectedStores.map((store, index) => [store.id, index + 1]));
+
+  // Si la ruta editada deja de estar planificada (se inició/completó/canceló
+  // desde otra pestaña), el editor vuelve a modo creación.
+  useEffect(() => {
+    if (editingRouteId === null) return;
+    const current = routes.data?.find((route) => route.id === editingRouteId);
+    if (current === undefined || current.status !== "planned") {
+      setEditingRouteId(null);
+      setSelectedIds(new Set(stores.map((store) => store.id)));
+    }
+  }, [editingRouteId, routes.data, stores]);
 
   function toggle(storeId: number): void {
     setSelectedIds((current) => {
@@ -331,63 +389,80 @@ export function MyRoutePage() {
   }
 
   function selectAll(): void {
-    setSelectedIds(new Set(stores.map((store) => store.id)));
+    setSelectedIds(new Set(plannerStores.map((store) => store.id)));
   }
 
   function clearAll(): void {
     setSelectedIds(new Set());
   }
 
+  function startEditing(route: RouteDetail): void {
+    initialized.current = true;
+    setEditingRouteId(route.id);
+    setSelectedIds(new Set(route.stops.map((stop) => stop.store_id)));
+    setRouteMsg({ error: null, ok: null });
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() =>
+        plannerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" }),
+      );
+    }
+  }
+
+  function cancelEditing(): void {
+    setEditingRouteId(null);
+    setSelectedIds(new Set(stores.map((store) => store.id)));
+    setRouteMsg({ error: null, ok: null });
+  }
+
   async function saveTodayRoute(): Promise<void> {
     if (selectedStores.length === 0) {
-      setRouteMsg({ error: "Marcá al menos una tienda para guardar la ruta.", ok: null });
+      setRouteMsg({ error: "Marcá al menos una tienda para la ruta.", ok: null });
       return;
     }
     setSavingRoute(true);
-    if (
-      route.data !== null &&
-      (route.data.status === "completed" || route.data.status === "cancelled")
-    ) {
-      setRouteMsg({ error: "La ruta de hoy ya está cerrada; no se puede reemplazar.", ok: null });
-      setSavingRoute(false);
-      return;
-    }
-    if (
-      route.data?.status === "active" &&
-      !window.confirm(
-        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
-      )
-    ) {
-      setSavingRoute(false);
-      return;
-    }
-    const distributor = await fetchMyDistributorId();
-    if (distributor.error !== null || distributor.data === null) {
-      setRouteMsg({ error: "No pudimos identificar tu distribuidora.", ok: null });
-      setSavingRoute(false);
-      return;
-    }
-    const distributorId = distributor.data;
     const stops = selectedStores.map((store, index) => ({
       store_id: store.id,
       stop_order: index + 1,
       estimated_time: null,
     }));
-    const error = await runAction(() => saveRoute(distributorId, today, stops));
-    setRouteMsg({ error, ok: error === null ? "Ruta de hoy guardada." : null });
+    let error: string | null;
+    if (editingRouteId === null) {
+      const distributor = await fetchMyDistributorId();
+      const distributorId = distributor.data;
+      if (distributor.error !== null || distributorId === null) {
+        setRouteMsg({ error: "No pudimos identificar tu distribuidora.", ok: null });
+        setSavingRoute(false);
+        return;
+      }
+      error = await runAction(() => createRoute(distributorId, today, stops));
+    } else {
+      error = await runAction(() => updateRouteStops(editingRouteId, stops));
+    }
+    setRouteMsg({
+      error,
+      ok:
+        error === null
+          ? editingRouteId === null
+            ? "Ruta creada."
+            : "Paradas actualizadas."
+          : null,
+    });
     if (error === null) {
-      route.reload();
+      routes.reload();
       requests.reload();
+      setEditingRouteId(null);
     }
     setSavingRoute(false);
   }
 
-  const routeStops = route.data?.stops.length ?? 0;
-  const routeStopsList = route.data?.stops ?? [];
+  const routeList = routes.data ?? [];
+  const routeStopsList = routeList.flatMap((route) => route.stops);
+  const routeStops = routeStopsList.length;
+  const stopNames = [...new Set(routeStopsList.map((stop) => stop.store_name))];
   const pendingStops = routeStopsList.filter((stop) => stop.status === "pending").length;
   const totalRequests = stores.reduce((total, store) => total + store.orderCount, 0);
   // Mismo panel que la “Vista de ejemplo” del inicio, pero con datos reales:
-  // los pedidos abiertos y las paradas de la ruta de hoy.
+  // los pedidos abiertos y las paradas de todas las rutas de hoy.
   const summaryStats: readonly [ExampleDashboardStat, ExampleDashboardStat] = [
     {
       label: "Pedidos",
@@ -396,11 +471,11 @@ export function MyRoutePage() {
     },
     {
       label: "Paradas",
-      value: route.loading ? "—" : String(routeStops),
+      value: routes.loading ? "—" : String(routeStops),
       hint:
-        route.data === null
-          ? "sin ruta guardada"
-          : `${pendingStops} ${pendingStops === 1 ? "pendiente" : "pendientes"}`,
+        routeList.length === 0
+          ? "sin rutas guardadas"
+          : `${routeList.length} ${routeList.length === 1 ? "ruta" : "rutas"} · ${pendingStops} ${pendingStops === 1 ? "pendiente" : "pendientes"}`,
     },
   ];
 
@@ -412,8 +487,7 @@ export function MyRoutePage() {
           <h1 className="text-2xl font-semibold tracking-tight">Ruta del día</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             Marcá las tiendas con solicitudes, ubicalas en el mapa y abrí el recorrido en Google
-            Maps. «Guardar ruta» registra esas paradas para hoy; el recorrido lo calcula Google
-            Maps.
+            Maps. «Crear ruta» agrega una ruta nueva; cada una se gestiona abajo.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -421,7 +495,7 @@ export function MyRoutePage() {
             {formatRouteDate(today)}
           </span>
           <span className="border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
-            {selectedStores.length} de {stores.length} tiendas
+            {selectedStores.length} de {plannerStores.length} tiendas
           </span>
         </div>
       </div>
@@ -431,7 +505,7 @@ export function MyRoutePage() {
           eyebrow="Tu día"
           layout="wide"
           stats={summaryStats}
-          stops={routeStopsList.map((stop) => stop.store_name)}
+          stops={stopNames}
           emptyStopsText="Todavía no guardaste paradas para hoy."
         />
       </div>
@@ -443,31 +517,38 @@ export function MyRoutePage() {
           Tu ruta de hoy
         </h2>
         <div className="mt-2">
-          <Status loading={route.loading} error={route.error} />
-          {!route.loading && route.data === null && !route.error && (
+          <Status loading={routes.loading} error={routes.error} />
+          {!routes.loading && routeList.length === 0 && !routes.error && (
             <EmptyState
-              title="No tenés ruta asignada para hoy"
-              hint="Cuando el administrador planifique una ruta, vas a ver tus paradas acá."
+              title="No tenés rutas para hoy"
+              hint="Creá una ruta abajo con las tiendas marcadas."
             />
           )}
-          {route.data && (
-            <RouteView
-              route={route.data}
-              onChanged={() => {
-                route.reload();
-                requests.reload();
-              }}
-            />
-          )}
+          <div className="space-y-4">
+            {routeList.map((route) => (
+              <RouteView
+                key={route.id}
+                route={route}
+                editing={editingRouteId === route.id}
+                onEdit={route.status === "planned" ? () => startEditing(route) : undefined}
+                onChanged={() => {
+                  routes.reload();
+                  requests.reload();
+                }}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8" ref={plannerRef}>
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">
-          Planificar el recorrido
+          {editingRouteId === null ? "Crear una ruta nueva" : "Editar paradas de la ruta"}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-gray-500">
-          Marcá las tiendas con solicitudes y guardá las paradas de hoy.
+          {editingRouteId === null
+            ? "Marcá las tiendas y creá una ruta nueva para hoy."
+            : "Ajustá las tiendas de la ruta planificada y guardá los cambios."}
         </p>
         <div className="mt-2 grid border border-gray-300 bg-white lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
           <section
@@ -488,7 +569,7 @@ export function MyRoutePage() {
           <section className="min-w-0" aria-label="Tiendas con solicitudes">
             <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-300 px-4 py-2.5">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-700">
-                Tiendas con solicitudes
+                {editingRouteId === null ? "Tiendas con solicitudes" : "Tiendas de la ruta"}
               </h2>
               <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wide text-gray-600">
                 <button
@@ -508,7 +589,7 @@ export function MyRoutePage() {
               </div>
             </header>
 
-            {stores.length === 0 && !requests.loading ? (
+            {plannerStores.length === 0 && !requests.loading ? (
               <div className="px-4 py-10">
                 <EmptyState
                   title="No hay tiendas con solicitudes abiertas"
@@ -523,7 +604,7 @@ export function MyRoutePage() {
               </div>
             ) : (
               <ul className="max-h-[24rem] divide-y divide-gray-200 overflow-y-auto lg:max-h-[34rem]">
-                {stores.map((store) => {
+                {plannerStores.map((store) => {
                   const selected = selectedIds.has(store.id);
                   const index = orderIndex.get(store.id);
                   return (
@@ -595,8 +676,21 @@ export function MyRoutePage() {
               disabled={savingRoute}
               onClick={() => void saveTodayRoute()}
             >
-              {savingRoute ? "Guardando…" : "Guardar ruta"}
+              {savingRoute
+                ? "Guardando…"
+                : editingRouteId === null
+                  ? "Crear ruta"
+                  : "Guardar cambios"}
             </button>
+            {editingRouteId !== null && (
+              <button
+                className={`${secondaryButtonClass} px-4 py-2.5 text-sm`}
+                type="button"
+                onClick={cancelEditing}
+              >
+                Cancelar edición
+              </button>
+            )}
             {mapsUrl !== null ? (
               <a
                 className="inline-flex items-center gap-2 border border-gray-900 bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
@@ -721,36 +815,15 @@ export function RoutesPage() {
       setMsg({ error: "Elegí distribuidor y al menos una tienda.", ok: null });
       return;
     }
-    // Misma regla que la ruta del distribuidor: una ruta cerrada no se toca y
-    // reemplazar una en curso reinicia su avance, así que se confirma.
-    // Se consulta al servidor: el listado trae solo las 50 rutas más recientes.
-    const existing = await fetchRouteStatusFor(Number(distributorId), date);
-    if (existing.error !== null) {
-      setMsg({ error: "No pudimos revisar la ruta de ese día. Probá de nuevo.", ok: null });
-      return;
-    }
-    if (existing.data === "completed") {
-      setMsg({
-        error: "La ruta de ese día ya está completada; no se puede replanificar.",
-        ok: null,
-      });
-      return;
-    }
-    if (
-      existing.data === "active" &&
-      !window.confirm(
-        "La ruta está en curso. Reemplazar las paradas reinicia el avance. ¿Continuar?",
-      )
-    ) {
-      return;
-    }
+    // 0057: cada guardado crea una ruta nueva para la fecha; ya no se reemplaza
+    // la única ruta del día ni se bloquea por una ruta completada.
     const payload = chosen.map((s, i) => ({
       store_id: Number(s.storeId),
       stop_order: i + 1,
       estimated_time: s.time === "" ? null : s.time,
     }));
-    const error = await runAction(() => saveRoute(Number(distributorId), date, payload));
-    setMsg({ error, ok: error === null ? "Ruta guardada." : null });
+    const error = await runAction(() => createRoute(Number(distributorId), date, payload));
+    setMsg({ error, ok: error === null ? "Ruta creada." : null });
     if (error === null) {
       routes.reload();
       setStops([{ storeId: "", time: "" }]);
@@ -762,10 +835,10 @@ export function RoutesPage() {
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Logística</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">Rutas</h1>
       <p className="mt-1 max-w-2xl text-sm text-gray-500">
-        Planificá el recorrido de cada distribuidor, ordená las paradas y seguí su avance.
+        Creá rutas para cada distribuidor, ordená las paradas y seguí su avance.
       </p>
 
-      <Box title="Planificar ruta">
+      <Box title="Crear ruta">
         <Status
           error={msg.error ?? distributors.error ?? stores.error ?? linked.error}
           ok={msg.ok}
@@ -878,7 +951,7 @@ export function RoutesPage() {
               + Agregar parada
             </button>
             <button className={buttonClass} type="submit">
-              Guardar ruta
+              Crear ruta
             </button>
           </div>
         </form>
@@ -889,7 +962,7 @@ export function RoutesPage() {
         {routes.data?.length === 0 && !routes.loading && (
           <EmptyState
             title="No hay rutas planificadas"
-            hint="Planificá la primera ruta arriba para verla en esta lista."
+            hint="Creá la primera ruta arriba para verla en esta lista."
           />
         )}
         <ul className="grid gap-2">

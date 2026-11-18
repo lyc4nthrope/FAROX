@@ -4,10 +4,12 @@ import { supabase } from "../../shared/lib/supabase/client";
 import {
   googleMapsUrl,
   markStop,
-  saveRoute,
+  createRoute,
+  updateRouteStops,
   updateRouteStatus,
   fetchStoresWithRequests,
   fetchRouteOpenOrders,
+  fetchTodayRoutes,
 } from "./api";
 
 vi.mock("../../shared/lib/supabase/client", () => ({
@@ -23,19 +25,19 @@ beforeEach(() => {
 });
 
 describe("logistics api", () => {
-  it("save_route envía las paradas con stop_order desde 1", async () => {
-    await saveRoute(2, "2026-10-26", [
+  it("create_route y update_route_stops envían sus parámetros", async () => {
+    const stops = [
       { store_id: 5, stop_order: 1, estimated_time: "09:00" },
       { store_id: 6, stop_order: 2, estimated_time: null },
-    ]);
-    expect(rpc).toHaveBeenCalledWith("save_route", {
+    ];
+    await createRoute(2, "2026-10-26", stops);
+    expect(rpc).toHaveBeenCalledWith("create_route", {
       p_distributor: 2,
       p_route_date: "2026-10-26",
-      p_stops: [
-        { store_id: 5, stop_order: 1, estimated_time: "09:00" },
-        { store_id: 6, stop_order: 2, estimated_time: null },
-      ],
+      p_stops: stops,
     });
+    await updateRouteStops(9, stops);
+    expect(rpc).toHaveBeenCalledWith("update_route_stops", { p_route: 9, p_stops: stops });
   });
 
   it("mark_stop y update_route_status con sus parámetros", async () => {
@@ -140,6 +142,82 @@ describe("fetchRouteOpenOrders", () => {
       ],
       2: [{ id: 12, store_id: 2, status: "pending" }],
     });
+  });
+});
+
+describe("fetchTodayRoutes", () => {
+  it("devuelve todas las rutas del día, ordena paradas y une coordenadas", async () => {
+    const routes = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      neq: vi.fn(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          {
+            id: 2,
+            route_date: "2026-11-17",
+            status: "planned",
+            distributor_id: 7,
+            distributor: { name: "Distribuidora Andes" },
+            route_stops: [
+              {
+                id: 20,
+                stop_order: 2,
+                status: "pending",
+                estimated_time: null,
+                arrived_at: null,
+                store_id: 6,
+                store: { name: "Tienda Norte" },
+              },
+              {
+                id: 10,
+                stop_order: 1,
+                status: "arrived",
+                estimated_time: "09:00",
+                arrived_at: null,
+                store_id: 5,
+                store: { name: "Tienda Centro" },
+              },
+            ],
+          },
+          {
+            id: 1,
+            route_date: "2026-11-17",
+            status: "completed",
+            distributor_id: 7,
+            distributor: { name: "Distribuidora Andes" },
+            route_stops: [],
+          },
+        ],
+        error: null,
+      }),
+    };
+    routes.select.mockReturnValue(routes);
+    routes.eq.mockReturnValue(routes);
+    routes.neq.mockReturnValue(routes);
+    const geo = {
+      select: vi.fn(),
+      in: vi.fn().mockResolvedValue({
+        data: [
+          { id: 5, lat: 4.6, lng: -74.1 },
+          { id: 6, lat: 4.7, lng: -74.05 },
+        ],
+        error: null,
+      }),
+    };
+    geo.select.mockReturnValue(geo);
+    from.mockReturnValueOnce(routes).mockReturnValueOnce(geo);
+
+    const result = await fetchTodayRoutes("2026-11-17");
+
+    expect(from).toHaveBeenCalledWith("routes");
+    expect(routes.eq).toHaveBeenCalledWith("route_date", "2026-11-17");
+    expect(routes.neq).toHaveBeenCalledWith("status", "cancelled");
+    expect(result.error).toBeNull();
+    expect(result.data).toHaveLength(2);
+    expect(result.data?.[0]?.stops.map((stop) => stop.store_id)).toEqual([5, 6]);
+    expect(result.data?.[0]?.stops[0]?.lat).toBe(4.6);
+    expect(result.data?.[0]?.stops[1]?.lat).toBe(4.7);
   });
 });
 
