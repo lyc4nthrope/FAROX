@@ -160,6 +160,7 @@ export function MovementList({
             {canReverse &&
               onReverse !== undefined &&
               movement.reverso_of_id === null &&
+              movement.order_id == null &&
               !reversed.has(movement.id) && (
                 <button
                   type="button"

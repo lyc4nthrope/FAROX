@@ -171,7 +171,7 @@ export async function fetchMovements(storeId: number): Promise<LoadResult<Moveme
   const { data, error } = await supabase
     .from("movements")
     .select(
-      "id,product_id,type,quantity,created_at,reverso_of_id,product:products(name, is_bulk, unit:unit_types(abbreviation)),motive:motives(name)",
+      "id,product_id,type,quantity,order_id,created_at,reverso_of_id,product:products(name, is_bulk, unit:unit_types(abbreviation)),motive:motives(name)",
     )
     .eq("store_id", storeId)
     .order("created_at", { ascending: false })
@@ -181,6 +181,7 @@ export async function fetchMovements(storeId: number): Promise<LoadResult<Moveme
     product_id: Number(r.product_id),
     type: r.type as "entry" | "exit",
     quantity: Number(r.quantity),
+    order_id: r.order_id == null ? null : Number(r.order_id),
     created_at: String(r.created_at),
     reverso_of_id: r.reverso_of_id === null ? null : Number(r.reverso_of_id),
     product_name: relName(r.product),

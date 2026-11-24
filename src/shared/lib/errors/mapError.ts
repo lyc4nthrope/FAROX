@@ -118,6 +118,20 @@ const BUSINESS_RULES: ReadonlyArray<readonly [string, string]> = [
   ["usuario inactivo", "Tu cuenta está desactivada."],
   ["último administrador", "No se puede quitar al último administrador activo."],
   ["requiere premium", "Esta acción requiere una cuenta Premium."],
+  [
+    "stock insuficiente del distribuidor",
+    "El distribuidor no tiene stock suficiente para entregar ese producto.",
+  ],
+  [
+    "no está en el catálogo del distribuidor para la entrega",
+    "El producto no está en el catálogo del distribuidor.",
+  ],
+  [
+    "hay líneas entregadas sin precio",
+    "Hay líneas entregadas sin precio; asigná un precio antes de fiar.",
+  ],
+  ["corregilo desde el pedido", "Ese movimiento pertenece a un pedido; corregilo desde el pedido."],
+  ["no admite cambios", "El pedido ya está cerrado y no admite cambios."],
   ["stock insuficiente", "No hay stock suficiente para esa salida."],
   [
     "sin precio activo",

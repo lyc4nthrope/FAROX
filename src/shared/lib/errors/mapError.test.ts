@@ -325,3 +325,47 @@ describe("mapError · rutas (0056)", () => {
     ).toBe("La ruta de ese día ya está completada; no se puede replanificar.");
   });
 });
+
+describe("mapError · entregas e inventario (0060)", () => {
+  it("stock insuficiente del distribuidor al entregar", () => {
+    expect(
+      mapError({
+        code: "P0001",
+        message:
+          "confirm_delivery: stock insuficiente del distribuidor para el producto 10 (hay 2, se entregan 5)",
+      }),
+    ).toBe("El distribuidor no tiene stock suficiente para entregar ese producto.");
+  });
+
+  it("producto fuera del catálogo del distribuidor", () => {
+    expect(
+      mapError({
+        message:
+          "confirm_delivery: el producto 10 no está en el catálogo del distribuidor para la entrega",
+      }),
+    ).toBe("El producto no está en el catálogo del distribuidor.");
+  });
+
+  it("fiado con líneas entregadas sin precio", () => {
+    expect(
+      mapError({
+        message:
+          "create_credit: hay líneas entregadas sin precio; asigná un precio a la tienda o cotizá el pedido antes de fiar",
+      }),
+    ).toBe("Hay líneas entregadas sin precio; asigná un precio antes de fiar.");
+  });
+
+  it("movimiento de pedido y pedido cerrado", () => {
+    expect(
+      mapError({
+        message:
+          "register_reverse: el movimiento 5 pertenece al pedido 9; corregilo desde el pedido",
+      }),
+    ).toBe("Ese movimiento pertenece a un pedido; corregilo desde el pedido.");
+    expect(
+      mapError({
+        message: "update_order_status: el pedido 9 ya está delivered; no admite cambios",
+      }),
+    ).toBe("El pedido ya está cerrado y no admite cambios.");
+  });
+});
