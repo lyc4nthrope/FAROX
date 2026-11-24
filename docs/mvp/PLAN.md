@@ -23,7 +23,7 @@
 
 > El plan original es del 23-24 oct. Desde entonces el trabajo se ejecutó integrado y la arquitectura del asistente cambió: **n8n fue reemplazado por Edge Functions** (`agent` + `whatsapp-webhook`). Las secciones §3.2, §3.3, §6 y §7 se conservan como registro histórico; lo que sigue describe lo que existe hoy y lo que falta.
 
-**Producto:** MVP funcional desplegado en Azure Static Web Apps, con Supabase como backend. Los **59** archivos de migración llegan hasta `20261118150000_stock_unidades_discretas.sql` (0059); el historial remoto quedó al día hasta **0057** el 2026-11-17 y las **0058-0059 están pendientes**.
+**Producto:** MVP funcional desplegado en Azure Static Web Apps, con Supabase como backend. Los **60** archivos de migración llegan hasta `20261124120000_entregas_inventario_auditoria.sql` (0060); el historial remoto quedó al día hasta **0057** el 2026-11-17 y las **0058-0060 están pendientes**.
 
 | Área                     | Estado | Qué existe                                                                                                             |
 | ------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------- |
@@ -59,7 +59,7 @@
 7. **Realtime de alertas.** El dashboard ya se suscribe; `/alertas` no.
 8. **A0.4/F11.** Los inputs de lat/lng solo aparecen si falla Leaflet; el plan pedía que estuvieran siempre visibles.
 9. **Backup.** Cifrar con `age`, mover secretos a los pasos y reactivar el `schedule` (B0.4).
-10. **Documentación.** `supabase/README.md` y `Base de datos FAROX.md` quedaron actualizados con el índice 0013-0059; `.atl/skill-registry.md` sigue con rutas absolutas de una máquina.
+10. **Documentación.** `supabase/README.md` y `Base de datos FAROX.md` quedaron actualizados con el índice 0013-0060; `.atl/skill-registry.md` sigue con rutas absolutas de una máquina.
 11. **C0.4 — Ciclos de categorías.** El picker de categoría padre solo excluye la propia fila; falta excluir sus descendientes.
 
 **Arquitectura vigente del asistente (reemplaza A1-A4 y A8 del Track A):**
@@ -114,7 +114,7 @@ UI de las pantallas nuevas: intencionalmente simple ("cajas"), con estados de ca
 
 | Tema                                                                  | Documento autoridad                                                                                    |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Esquema, tablas, RPC, RLS, decisiones D1-D55 y estado 0013-0059 (§10) | [`Base de datos FAROX.md`](../../Base%20de%20datos%20FAROX.md)                                         |
+| Esquema, tablas, RPC, RLS, decisiones D1-D55 y estado 0013-0060 (§10) | [`Base de datos FAROX.md`](../../Base%20de%20datos%20FAROX.md)                                         |
 | Requisitos, matriz de roles, seguridad                                | [`idea basica proy admin de proys.md`](../../idea%20basica%20proy%20admin%20de%20proys.md)             |
 | SQL ejecutable y orden de migración                                   | [`supabase/migrations/`](../../supabase/migrations) + [`supabase/README.md`](../../supabase/README.md) |
 | Qué se hace, quién, cuándo y cómo se demuestra                        | **este archivo + los 3 archivos de track**                                                             |
@@ -183,7 +183,7 @@ Trabajas en el repositorio FARØX (React + Supabase).
 | INV-05                | QR tienda↔distribuidor (necesita migración **0017**)                                                                                                                                                                                                                                                  | A                                  |
 | CHAT-01/02            | Chatbot n8n + pantalla (necesita migración **0016**)                                                                                                                                                                                                                                                  | A                                  |
 | Rol distribuidor      | Hoy solo ve Productos: le faltan "Mis pedidos" y "Mi ruta"                                                                                                                                                                                                                                            | A (nav) + C (pedidos)              |
-| DevOps                | Confirmar estado remoto de 0013/0014; `config.toml` + baseline (spike U3); despliegue del front (Azure SWA, spike U1); `schema-check` aplica todas las migraciones en un stack fresco, corre `db lint` y las pruebas SQL de `supabase/tests` (0054-0059; el resto sin verificación funcional por RPC) | B                                  |
+| DevOps                | Confirmar estado remoto de 0013/0014; `config.toml` + baseline (spike U3); despliegue del front (Azure SWA, spike U1); `schema-check` aplica todas las migraciones en un stack fresco, corre `db lint` y las pruebas SQL de `supabase/tests` (0054-0060; el resto sin verificación funcional por RPC) | B                                  |
 | Calidad BD            | No hay pruebas automatizadas por RPC (solo los scripts 0008/0012)                                                                                                                                                                                                                                     | B (harness) + cada track (sus RPC) |
 | E2E                   | No hay Playwright                                                                                                                                                                                                                                                                                     | C                                  |
 | Cierre                | Manual, informe final, ensayo de demo                                                                                                                                                                                                                                                                 | C                                  |
